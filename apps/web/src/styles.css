@@ -852,23 +852,114 @@ h1 {
 }
 
 .adminlte-shell {
-  background: #f4f6f9;
+  background: #eef2f7;
 }
 
 .adminlte-topbar {
   background: #ffffff;
-  color: #1f2937;
+  color: #343a40;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminlte-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminlte-logo-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 800;
+  background: #3c8dbc;
+  color: #fff;
 }
 
 .adminlte-topbar .company-kicker {
   color: #6b7280;
+  margin: 0;
+}
+
+.adminlte-topbar h1 {
+  margin: 2px 0 0;
+  font-size: 1.2rem;
+}
+
+.adminlte-topbar-actions {
+  margin-top: 0;
+}
+
+.adminlte-toolbar {
+  border-top: 3px solid #3c8dbc;
+}
+
+.adminlte-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.adminlte-tenant-field {
+  min-width: 300px;
+}
+
+.adminlte-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adminlte-kpi {
+  border-radius: 8px;
+  color: #fff;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.adminlte-kpi p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.92;
+}
+
+.adminlte-kpi strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.6rem;
+}
+
+.adminlte-kpi.kpi-a {
+  background: #17a2b8;
+}
+
+.adminlte-kpi.kpi-b {
+  background: #28a745;
+}
+
+.adminlte-kpi.kpi-c {
+  background: #ffc107;
+  color: #1f2937;
+}
+
+.adminlte-kpi.kpi-d {
+  background: #dc3545;
 }
 
 .adminlte-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 260px 1fr;
   gap: 14px;
   align-items: start;
 }
@@ -957,6 +1048,10 @@ h1 {
 }
 
 @media (max-width: 900px) {
+  .adminlte-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .adminlte-layout {
     grid-template-columns: 1fr;
   }
@@ -973,6 +1068,16 @@ h1 {
   .company-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .adminlte-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .adminlte-crumbs {
+    flex-wrap: wrap;
   }
 }
 

@@ -791,12 +791,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
   return (
     <main className="company-shell adminlte-shell">
-      <header className="company-header adminlte-topbar">
-        <div>
-          <p className="company-kicker">Administracion de empresa</p>
-          <h1>Consola central AgroSentinel</h1>
+      <header className="adminlte-topbar">
+        <div className="adminlte-topbar-left">
+          <span className="adminlte-logo-mark">AS</span>
+          <div>
+            <p className="company-kicker">Administracion de empresa</p>
+            <h1>AgroSentinel v3 Console</h1>
+          </div>
         </div>
-        <div className="company-actions">
+        <div className="company-actions adminlte-topbar-actions">
           <a className="admin-link" href="/panel-cliente">
             Ver panel cliente
           </a>
@@ -806,12 +809,38 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         </div>
       </header>
 
-      <section className="company-panel company-toolbar">
-        <div className="company-field">
-          <span>Tenant cliente</span>
+      <section className="company-panel company-toolbar adminlte-toolbar">
+        <div className="adminlte-crumbs">
+          <span>Home</span>
+          <span>/</span>
+          <span>Administracion</span>
+          <span>/</span>
+          <strong>{mainMenu === 'clientes' ? 'Clientes' : 'Planes y facturacion'}</strong>
+        </div>
+        <div className="company-field adminlte-tenant-field">
+          <span>Tenant activo</span>
           <input value={tenantInput} onChange={e => setTenantInput(e.target.value)} placeholder="cliente-a" />
         </div>
         <button onClick={() => setTenantId(tenantInput.trim() || DEFAULT_TENANT_ID)}>Cargar cliente</button>
+      </section>
+
+      <section className="adminlte-kpis">
+        <article className="adminlte-kpi kpi-a">
+          <p>Clientes cargados</p>
+          <strong>{new Set(users.map(user => user.tenantId)).size || 1}</strong>
+        </article>
+        <article className="adminlte-kpi kpi-b">
+          <p>Sensores del tenant</p>
+          <strong>{devices.length}</strong>
+        </article>
+        <article className="adminlte-kpi kpi-c">
+          <p>Usuarios del tenant</p>
+          <strong>{users.length}</strong>
+        </article>
+        <article className="adminlte-kpi kpi-d">
+          <p>Facturas registradas</p>
+          <strong>{invoices.length}</strong>
+        </article>
       </section>
 
       <section className="adminlte-layout">
