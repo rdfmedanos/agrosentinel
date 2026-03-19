@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Error: este script requiere bash. Ejecuta: bash ./install_server.sh [opciones]" >&2
+  exit 1
+fi
 set -euo pipefail
 
 DOMAIN="agrosentinel.jaz.ar"
