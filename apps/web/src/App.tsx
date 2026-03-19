@@ -685,6 +685,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [mainMenu, setMainMenu] = useState<'clientes' | 'planes_facturacion'>('clientes');
   const [subMenu, setSubMenu] = useState<'sensores' | 'usuarios' | 'planes' | 'arca'>('sensores');
+  const [openMenus, setOpenMenus] = useState({ clientes: true, planes_facturacion: true });
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -789,8 +790,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   };
 
   return (
-    <main className="company-shell">
-      <header className="company-header">
+    <main className="company-shell adminlte-shell">
+      <header className="company-header adminlte-topbar">
         <div>
           <p className="company-kicker">Administracion de empresa</p>
           <h1>Consola central AgroSentinel</h1>
@@ -813,58 +814,91 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         <button onClick={() => setTenantId(tenantInput.trim() || DEFAULT_TENANT_ID)}>Cargar cliente</button>
       </section>
 
-      <section className="company-console">
-        <aside className="company-nav company-panel">
-          <h2>Menu</h2>
-          <button
-            className={`company-nav-item ${mainMenu === 'clientes' ? 'active' : ''}`}
-            onClick={() => selectMainMenu('clientes')}
-          >
-            Clientes
-          </button>
-          <button
-            className={`company-nav-item ${mainMenu === 'planes_facturacion' ? 'active' : ''}`}
-            onClick={() => selectMainMenu('planes_facturacion')}
-          >
-            Planes y facturacion
-          </button>
-
-          <h3>Submenu</h3>
-          {mainMenu === 'clientes' && (
-            <>
-              <button
-                className={`company-subnav-item ${subMenu === 'sensores' ? 'active' : ''}`}
-                onClick={() => setSubMenu('sensores')}
-              >
-                Sensores
-              </button>
-              <button
-                className={`company-subnav-item ${subMenu === 'usuarios' ? 'active' : ''}`}
-                onClick={() => setSubMenu('usuarios')}
-              >
-                Usuarios
-              </button>
-            </>
-          )}
-          {mainMenu === 'planes_facturacion' && (
-            <>
-              <button
-                className={`company-subnav-item ${subMenu === 'planes' ? 'active' : ''}`}
-                onClick={() => setSubMenu('planes')}
-              >
-                Planes y facturacion
-              </button>
-              <button
-                className={`company-subnav-item ${subMenu === 'arca' ? 'active' : ''}`}
-                onClick={() => setSubMenu('arca')}
-              >
-                Configuracion ARCA
-              </button>
-            </>
-          )}
+      <section className="adminlte-layout">
+        <aside className="adminlte-sidebar">
+          <div className="adminlte-brand">AgroSentinel Admin</div>
+          <div className="adminlte-user">{props.session.user.email}</div>
+          <nav className="adminlte-menu">
+            <ul>
+              <li>
+                <button
+                  className={`adminlte-parent ${mainMenu === 'clientes' ? 'active' : ''}`}
+                  onClick={() => {
+                    selectMainMenu('clientes');
+                    setOpenMenus(prev => ({ ...prev, clientes: !prev.clientes }));
+                  }}
+                >
+                  Clientes
+                </button>
+                {openMenus.clientes && (
+                  <ul className="adminlte-submenu">
+                    <li>
+                      <button
+                        className={`adminlte-subitem ${subMenu === 'sensores' ? 'active' : ''}`}
+                        onClick={() => {
+                          setMainMenu('clientes');
+                          setSubMenu('sensores');
+                        }}
+                      >
+                        Sensores
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        className={`adminlte-subitem ${subMenu === 'usuarios' ? 'active' : ''}`}
+                        onClick={() => {
+                          setMainMenu('clientes');
+                          setSubMenu('usuarios');
+                        }}
+                      >
+                        Usuarios
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </li>
+              <li>
+                <button
+                  className={`adminlte-parent ${mainMenu === 'planes_facturacion' ? 'active' : ''}`}
+                  onClick={() => {
+                    selectMainMenu('planes_facturacion');
+                    setOpenMenus(prev => ({ ...prev, planes_facturacion: !prev.planes_facturacion }));
+                  }}
+                >
+                  Planes y facturacion
+                </button>
+                {openMenus.planes_facturacion && (
+                  <ul className="adminlte-submenu">
+                    <li>
+                      <button
+                        className={`adminlte-subitem ${subMenu === 'planes' ? 'active' : ''}`}
+                        onClick={() => {
+                          setMainMenu('planes_facturacion');
+                          setSubMenu('planes');
+                        }}
+                      >
+                        Planes y facturacion
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        className={`adminlte-subitem ${subMenu === 'arca' ? 'active' : ''}`}
+                        onClick={() => {
+                          setMainMenu('planes_facturacion');
+                          setSubMenu('arca');
+                        }}
+                      >
+                        Configuracion ARCA
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </li>
+            </ul>
+          </nav>
         </aside>
 
-        <div className="company-content">
+        <div className="company-content adminlte-content">
           {mainMenu === 'clientes' && subMenu === 'sensores' && (
             <>
               <section className="company-panel">
