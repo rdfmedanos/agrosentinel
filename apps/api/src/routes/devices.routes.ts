@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { resolveTenantFromRequest } from '../auth/auth.js';
 import { DeviceModel } from '../models/Device.js';
 import { publishDeviceCommand } from '../services/mqtt.service.js';
 
@@ -16,15 +17,21 @@ const createSchema = z.object({
 export const devicesRouter = Router();
 
 devicesRouter.get('/', async (req, res) => {
-  const tenantId = String(req.query.tenantId ?? 'demo-tenant');
+  const tenantId = resolveTenantFromRequest(req);
   const devices = await DeviceModel.find({ tenantId }).sort({ updatedAt: -1 });
   res.json(devices);
 });
 
 devicesRouter.post('/', async (req, res) => {
   const data = createSchema.parse(req.body);
+  const tenantId = req.auth?.role === 'company_admin' ? data.tenantId : req.auth?.tenantId;
+  if (!tenantId) {
+    res.status(403).json({ error: 'Tenant no permitido' });
+    return;
+  }
+
   const device = await DeviceModel.create({
-    tenantId: data.tenantId,
+    tenantId,
     deviceId: data.deviceId,
     name: data.name,
     location: { lat: data.lat, lng: data.lng, address: data.address ?? '' }

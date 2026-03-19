@@ -56,6 +56,20 @@ type ArcaConfig = {
   sign?: string;
 };
 
+type AuthUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'operator' | 'technician' | 'company_admin';
+  tenantId: string;
+  mustChangePassword: boolean;
+};
+
+type AuthSession = {
+  token: string;
+  user: AuthUser;
+};
+
 const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? window.location.origin;
 const DEFAULT_TENANT_ID = 'demo-tenant';
@@ -97,28 +111,64 @@ const emptyArcaConfig: ArcaConfig = {
   sign: ''
 };
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`);
+function authHeaders(token?: string, json = false): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (json) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function getJson<T>(path: string, token?: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, { headers: authHeaders(token) });
   if (!res.ok) throw new Error('API request failed');
   return res.json();
 }
 
-async function putJson(path: string, body: unknown) {
+async function putJson(path: string, body: unknown, token?: string) {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error('API request failed');
 }
 
-async function postJson(path: string, body: unknown) {
+async function postJson(path: string, body: unknown, token?: string) {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error('API request failed');
+  return res;
+}
+
+async function patchJson(path: string, body: unknown, token?: string) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('API request failed');
+  return res;
+}
+
+function loadStoredSession(): AuthSession | null {
+  const raw = localStorage.getItem('agrosentinel_session');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthSession;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session: AuthSession | null) {
+  if (!session) {
+    localStorage.removeItem('agrosentinel_session');
+    return;
+  }
+  localStorage.setItem('agrosentinel_session', JSON.stringify(session));
 }
 
 function markerColor(status: Device['status']) {
@@ -249,7 +299,98 @@ function LandingPage() {
   );
 }
 
-function ClientPanel() {
+function LoginPanel(props: {
+  title: string;
+  allowedRoles: AuthUser['role'][];
+  onAuthenticated: (session: AuthSession) => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await postJson('/auth/login', { email, password });
+      const session = (await res.json()) as AuthSession;
+      if (!props.allowedRoles.includes(session.user.role)) {
+        setError('Este usuario no tiene acceso a esta seccion');
+        return;
+      }
+      props.onAuthenticated(session);
+    } catch {
+      setError('Credenciales invalidas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="auth-shell">
+      <section className="auth-card">
+        <h1>{props.title}</h1>
+        <p>Ingresar con email y contrasena.</p>
+        <label>
+          <span>Email</span>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@dominio.com" />
+        </label>
+        <label>
+          <span>Contrasena</span>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="********" />
+        </label>
+        {error && <p className="auth-error">{error}</p>}
+        <button onClick={() => void submit()} disabled={loading || !email || !password}>
+          {loading ? 'Ingresando...' : 'Ingresar'}
+        </button>
+      </section>
+    </main>
+  );
+}
+
+function PasswordSection(props: { token: string; mustChangePassword: boolean }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [message, setMessage] = useState('');
+
+  const save = async () => {
+    setMessage('');
+    try {
+      await postJson('/auth/change-password', { currentPassword, newPassword }, props.token);
+      setCurrentPassword('');
+      setNewPassword('');
+      setMessage('Contrasena actualizada correctamente');
+    } catch {
+      setMessage('No se pudo actualizar la contrasena');
+    }
+  };
+
+  return (
+    <section className="admin-panel">
+      <h2>Gestion de contrasena</h2>
+      {props.mustChangePassword && <p className="auth-warning">Debes cambiar la contrasena inicial.</p>}
+      <div className="admin-form-grid">
+        <label>
+          <span>Contrasena actual</span>
+          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+        </label>
+        <label>
+          <span>Nueva contrasena</span>
+          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+        </label>
+      </div>
+      <div className="admin-actions">
+        <button onClick={() => void save()} disabled={!currentPassword || !newPassword}>
+          Cambiar contrasena
+        </button>
+      </div>
+      {message && <p className="auth-message">{message}</p>}
+    </section>
+  );
+}
+
+function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
@@ -264,25 +405,29 @@ function ClientPanel() {
   }, [devices, alerts]);
 
   const loadAll = async () => {
+    const token = props.session.token;
+    const tenantId = props.session.user.tenantId;
     const [d, a, o, i] = await Promise.all([
-      getJson<Device[]>(`/devices?tenantId=${DEFAULT_TENANT_ID}`),
-      getJson<Alert[]>(`/alerts?tenantId=${DEFAULT_TENANT_ID}`),
-      getJson<WorkOrder[]>(`/work-orders?tenantId=${DEFAULT_TENANT_ID}`),
-      getJson<Invoice[]>(`/billing/invoices?tenantId=${DEFAULT_TENANT_ID}`)
+      getJson<Device[]>(`/devices?tenantId=${tenantId}`, token),
+      getJson<Alert[]>(`/alerts?tenantId=${tenantId}`, token),
+      getJson<WorkOrder[]>(`/work-orders?tenantId=${tenantId}`, token),
+      getJson<Invoice[]>(`/billing/invoices?tenantId=${tenantId}`, token)
     ]);
     setDevices(d);
     setAlerts(a);
     setOrders(o);
     setInvoices(i);
 
-    const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${DEFAULT_TENANT_ID}`);
+    const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
     setArcaConfig(arca);
   };
 
   useEffect(() => {
     void loadAll();
-    const socket = io(SOCKET_URL);
-    socket.emit('tenant:join', DEFAULT_TENANT_ID);
+    const socket = io(SOCKET_URL, {
+      auth: { token: props.session.token }
+    });
+    socket.emit('tenant:join', props.session.user.tenantId);
     socket.on('devices:updated', () => void loadAll());
     socket.on('alerts:updated', () => void loadAll());
     socket.on('work-orders:updated', () => void loadAll());
@@ -290,21 +435,21 @@ function ClientPanel() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [props.session.token, props.session.user.tenantId]);
 
   const pumpCommand = async (deviceId: string, cmd: 'pump_on' | 'pump_off') => {
-    await postJson(`/devices/${deviceId}/command`, { cmd });
+    await postJson(`/devices/${deviceId}/command`, { cmd }, props.session.token);
   };
 
   const closeOrder = async (id: string) => {
-    await fetch(`${API_URL}/work-orders/${id}/close`, { method: 'PATCH' });
+    await patchJson(`/work-orders/${id}/close`, {}, props.session.token);
     await loadAll();
   };
 
   const saveArcaConfig = async () => {
     setSavingArca(true);
     try {
-      await putJson(`/billing/arca-config?tenantId=${DEFAULT_TENANT_ID}`, arcaConfig);
+      await putJson(`/billing/arca-config?tenantId=${props.session.user.tenantId}`, arcaConfig, props.session.token);
       await loadAll();
     } finally {
       setSavingArca(false);
@@ -321,6 +466,9 @@ function ClientPanel() {
         <a className="admin-link" href="/">
           Ver landing
         </a>
+        <button className="admin-link" onClick={props.onLogout}>
+          Cerrar sesion
+        </button>
         <a className="admin-link" href="/admin-empresa">
           Ir a admin empresa
         </a>
@@ -528,38 +676,53 @@ function ClientPanel() {
           </button>
         </div>
       </section>
+
+      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
     </main>
   );
 }
 
-function CompanyAdminPanel() {
+function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [users, setUsers] = useState<AuthUser[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
   const [creatingDevice, setCreatingDevice] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    role: 'owner' as 'owner' | 'operator' | 'technician',
+    password: 'Cliente123!'
+  });
+  const [resetPassword, setResetPassword] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
 
   const loadCompanyData = async (targetTenant: string) => {
-    const [p, d, i, arca] = await Promise.all([
-      getJson<Plan[]>('/billing/plans'),
-      getJson<Device[]>(`/devices?tenantId=${targetTenant}`),
-      getJson<Invoice[]>(`/billing/invoices?tenantId=${targetTenant}`),
-      getJson<ArcaConfig>(`/billing/arca-config?tenantId=${targetTenant}`)
+    const token = props.session.token;
+    const [p, d, i, arca, tenantUsers] = await Promise.all([
+      getJson<Plan[]>('/billing/plans', token),
+      getJson<Device[]>(`/devices?tenantId=${targetTenant}`, token),
+      getJson<Invoice[]>(`/billing/invoices?tenantId=${targetTenant}`, token),
+      getJson<ArcaConfig>(`/billing/arca-config?tenantId=${targetTenant}`, token),
+      getJson<AuthUser[]>(`/auth/admin/users?tenantId=${targetTenant}`, token)
     ]);
 
     setPlans(p);
     setDevices(d);
     setInvoices(i);
     setArcaConfig(arca);
+    setUsers(tenantUsers);
   };
 
   useEffect(() => {
     void loadCompanyData(tenantId);
-  }, [tenantId]);
+  }, [tenantId, props.session.token]);
 
   const createDevice = async () => {
     setCreatingDevice(true);
@@ -571,7 +734,7 @@ function CompanyAdminPanel() {
         lat: Number(newDevice.lat),
         lng: Number(newDevice.lng),
         address: newDevice.address
-      });
+      }, props.session.token);
       setNewDevice({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
       await loadCompanyData(tenantId);
     } finally {
@@ -582,11 +745,39 @@ function CompanyAdminPanel() {
   const saveArcaConfig = async () => {
     setSavingArca(true);
     try {
-      await putJson(`/billing/arca-config?tenantId=${tenantId}`, arcaConfig);
+      await putJson(`/billing/arca-config?tenantId=${tenantId}`, arcaConfig, props.session.token);
       await loadCompanyData(tenantId);
     } finally {
       setSavingArca(false);
     }
+  };
+
+  const createUser = async () => {
+    setCreatingUser(true);
+    try {
+      await postJson(
+        '/auth/admin/create-user',
+        {
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          tenantId,
+          password: newUser.password
+        },
+        props.session.token
+      );
+      setNewUser({ name: '', email: '', role: 'owner', password: 'Cliente123!' });
+      await loadCompanyData(tenantId);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const resetUserPassword = async () => {
+    if (!selectedUserId || !resetPassword) return;
+    await postJson('/auth/admin/reset-password', { userId: selectedUserId, newPassword: resetPassword }, props.session.token);
+    setResetPassword('');
+    await loadCompanyData(tenantId);
   };
 
   return (
@@ -596,9 +787,14 @@ function CompanyAdminPanel() {
           <p className="company-kicker">Administracion de empresa</p>
           <h1>Consola central AgroSentinel</h1>
         </div>
-        <a className="admin-link" href="/panel-cliente">
-          Ver panel cliente
-        </a>
+        <div className="company-actions">
+          <a className="admin-link" href="/panel-cliente">
+            Ver panel cliente
+          </a>
+          <button className="admin-link admin-link-button" onClick={props.onLogout}>
+            Cerrar sesion
+          </button>
+        </div>
       </header>
 
       <section className="company-panel company-toolbar">
@@ -690,6 +886,88 @@ function CompanyAdminPanel() {
       </section>
 
       <section className="company-panel">
+        <h2>Usuarios del cliente</h2>
+        <div className="company-grid-2">
+          <div>
+            <div className="company-list">
+              {users.map(user => (
+                <article key={user.id} className="company-list-item">
+                  <strong>{user.name}</strong>
+                  <span>{user.email}</span>
+                  <span>
+                    {user.role} {user.mustChangePassword ? '(debe cambiar clave)' : ''}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3>Alta de usuario cliente</h3>
+            <div className="company-form-grid">
+              <label>
+                <span>Nombre</span>
+                <input value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))} />
+              </label>
+              <label>
+                <span>Email</span>
+                <input value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
+              </label>
+              <label>
+                <span>Rol</span>
+                <select
+                  value={newUser.role}
+                  onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as 'owner' | 'operator' | 'technician' }))}
+                >
+                  <option value="owner">owner</option>
+                  <option value="operator">operator</option>
+                  <option value="technician">technician</option>
+                </select>
+              </label>
+              <label>
+                <span>Contrasena inicial</span>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="company-actions">
+              <button onClick={() => void createUser()} disabled={creatingUser || !newUser.email || !newUser.name || !newUser.password}>
+                {creatingUser ? 'Creando...' : 'Crear usuario'}
+              </button>
+            </div>
+
+            <h3>Resetear contrasena</h3>
+            <div className="company-form-grid">
+              <label>
+                <span>Usuario</span>
+                <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
+                  <option value="">Seleccionar</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Nueva contrasena</span>
+                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} />
+              </label>
+            </div>
+            <div className="company-actions">
+              <button onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>
+                Resetear contrasena
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
+
+      <section className="company-panel">
         <h2>Configuracion ARCA por cliente</h2>
         <div className="company-form-grid">
           <label>
@@ -743,9 +1021,70 @@ export function App() {
   const path = window.location.pathname;
   const isClientPanel = path.startsWith('/panel') || path.startsWith('/panel-cliente');
   const isCompanyPanel = path.startsWith('/admin-empresa') || path.startsWith('/empresa');
+  const [session, setSession] = useState<AuthSession | null>(() => loadStoredSession());
 
-  if (isCompanyPanel) return <CompanyAdminPanel />;
-  if (isClientPanel) return <ClientPanel />;
-  if (appMode === 'company') return <CompanyAdminPanel />;
+  const login = (next: AuthSession) => {
+    setSession(next);
+    saveSession(next);
+  };
+
+  const logout = () => {
+    setSession(null);
+    saveSession(null);
+  };
+
+  useEffect(() => {
+    const current = loadStoredSession();
+    if (!current?.token) return;
+    void getJson<AuthUser>('/auth/me', current.token).catch(() => {
+      setSession(null);
+      saveSession(null);
+    });
+  }, []);
+
+  if (isCompanyPanel || appMode === 'company') {
+    if (!session) {
+      return (
+        <LoginPanel
+          title="Ingreso administracion empresa"
+          allowedRoles={['company_admin']}
+          onAuthenticated={login}
+        />
+      );
+    }
+    if (session.user.role !== 'company_admin') {
+      return (
+        <LoginPanel
+          title="Acceso denegado para este usuario"
+          allowedRoles={['company_admin']}
+          onAuthenticated={login}
+        />
+      );
+    }
+    return <CompanyAdminPanel session={session} onLogout={logout} />;
+  }
+
+  if (isClientPanel) {
+    if (!session) {
+      return (
+        <LoginPanel
+          title="Ingreso panel cliente"
+          allowedRoles={['owner', 'operator', 'technician']}
+          onAuthenticated={login}
+        />
+      );
+    }
+    if (session.user.role === 'company_admin') {
+      return (
+        <LoginPanel
+          title="Este acceso es solo para usuarios de cliente"
+          allowedRoles={['owner', 'operator', 'technician']}
+          onAuthenticated={login}
+        />
+      );
+    }
+    return <ClientPanel session={session} onLogout={logout} />;
+  }
+
   return <LandingPage />;
 }

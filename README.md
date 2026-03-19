@@ -37,6 +37,12 @@ agrosentinel/
 ### Backend
 - API REST:
   - `GET /api/health`
+  - `POST /api/auth/login`
+  - `GET /api/auth/me`
+  - `POST /api/auth/change-password`
+  - `GET /api/auth/admin/users?tenantId=...` (solo empresa)
+  - `POST /api/auth/admin/create-user` (solo empresa)
+  - `POST /api/auth/admin/reset-password` (solo empresa)
   - `GET/POST /api/devices`
   - `POST /api/devices/:deviceId/command`
   - `GET /api/alerts`
@@ -66,7 +72,10 @@ agrosentinel/
   - Campos ARCA: `cae`, `ptoVta`, `cbteNro`, `cbteTipo`
 
 ### Frontend
-- Dashboard principal con tarjetas SaaS
+- Landing publica (`/`)
+- Panel cliente con login (`/panel-cliente`)
+- Admin empresa con login (`/admin-empresa`)
+- Gestion de contrasena para usuarios cliente y empresa
 - Mapa interactivo Leaflet con colores por estado
 - Panel de alertas
 - Panel de ordenes de trabajo
@@ -139,10 +148,15 @@ docker compose up -d --build
 ```
 
 ### 3) Servicios
-- Landing + panel cliente: `http://IP_VPS` (y panel en `/panel`)
+- Landing + panel cliente: `http://IP_VPS` (y panel en `/panel-cliente`)
 - Administracion empresa: `http://IP_VPS:8080`
 - API: `http://IP_VPS:4000/api/health`
 - MQTT: `IP_VPS:1883`
+
+### Credenciales iniciales de acceso
+- Admin empresa: `admin@agrosentinel.com` / `Empresa123!`
+- Cliente demo: `owner@agrosentinel.com` / `Cliente123!`
+- Ambos usuarios quedan marcados para cambio de contrasena al primer ingreso.
 
 ## Integracion ARCA (Argentina)
 

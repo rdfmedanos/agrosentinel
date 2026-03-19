@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { DeviceModel } from '../models/Device.js';
 import { PlanModel } from '../models/Plan.js';
 import { UserModel } from '../models/User.js';
@@ -13,6 +14,7 @@ export async function seedInitialData() {
   }
 
   const owner = await UserModel.findOne({ email: 'owner@agrosentinel.com' });
+  const ownerPasswordHash = await bcrypt.hash('Cliente123!', 10);
   if (!owner) {
     const starter = await PlanModel.findOne({ name: 'Starter' });
     await UserModel.create({
@@ -20,8 +22,31 @@ export async function seedInitialData() {
       email: 'owner@agrosentinel.com',
       role: 'owner',
       tenantId: 'demo-tenant',
-      planId: starter?._id
+      planId: starter?._id,
+      passwordHash: ownerPasswordHash,
+      mustChangePassword: true
     });
+  } else if (!owner.passwordHash) {
+    owner.passwordHash = ownerPasswordHash;
+    owner.mustChangePassword = true;
+    await owner.save();
+  }
+
+  const companyAdmin = await UserModel.findOne({ email: 'admin@agrosentinel.com' });
+  const companyAdminPasswordHash = await bcrypt.hash('Empresa123!', 10);
+  if (!companyAdmin) {
+    await UserModel.create({
+      name: 'Administrador AgroSentinel',
+      email: 'admin@agrosentinel.com',
+      role: 'company_admin',
+      tenantId: 'agrosentinel-company',
+      passwordHash: companyAdminPasswordHash,
+      mustChangePassword: true
+    });
+  } else if (!companyAdmin.passwordHash) {
+    companyAdmin.passwordHash = companyAdminPasswordHash;
+    companyAdmin.mustChangePassword = true;
+    await companyAdmin.save();
   }
 
   const devices = await DeviceModel.countDocuments({ tenantId: 'demo-tenant' });

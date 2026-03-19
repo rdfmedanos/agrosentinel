@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { resolveTenantFromRequest } from '../auth/auth.js';
 import { WorkOrderModel } from '../models/WorkOrder.js';
 import { closeWorkOrder } from '../services/workOrder.service.js';
 
 export const workOrdersRouter = Router();
 
 workOrdersRouter.get('/', async (req, res) => {
-  const tenantId = String(req.query.tenantId ?? 'demo-tenant');
+  const tenantId = resolveTenantFromRequest(req);
   const orders = await WorkOrderModel.find({ tenantId }).sort({ createdAt: -1 });
   res.json(orders);
 });

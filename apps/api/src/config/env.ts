@@ -17,5 +17,7 @@ export const env = {
   arcaMock: process.env.ARCA_MOCK !== 'false',
   arcaWsfeUrl: process.env.ARCA_WSFE_URL ?? 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
   arcaToken: process.env.ARCA_TOKEN,
-  arcaSign: process.env.ARCA_SIGN
+  arcaSign: process.env.ARCA_SIGN,
+  authJwtSecret: process.env.AUTH_JWT_SECRET ?? 'change_this_secret',
+  authJwtExpires: process.env.AUTH_JWT_EXPIRES ?? '12h'
 };
