@@ -140,7 +140,8 @@ function LandingPage() {
           <a href="#vision">Vision</a>
           <a href="#flujo">Flujo</a>
           <a href="#impacto">Impacto</a>
-          <a href="/panel">Panel cliente</a>
+          <a href="/panel-cliente">Panel cliente</a>
+          <a href="/admin-empresa">Admin empresa</a>
         </nav>
       </header>
 
@@ -163,8 +164,11 @@ function LandingPage() {
           <a className="btn btn-ghost" href="#flujo">
             Explorar flujo tecnico
           </a>
-          <a className="btn btn-ghost" href="/panel">
+          <a className="btn btn-ghost" href="/panel-cliente">
             Ingresar al panel cliente
+          </a>
+          <a className="btn btn-ghost" href="/admin-empresa">
+            Ir a admin empresa
           </a>
         </div>
 
@@ -233,8 +237,11 @@ function LandingPage() {
           <a className="btn btn-primary" href="mailto:rdfmedanos@yahoo.com.ar">
             Solicitar implementacion
           </a>
-          <a className="btn btn-ghost" href="/panel">
+          <a className="btn btn-ghost" href="/panel-cliente">
             Acceso panel cliente
+          </a>
+          <a className="btn btn-ghost" href="/admin-empresa">
+            Acceso admin empresa
           </a>
         </div>
       </section>
@@ -313,6 +320,9 @@ function ClientPanel() {
         </div>
         <a className="admin-link" href="/">
           Ver landing
+        </a>
+        <a className="admin-link" href="/admin-empresa">
+          Ir a admin empresa
         </a>
       </header>
 
@@ -586,6 +596,9 @@ function CompanyAdminPanel() {
           <p className="company-kicker">Administracion de empresa</p>
           <h1>Consola central AgroSentinel</h1>
         </div>
+        <a className="admin-link" href="/panel-cliente">
+          Ver panel cliente
+        </a>
       </header>
 
       <section className="company-panel company-toolbar">
@@ -728,8 +741,11 @@ function CompanyAdminPanel() {
 export function App() {
   const appMode = import.meta.env.VITE_APP_MODE ?? 'public';
   const path = window.location.pathname;
+  const isClientPanel = path.startsWith('/panel') || path.startsWith('/panel-cliente');
+  const isCompanyPanel = path.startsWith('/admin-empresa') || path.startsWith('/empresa');
 
+  if (isCompanyPanel) return <CompanyAdminPanel />;
+  if (isClientPanel) return <ClientPanel />;
   if (appMode === 'company') return <CompanyAdminPanel />;
-  if (path.startsWith('/panel')) return <ClientPanel />;
   return <LandingPage />;
 }
