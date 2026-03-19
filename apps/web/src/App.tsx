@@ -104,7 +104,9 @@ export function App() {
     socket.on('alerts:updated', () => void loadAll());
     socket.on('work-orders:updated', () => void loadAll());
     socket.on('telemetry:new', () => void loadAll());
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const pumpCommand = async (deviceId: string, cmd: 'pump_on' | 'pump_off') => {
