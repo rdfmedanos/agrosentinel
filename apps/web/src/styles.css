@@ -453,3 +453,397 @@ h1 {
     opacity: 1;
   }
 }
+
+.admin-shell {
+  min-height: 100vh;
+  padding: 20px;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+  color: #0f172a;
+  background: #f3f8f7;
+}
+
+.admin-header {
+  background: linear-gradient(130deg, #0f3a41, #18616c);
+  color: #f8fffc;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 16px 36px rgba(10, 38, 42, 0.24);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-kicker {
+  margin: 0;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.admin-header h1 {
+  margin: 6px 0 0;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-family: 'Fraunces', serif;
+}
+
+.admin-link {
+  color: #f8fffc;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+}
+
+.admin-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-card,
+.admin-panel,
+.admin-device-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08);
+}
+
+.admin-card {
+  padding: 14px;
+}
+
+.admin-card h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #5f6f7a;
+  font-family: 'Instrument Sans', sans-serif;
+}
+
+.admin-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.9rem;
+}
+
+.admin-panel {
+  padding: 16px;
+}
+
+.admin-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.4rem;
+}
+
+.admin-devices-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-device-card {
+  padding: 14px;
+}
+
+.admin-device-card h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.admin-device-card p {
+  margin: 6px 0;
+  color: #334155;
+}
+
+.admin-row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-shell button {
+  border: 0;
+  border-radius: 10px;
+  background: #0f766e;
+  color: #fff;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.admin-shell button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.admin-shell .admin-secondary {
+  background: #475569;
+}
+
+.admin-badge {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.admin-badge.online {
+  background: #22c55e;
+}
+
+.admin-badge.warning {
+  background: #f59e0b;
+}
+
+.admin-badge.critical,
+.admin-badge.offline {
+  background: #e11d48;
+}
+
+.admin-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-list-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-panel th,
+.admin-panel td {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.admin-form-grid label.full {
+  grid-column: 1 / -1;
+}
+
+.admin-form-grid input,
+.admin-form-grid select,
+.admin-form-grid textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font-family: inherit;
+}
+
+@media (max-width: 1024px) {
+  .admin-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-devices-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-shell {
+    padding: 14px;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-cards-grid,
+  .admin-devices-grid,
+  .admin-grid-2,
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.company-shell {
+  min-height: 100vh;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+  background: #f4f4f2;
+  color: #1f2937;
+}
+
+.company-header {
+  background: linear-gradient(135deg, #1f2937, #111827);
+  color: #f9fafb;
+  border-radius: 20px;
+  padding: 22px;
+}
+
+.company-kicker {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.13em;
+  color: #a5b4fc;
+}
+
+.company-header h1 {
+  margin: 8px 0 0;
+  font-size: clamp(1.4rem, 3vw, 2.1rem);
+}
+
+.company-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+}
+
+.company-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.28rem;
+}
+
+.company-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.company-field {
+  display: grid;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.company-field span {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.company-shell input,
+.company-shell select,
+.company-shell textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-family: inherit;
+}
+
+.company-shell button {
+  border: 0;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  font-weight: 700;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+.company-shell button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.company-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.company-list {
+  display: grid;
+  gap: 8px;
+}
+
+.company-list-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.company-list-item strong {
+  font-size: 1rem;
+}
+
+.company-list-item span {
+  color: #4b5563;
+}
+
+.company-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.company-form-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.company-form-grid label span {
+  color: #4b5563;
+  font-size: 0.88rem;
+}
+
+.company-form-grid label.full {
+  grid-column: 1 / -1;
+}
+
+.company-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .company-grid-2,
+  .company-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

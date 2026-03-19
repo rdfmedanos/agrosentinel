@@ -139,7 +139,8 @@ docker compose up -d --build
 ```
 
 ### 3) Servicios
-- Web: `http://IP_VPS:8080`
+- Landing + panel cliente: `http://IP_VPS` (y panel en `/panel`)
+- Administracion empresa: `http://IP_VPS:8080`
 - API: `http://IP_VPS:4000/api/health`
 - MQTT: `IP_VPS:1883`
 

@@ -9,7 +9,7 @@ set -euo pipefail
 DOMAIN="agrosentinel.jaz.ar"
 EMAIL=""
 SKIP_CERTBOT="false"
-OPEN_8080="false"
+OPEN_8080="true"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -22,7 +22,7 @@ Opciones:
   --email <correo>         Correo para Let's Encrypt (requerido salvo --skip-certbot)
   --domain <dominio>       Dominio a configurar (default: agrosentinel.jaz.ar)
   --skip-certbot           No emitir SSL con Let's Encrypt
-  --open-8080              Deja 8080 abierto en UFW (debug)
+  --open-8080              Mantiene 8080 abierto en UFW (admin empresa)
   -h, --help               Muestra esta ayuda
 
 Ejemplo:
@@ -147,12 +147,7 @@ configure_firewall() {
   sudo ufw allow 80/tcp
   sudo ufw allow 443/tcp
   sudo ufw allow 1883/tcp
-
-  if [[ "$OPEN_8080" == "true" ]]; then
-    sudo ufw allow 8080/tcp
-  else
-    sudo ufw delete allow 8080/tcp >/dev/null 2>&1 || true
-  fi
+  sudo ufw allow 8080/tcp
 
   sudo ufw --force enable
 }
@@ -181,7 +176,7 @@ server {
   server_name ${DOMAIN};
 
   location / {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:8081;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
@@ -190,7 +185,7 @@ server {
   }
 
   location /socket.io/ {
-    proxy_pass http://127.0.0.1:8080/socket.io/;
+    proxy_pass http://127.0.0.1:8081/socket.io/;
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -262,7 +257,8 @@ main() {
   final_checks
 
   log "Instalacion finalizada"
-  echo "Panel: https://${DOMAIN}"
+  echo "Landing y panel cliente: https://${DOMAIN}"
+  echo "Admin empresa: https://${DOMAIN}:8080"
   echo "MQTT: ${DOMAIN}:1883"
   echo "Proyecto: ${SCRIPT_DIR}"
 }

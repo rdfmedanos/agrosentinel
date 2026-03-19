@@ -1,5 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_APP_MODE=public
+ENV VITE_APP_MODE=$VITE_APP_MODE
 COPY apps/web/package.json ./package.json
 COPY apps/web/tsconfig.json ./tsconfig.json
 COPY apps/web/vite.config.ts ./vite.config.ts
