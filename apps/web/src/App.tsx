@@ -683,6 +683,8 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 }
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
+  const [mainMenu, setMainMenu] = useState<'clientes' | 'planes_facturacion'>('clientes');
+  const [subMenu, setSubMenu] = useState<'sensores' | 'usuarios' | 'planes' | 'arca'>('sensores');
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -780,6 +782,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     await loadCompanyData(tenantId);
   };
 
+  const selectMainMenu = (menu: 'clientes' | 'planes_facturacion') => {
+    setMainMenu(menu);
+    if (menu === 'clientes') setSubMenu('sensores');
+    if (menu === 'planes_facturacion') setSubMenu('planes');
+  };
+
   return (
     <main className="company-shell">
       <header className="company-header">
@@ -805,213 +813,294 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         <button onClick={() => setTenantId(tenantInput.trim() || DEFAULT_TENANT_ID)}>Cargar cliente</button>
       </section>
 
-      <section className="company-panel">
-        <h2>Planes y facturacion base</h2>
-        <div className="company-grid-2">
-          <div className="company-list">
-            {plans.map(plan => (
-              <article key={plan._id} className="company-list-item">
-                <strong>{plan.name}</strong>
-                <span>${plan.monthlyPriceArs.toLocaleString('es-AR')} / mes</span>
-                <span>Max dispositivos: {plan.maxDevices}</span>
-              </article>
-            ))}
-          </div>
-          <div className="company-list">
-            {invoices.map(inv => (
-              <article key={inv._id} className="company-list-item">
-                <strong>{inv.period}</strong>
-                <span>Monto: ${inv.amountArs.toLocaleString('es-AR')}</span>
-                <span>Estado: {inv.status}</span>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="company-panel">
-        <h2>Alta de sensores para cliente</h2>
-        <div className="company-form-grid">
-          <label>
-            <span>Device ID</span>
-            <input
-              value={newDevice.deviceId}
-              onChange={e => setNewDevice(prev => ({ ...prev, deviceId: e.target.value }))}
-              placeholder="ESP32-CENTRO-001"
-            />
-          </label>
-          <label>
-            <span>Nombre</span>
-            <input
-              value={newDevice.name}
-              onChange={e => setNewDevice(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Tanque centro"
-            />
-          </label>
-          <label>
-            <span>Lat</span>
-            <input value={newDevice.lat} onChange={e => setNewDevice(prev => ({ ...prev, lat: e.target.value }))} />
-          </label>
-          <label>
-            <span>Lng</span>
-            <input value={newDevice.lng} onChange={e => setNewDevice(prev => ({ ...prev, lng: e.target.value }))} />
-          </label>
-          <label className="full">
-            <span>Direccion</span>
-            <input
-              value={newDevice.address}
-              onChange={e => setNewDevice(prev => ({ ...prev, address: e.target.value }))}
-              placeholder="Lote 2"
-            />
-          </label>
-        </div>
-        <div className="company-actions">
-          <button onClick={() => void createDevice()} disabled={creatingDevice || !newDevice.deviceId || !newDevice.name}>
-            {creatingDevice ? 'Creando...' : 'Crear sensor'}
+      <section className="company-console">
+        <aside className="company-nav company-panel">
+          <h2>Menu</h2>
+          <button
+            className={`company-nav-item ${mainMenu === 'clientes' ? 'active' : ''}`}
+            onClick={() => selectMainMenu('clientes')}
+          >
+            Clientes
           </button>
-        </div>
-      </section>
+          <button
+            className={`company-nav-item ${mainMenu === 'planes_facturacion' ? 'active' : ''}`}
+            onClick={() => selectMainMenu('planes_facturacion')}
+          >
+            Planes y facturacion
+          </button>
 
-      <section className="company-panel">
-        <h2>Sensores del cliente cargado</h2>
-        <div className="company-list">
-          {devices.map(d => (
-            <article key={d._id} className="company-list-item">
-              <strong>{d.name}</strong>
-              <span>{d.deviceId}</span>
-              <span>Estado: {d.status}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="company-panel">
-        <h2>Usuarios del cliente</h2>
-        <div className="company-grid-2">
-          <div>
-            <div className="company-list">
-              {users.map(user => (
-                <article key={user.id} className="company-list-item">
-                  <strong>{user.name}</strong>
-                  <span>{user.email}</span>
-                  <span>
-                    {user.role} {user.mustChangePassword ? '(debe cambiar clave)' : ''}
-                  </span>
-                </article>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h3>Alta de usuario cliente</h3>
-            <div className="company-form-grid">
-              <label>
-                <span>Nombre</span>
-                <input value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))} />
-              </label>
-              <label>
-                <span>Email</span>
-                <input value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
-              </label>
-              <label>
-                <span>Rol</span>
-                <select
-                  value={newUser.role}
-                  onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as 'owner' | 'operator' | 'technician' }))}
-                >
-                  <option value="owner">owner</option>
-                  <option value="operator">operator</option>
-                  <option value="technician">technician</option>
-                </select>
-              </label>
-              <label>
-                <span>Contrasena inicial</span>
-                <input
-                  type="password"
-                  value={newUser.password}
-                  onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="company-actions">
-              <button onClick={() => void createUser()} disabled={creatingUser || !newUser.email || !newUser.name || !newUser.password}>
-                {creatingUser ? 'Creando...' : 'Crear usuario'}
+          <h3>Submenu</h3>
+          {mainMenu === 'clientes' && (
+            <>
+              <button
+                className={`company-subnav-item ${subMenu === 'sensores' ? 'active' : ''}`}
+                onClick={() => setSubMenu('sensores')}
+              >
+                Sensores
               </button>
-            </div>
+              <button
+                className={`company-subnav-item ${subMenu === 'usuarios' ? 'active' : ''}`}
+                onClick={() => setSubMenu('usuarios')}
+              >
+                Usuarios
+              </button>
+            </>
+          )}
+          {mainMenu === 'planes_facturacion' && (
+            <>
+              <button
+                className={`company-subnav-item ${subMenu === 'planes' ? 'active' : ''}`}
+                onClick={() => setSubMenu('planes')}
+              >
+                Planes y facturacion
+              </button>
+              <button
+                className={`company-subnav-item ${subMenu === 'arca' ? 'active' : ''}`}
+                onClick={() => setSubMenu('arca')}
+              >
+                Configuracion ARCA
+              </button>
+            </>
+          )}
+        </aside>
 
-            <h3>Resetear contrasena</h3>
-            <div className="company-form-grid">
-              <label>
-                <span>Usuario</span>
-                <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
-                  <option value="">Seleccionar</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.email}
-                    </option>
+        <div className="company-content">
+          {mainMenu === 'clientes' && subMenu === 'sensores' && (
+            <>
+              <section className="company-panel">
+                <h2>Alta de sensores para cliente</h2>
+                <div className="company-form-grid">
+                  <label>
+                    <span>Device ID</span>
+                    <input
+                      value={newDevice.deviceId}
+                      onChange={e => setNewDevice(prev => ({ ...prev, deviceId: e.target.value }))}
+                      placeholder="ESP32-CENTRO-001"
+                    />
+                  </label>
+                  <label>
+                    <span>Nombre</span>
+                    <input
+                      value={newDevice.name}
+                      onChange={e => setNewDevice(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Tanque centro"
+                    />
+                  </label>
+                  <label>
+                    <span>Lat</span>
+                    <input value={newDevice.lat} onChange={e => setNewDevice(prev => ({ ...prev, lat: e.target.value }))} />
+                  </label>
+                  <label>
+                    <span>Lng</span>
+                    <input value={newDevice.lng} onChange={e => setNewDevice(prev => ({ ...prev, lng: e.target.value }))} />
+                  </label>
+                  <label className="full">
+                    <span>Direccion</span>
+                    <input
+                      value={newDevice.address}
+                      onChange={e => setNewDevice(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="Lote 2"
+                    />
+                  </label>
+                </div>
+                <div className="company-actions">
+                  <button
+                    onClick={() => void createDevice()}
+                    disabled={creatingDevice || !newDevice.deviceId || !newDevice.name}
+                  >
+                    {creatingDevice ? 'Creando...' : 'Crear sensor'}
+                  </button>
+                </div>
+              </section>
+
+              <section className="company-panel">
+                <h2>Sensores del cliente cargado</h2>
+                <div className="company-list">
+                  {devices.map(d => (
+                    <article key={d._id} className="company-list-item">
+                      <strong>{d.name}</strong>
+                      <span>{d.deviceId}</span>
+                      <span>Estado: {d.status}</span>
+                    </article>
                   ))}
-                </select>
-              </label>
-              <label>
-                <span>Nueva contrasena</span>
-                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} />
-              </label>
-            </div>
-            <div className="company-actions">
-              <button onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>
-                Resetear contrasena
-              </button>
-            </div>
-          </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {mainMenu === 'clientes' && subMenu === 'usuarios' && (
+            <section className="company-panel">
+              <h2>Usuarios del cliente</h2>
+              <div className="company-grid-2">
+                <div>
+                  <div className="company-list">
+                    {users.map(user => (
+                      <article key={user.id} className="company-list-item">
+                        <strong>{user.name}</strong>
+                        <span>{user.email}</span>
+                        <span>
+                          {user.role} {user.mustChangePassword ? '(debe cambiar clave)' : ''}
+                        </span>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3>Alta de usuario cliente</h3>
+                  <div className="company-form-grid">
+                    <label>
+                      <span>Nombre</span>
+                      <input
+                        value={newUser.name}
+                        onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>Email</span>
+                      <input
+                        value={newUser.email}
+                        onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>Rol</span>
+                      <select
+                        value={newUser.role}
+                        onChange={e =>
+                          setNewUser(prev => ({ ...prev, role: e.target.value as 'owner' | 'operator' | 'technician' }))
+                        }
+                      >
+                        <option value="owner">owner</option>
+                        <option value="operator">operator</option>
+                        <option value="technician">technician</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Contrasena inicial</span>
+                      <input
+                        type="password"
+                        value={newUser.password}
+                        onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <div className="company-actions">
+                    <button
+                      onClick={() => void createUser()}
+                      disabled={creatingUser || !newUser.email || !newUser.name || !newUser.password}
+                    >
+                      {creatingUser ? 'Creando...' : 'Crear usuario'}
+                    </button>
+                  </div>
+
+                  <h3>Resetear contrasena</h3>
+                  <div className="company-form-grid">
+                    <label>
+                      <span>Usuario</span>
+                      <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
+                        <option value="">Seleccionar</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.email}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Nueva contrasena</span>
+                      <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} />
+                    </label>
+                  </div>
+                  <div className="company-actions">
+                    <button onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>
+                      Resetear contrasena
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {mainMenu === 'planes_facturacion' && subMenu === 'planes' && (
+            <section className="company-panel">
+              <h2>Planes y facturacion base</h2>
+              <div className="company-grid-2">
+                <div className="company-list">
+                  {plans.map(plan => (
+                    <article key={plan._id} className="company-list-item">
+                      <strong>{plan.name}</strong>
+                      <span>${plan.monthlyPriceArs.toLocaleString('es-AR')} / mes</span>
+                      <span>Max dispositivos: {plan.maxDevices}</span>
+                    </article>
+                  ))}
+                </div>
+                <div className="company-list">
+                  {invoices.map(inv => (
+                    <article key={inv._id} className="company-list-item">
+                      <strong>{inv.period}</strong>
+                      <span>Monto: ${inv.amountArs.toLocaleString('es-AR')}</span>
+                      <span>Estado: {inv.status}</span>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {mainMenu === 'planes_facturacion' && subMenu === 'arca' && (
+            <section className="company-panel">
+              <h2>Configuracion ARCA por cliente</h2>
+              <div className="company-form-grid">
+                <label>
+                  <span>Habilitar ARCA</span>
+                  <select
+                    value={arcaConfig.enabled ? 'yes' : 'no'}
+                    onChange={e => setArcaConfig(prev => ({ ...prev, enabled: e.target.value === 'yes' }))}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Si</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Modo mock</span>
+                  <select
+                    value={arcaConfig.mock ? 'yes' : 'no'}
+                    onChange={e => setArcaConfig(prev => ({ ...prev, mock: e.target.value === 'yes' }))}
+                  >
+                    <option value="yes">Si (pruebas)</option>
+                    <option value="no">No (real)</option>
+                  </select>
+                </label>
+                <label>
+                  <span>CUIT</span>
+                  <input value={arcaConfig.cuit} onChange={e => setArcaConfig(prev => ({ ...prev, cuit: e.target.value }))} />
+                </label>
+                <label>
+                  <span>Punto de venta</span>
+                  <input
+                    value={arcaConfig.ptoVta}
+                    onChange={e => setArcaConfig(prev => ({ ...prev, ptoVta: e.target.value }))}
+                  />
+                </label>
+                <label className="full">
+                  <span>WSFE URL</span>
+                  <input
+                    value={arcaConfig.wsfeUrl}
+                    onChange={e => setArcaConfig(prev => ({ ...prev, wsfeUrl: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="company-actions">
+                <button onClick={() => void saveArcaConfig()} disabled={savingArca}>
+                  {savingArca ? 'Guardando...' : 'Guardar ARCA cliente'}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </section>
 
       <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
-
-      <section className="company-panel">
-        <h2>Configuracion ARCA por cliente</h2>
-        <div className="company-form-grid">
-          <label>
-            <span>Habilitar ARCA</span>
-            <select
-              value={arcaConfig.enabled ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, enabled: e.target.value === 'yes' }))}
-            >
-              <option value="no">No</option>
-              <option value="yes">Si</option>
-            </select>
-          </label>
-          <label>
-            <span>Modo mock</span>
-            <select
-              value={arcaConfig.mock ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, mock: e.target.value === 'yes' }))}
-            >
-              <option value="yes">Si (pruebas)</option>
-              <option value="no">No (real)</option>
-            </select>
-          </label>
-          <label>
-            <span>CUIT</span>
-            <input value={arcaConfig.cuit} onChange={e => setArcaConfig(prev => ({ ...prev, cuit: e.target.value }))} />
-          </label>
-          <label>
-            <span>Punto de venta</span>
-            <input value={arcaConfig.ptoVta} onChange={e => setArcaConfig(prev => ({ ...prev, ptoVta: e.target.value }))} />
-          </label>
-          <label className="full">
-            <span>WSFE URL</span>
-            <input
-              value={arcaConfig.wsfeUrl}
-              onChange={e => setArcaConfig(prev => ({ ...prev, wsfeUrl: e.target.value }))}
-            />
-          </label>
-        </div>
-        <div className="company-actions">
-          <button onClick={() => void saveArcaConfig()} disabled={savingArca}>
-            {savingArca ? 'Guardando...' : 'Guardar ARCA cliente'}
-          </button>
-        </div>
-      </section>
     </main>
   );
 }

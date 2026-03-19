@@ -851,7 +851,68 @@ h1 {
   flex-wrap: wrap;
 }
 
+.company-console {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.company-content {
+  display: grid;
+  gap: 14px;
+}
+
+.company-nav {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.company-nav h2,
+.company-nav h3 {
+  margin: 0 0 4px;
+}
+
+.company-nav h3 {
+  margin-top: 10px;
+  font-size: 1rem;
+  color: #4b5563;
+}
+
+.company-nav-item,
+.company-subnav-item {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.company-subnav-item {
+  font-weight: 500;
+}
+
+.company-nav-item.active,
+.company-subnav-item.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
 @media (max-width: 900px) {
+  .company-console {
+    grid-template-columns: 1fr;
+  }
+
+  .company-nav {
+    position: static;
+  }
+
   .company-grid-2,
   .company-form-grid {
     grid-template-columns: 1fr;
