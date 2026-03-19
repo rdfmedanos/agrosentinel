@@ -188,7 +188,7 @@ function authorizeInvoiceMock(config: EffectiveArcaConfig, req: ArcaInvoiceReque
 
 export async function getEffectiveArcaConfig(tenantId: string): Promise<EffectiveArcaConfig> {
   const tenantConfig = await TenantConfigModel.findOne({ tenantId });
-  if (!tenantConfig) {
+  if (!tenantConfig || !tenantConfig.arca) {
     return {
       enabled: env.arcaEnabled,
       mock: env.arcaMock,

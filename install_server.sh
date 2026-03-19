@@ -245,7 +245,6 @@ main() {
   assert_project_files
 
   require_cmd sudo
-  require_cmd curl
   require_cmd grep
   require_cmd sed
   require_cmd apt-get
