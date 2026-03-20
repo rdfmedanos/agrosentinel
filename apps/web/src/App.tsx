@@ -749,7 +749,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [clientSearch, setClientSearch] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
-  const clientInputRef = useRef<HTMLInputElement>(null);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
@@ -817,17 +816,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   useEffect(() => {
     void loadClients();
   }, [loadClients]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node) &&
-          clientInputRef.current && !clientInputRef.current.contains(e.target as Node)) {
-        setClientSearch('');
-      }
-    };
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
 
   const setSection = (section: AdminSection) => {
     setActiveSection(section);
@@ -1187,12 +1175,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                             className="form-control"
                             value={clientSearch}
                             onChange={e => setClientSearch(e.target.value)}
-                            ref={clientInputRef}
+                            onBlur={() => setTimeout(() => setClientSearch(''), 200)}
                             placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
                           />
                           {clientSearch && (
                             <div className="input-group-append">
-                              <button className="btn btn-default" onClick={() => setClientSearch('')}>
+                              <button className="btn btn-default" onMouseDown={e => e.preventDefault()} onClick={() => setClientSearch('')}>
                                 <i className="fas fa-times"></i>
                               </button>
                             </div>
@@ -1204,14 +1192,14 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                             className="list-group shadow-sm"
                             style={{
                               position: 'absolute',
-                              top: '100%',
+                              top: 'calc(100% + 2px)',
                               left: 0,
                               right: 0,
-                              zIndex: 1050,
+                              zIndex: 9999,
                               maxHeight: '260px',
                               overflowY: 'auto',
-                              marginTop: '2px',
-                              borderRadius: '4px'
+                              borderRadius: '4px',
+                              backgroundColor: 'white'
                             }}
                           >
                             {loadingClients ? (
@@ -1240,6 +1228,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                                   <div
                                     key={c._id}
                                     className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
+                                    onMouseDown={e => e.preventDefault()}
                                     onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
                                     style={{ cursor: 'pointer' }}
                                   >
