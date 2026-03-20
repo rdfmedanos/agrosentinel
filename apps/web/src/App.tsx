@@ -749,6 +749,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [clientSearch, setClientSearch] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
+  const clientInputRef = useRef<HTMLInputElement>(null);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
@@ -819,12 +820,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node) &&
+          clientInputRef.current && !clientInputRef.current.contains(e.target as Node)) {
         setClientSearch('');
       }
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
   }, []);
 
   const setSection = (section: AdminSection) => {
@@ -1176,7 +1178,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       </button>
                     </div>
                     <div className="card-body">
-                      <div ref={clientDropdownRef} style={{ position: 'relative', maxWidth: '600px' }}>
+                      <div style={{ position: 'relative', maxWidth: '600px' }}>
                         <div className="input-group">
                           <div className="input-group-prepend">
                             <span className="input-group-text"><i className="fas fa-search"></i></span>
@@ -1185,6 +1187,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                             className="form-control"
                             value={clientSearch}
                             onChange={e => setClientSearch(e.target.value)}
+                            ref={clientInputRef}
                             placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
                           />
                           {clientSearch && (
@@ -1197,6 +1200,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                         </div>
                         {clientSearch && (
                           <div
+                            ref={clientDropdownRef}
                             className="list-group shadow-sm"
                             style={{
                               position: 'absolute',
