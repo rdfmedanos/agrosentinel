@@ -65,6 +65,18 @@ type AuthUser = {
   mustChangePassword: boolean;
 };
 
+type TenantClient = {
+  _id: string;
+  tenantId: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  address: string;
+  active: boolean;
+  createdAt: string;
+};
+
 type AuthSession = {
   token: string;
   user: AuthUser;
@@ -733,7 +745,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [allTenants] = useState<string[]>([DEFAULT_TENANT_ID]);
+  const [clients, setClients] = useState<TenantClient[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [loadingClients, setLoadingClients] = useState(false);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
@@ -760,6 +774,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     planId: ''
   });
 
+  const loadClients = useCallback(async () => {
+    setLoadingClients(true);
+    try {
+      const data = await getJson<TenantClient[]>('/tenants', props.session.token);
+      setClients(data);
+    } catch {
+      console.error('Error loading clients');
+    } finally {
+      setLoadingClients(false);
+    }
+  }, [props.session.token]);
+
   const loadCompanyData = useCallback(async (targetTenant: string) => {
     const token = props.session.token;
     try {
@@ -785,6 +811,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   useEffect(() => {
     void loadCompanyData(tenantId);
   }, [tenantId, loadCompanyData]);
+
+  useEffect(() => {
+    void loadClients();
+  }, [loadClients]);
 
   const setSection = (section: AdminSection) => {
     setActiveSection(section);
@@ -848,8 +878,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     offline: devices.filter(d => d.status === 'offline' || d.status === 'critical').length,
     alerts: alerts.filter(a => a.status === 'open').length,
     users: users.length,
-    tenants: allTenants.length
-  }), [devices, alerts, users, allTenants]);
+    tenants: clients.length
+  }), [devices, alerts, users, clients]);
 
   const sectionTitle = () => {
     const map: Record<AdminSection, string> = {
@@ -1129,28 +1159,79 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                 <div className="col-12">
                   <div className="card card-outline card-primary shadow-sm">
                     <div className="card-header border-0 d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-primary font-weight-bold mb-0"><i className="fas fa-search mr-2"></i>Selector de Cliente</h3>
+                      <h3 className="card-title text-primary font-weight-bold mb-0"><i className="fas fa-building mr-2"></i>Clientes</h3>
                       <button className="btn btn-success btn-sm" onClick={() => setShowAddClient(true)}>
                         <i className="fas fa-plus mr-1"></i>Agregar Cliente
                       </button>
                     </div>
                     <div className="card-body">
-                      <div className="row align-items-center">
-                        <div className="col-md-5">
-                          <div className="input-group" style={{ maxWidth: '400px' }}>
-                            <input className="form-control form-control-sm" value={tenantInput}
-                              onChange={e => setTenantInput(e.target.value)} placeholder="ID del tenant (ej: demo-tenant)" />
-                            <div className="input-group-append">
-                              <button className="btn btn-primary btn-sm" onClick={() => setTenantId(tenantInput)}>
-                                <i className="fas fa-search mr-1"></i>Cargar
-                              </button>
-                            </div>
+                      <div className="input-group mb-3" style={{ maxWidth: '500px' }}>
+                        <div className="input-group-prepend">
+                          <span className="input-group-text"><i className="fas fa-search"></i></span>
+                        </div>
+                        <input className="form-control" value={clientSearch}
+                          onChange={e => setClientSearch(e.target.value)}
+                          placeholder="Buscar por nombre, email o ID del cliente..." />
+                        {clientSearch && (
+                          <div className="input-group-append">
+                            <button className="btn btn-default" onClick={() => setClientSearch('')}>
+                              <i className="fas fa-times"></i>
+                            </button>
                           </div>
-                        </div>
-                        <div className="col-md-7 text-md-right mt-3 mt-md-0">
-                          <span className="font-weight-bold text-dark">Cliente actual: <span className="badge badge-primary">{tenantId}</span></span>
-                        </div>
+                        )}
                       </div>
+                      {loadingClients ? (
+                        <div className="text-center text-muted py-4">
+                          <i className="fas fa-spinner fa-spin fa-2x"></i>
+                          <p className="mt-2 mb-0">Cargando clientes...</p>
+                        </div>
+                      ) : (
+                        <div className="list-group" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                          {clients
+                            .filter(c =>
+                              !clientSearch ||
+                              c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                              c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                              c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                              c.contactName.toLowerCase().includes(clientSearch.toLowerCase())
+                            )
+                            .map(c => (
+                              <div
+                                key={c._id}
+                                className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
+                                onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div>
+                                  <div className="font-weight-bold">{c.companyName}</div>
+                                  <div className="small">
+                                    <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
+                                    <span className="mx-2">·</span>
+                                    <span className="text-muted">{c.email || 'Sin email'}</span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="small font-weight-bold text-muted">{c.tenantId}</div>
+                                  <span className={`badge ${tenantId === c.tenantId ? 'badge-light' : 'badge-secondary'}`}>
+                                    {tenantId === c.tenantId ? 'Seleccionado' : 'Clic para seleccionar'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          {clients.filter(c =>
+                            !clientSearch ||
+                            c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            c.contactName.toLowerCase().includes(clientSearch.toLowerCase())
+                          ).length === 0 && (
+                            <div className="text-center text-muted py-4">
+                              <i className="fas fa-folder-open fa-2x mb-2"></i>
+                              <p className="mb-0">{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="card shadow-sm border-0 mt-3">
@@ -1553,6 +1634,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
                       setTenantId(data.tenantId);
                       setTenantInput(data.tenantId);
+                      void loadClients();
                     } catch {
                       alert('Error al crear el cliente');
                     } finally {
