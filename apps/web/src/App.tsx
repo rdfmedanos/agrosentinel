@@ -179,7 +179,8 @@ function markerColor(status: Device['status']) {
 
 function LandingPage() {
   return (
-    <main className="landing">
+    <div className="landing-outer">
+      <main className="landing">
       <div className="atmosphere atmosphere-a" />
       <div className="atmosphere atmosphere-b" />
       <div className="grain" />
@@ -296,6 +297,7 @@ function LandingPage() {
         </div>
       </section>
     </main>
+    </div>
   );
 }
 
@@ -391,6 +393,7 @@ function PasswordSection(props: { token: string; mustChangePassword: boolean }) 
 }
 
 function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
@@ -407,19 +410,23 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const loadAll = async () => {
     const token = props.session.token;
     const tenantId = props.session.user.tenantId;
-    const [d, a, o, i] = await Promise.all([
-      getJson<Device[]>(`/devices?tenantId=${tenantId}`, token),
-      getJson<Alert[]>(`/alerts?tenantId=${tenantId}`, token),
-      getJson<WorkOrder[]>(`/work-orders?tenantId=${tenantId}`, token),
-      getJson<Invoice[]>(`/billing/invoices?tenantId=${tenantId}`, token)
-    ]);
-    setDevices(d);
-    setAlerts(a);
-    setOrders(o);
-    setInvoices(i);
+    try {
+      const [d, a, o, i] = await Promise.all([
+        getJson<Device[]>(`/devices?tenantId=${tenantId}`, token),
+        getJson<Alert[]>(`/alerts?tenantId=${tenantId}`, token),
+        getJson<WorkOrder[]>(`/work-orders?tenantId=${tenantId}`, token),
+        getJson<Invoice[]>(`/billing/invoices?tenantId=${tenantId}`, token)
+      ]);
+      setDevices(d);
+      setAlerts(a);
+      setOrders(o);
+      setInvoices(i);
 
-    const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
-    setArcaConfig(arca);
+      const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
+      setArcaConfig(arca);
+    } catch (err) {
+      console.error('Error loading client data:', err);
+    }
   };
 
   useEffect(() => {
@@ -457,232 +464,265 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   };
 
   return (
-    <main className="admin-shell">
-      <header className="admin-header">
-        <div>
-          <p className="admin-kicker">Panel cliente</p>
-          <h1>Operacion AgroSentinel</h1>
-        </div>
-        <a className="admin-link" href="/">
-          Ver landing
-        </a>
-        <button className="admin-link" onClick={props.onLogout}>
-          Cerrar sesion
-        </button>
-        <a className="admin-link" href="/admin-empresa">
-          Ir a admin empresa
-        </a>
-      </header>
+    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
+      {/* Navbar */}
+      <nav className="main-header navbar navbar-expand navbar-white navbar-light">
+        <ul className="navbar-nav">
+          <li className="nav-item">
+            <button className="nav-link btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+              <i className="fas fa-bars"></i>
+            </button>
+          </li>
+          <li className="nav-item d-none d-sm-inline-block">
+            <a href="/" className="nav-link text-muted">Web Principal</a>
+          </li>
+        </ul>
 
-      <section className="admin-cards-grid">
-        <div className="admin-card">
-          <h3>Dispositivos</h3>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="admin-card">
-          <h3>Online</h3>
-          <strong>{stats.online}</strong>
-        </div>
-        <div className="admin-card">
-          <h3>Criticos</h3>
-          <strong>{stats.critical}</strong>
-        </div>
-        <div className="admin-card">
-          <h3>Alertas abiertas</h3>
-          <strong>{stats.alerts}</strong>
-        </div>
-      </section>
+        <ul className="navbar-nav ml-auto">
+          <li className="nav-item">
+            <button onClick={props.onLogout} className="btn nav-link">
+              <i className="fas fa-sign-out-alt"></i> Salir
+            </button>
+          </li>
+        </ul>
+      </nav>
 
-      <section className="admin-panel">
-        <h2>Dispositivos</h2>
-        <div className="admin-devices-grid">
-          {devices.map(d => (
-            <article key={d._id} className="admin-device-card">
-              <div className="admin-row-between">
-                <h3>{d.name}</h3>
-                <span className={`admin-badge ${d.status}`}>{d.status}</span>
+      {/* Sidebar */}
+      <aside className="main-sidebar sidebar-dark-primary elevation-4">
+        <div className="brand-link text-center pt-3 pb-3">
+          <span className="brand-text font-weight-bold h4">AgroSentinel</span>
+        </div>
+        <div className="sidebar">
+          <nav className="mt-4">
+            <ul className="nav nav-pills nav-sidebar flex-column" role="menu">
+              <li className="nav-header">MONITOREO</li>
+              <li className="nav-item">
+                <a href="#" className="nav-link active">
+                  <i className="nav-icon fas fa-tachometer-alt"></i>
+                  <p>Dashboard</p>
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </aside>
+
+      {/* Content Wrapper */}
+      <div className="content-wrapper">
+        <section className="content-header">
+          <div className="container-fluid">
+            <div className="row mb-2">
+              <div className="col-sm-6">
+                <h1 className="m-0 text-dark">Operación AgroSentinel</h1>
               </div>
-              <p>ID: {d.deviceId}</p>
-              <p>Nivel: {d.levelPct}%</p>
-              <p>Reserva: {d.reserveLiters} L</p>
-              <p>Bomba: {d.pumpOn ? 'Encendida' : 'Apagada'}</p>
-              <div className="admin-actions">
-                <button onClick={() => void pumpCommand(d.deviceId, 'pump_on')}>Encender bomba</button>
-                <button className="admin-secondary" onClick={() => void pumpCommand(d.deviceId, 'pump_off')}>
-                  Apagar bomba
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="admin-panel">
-        <h2>Mapa de dispositivos</h2>
-        <MapContainer center={[-34.62, -58.43]} zoom={10} style={{ height: '340px', borderRadius: '16px' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {devices.map(d => (
-            <CircleMarker
-              key={d._id}
-              center={[d.location.lat, d.location.lng]}
-              radius={11}
-              pathOptions={{ color: markerColor(d.status), fillOpacity: 0.8 }}
-            >
-              <Popup>
-                <strong>{d.name}</strong>
-                <br />
-                Estado: {d.status}
-                <br />
-                Nivel: {d.levelPct}%
-              </Popup>
-            </CircleMarker>
-          ))}
-        </MapContainer>
-      </section>
-
-      <section className="admin-grid-2">
-        <div className="admin-panel">
-          <h2>Alertas</h2>
-          {alerts.map(a => (
-            <div className="admin-list-item" key={a._id}>
-              <strong>{a.deviceId}</strong>
-              <span>{a.message}</span>
-              <span className={`admin-badge ${a.status === 'open' ? 'critical' : 'online'}`}>{a.status}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="admin-panel">
-          <h2>Ordenes de trabajo</h2>
-          {orders.map(o => (
-            <div className="admin-list-item" key={o._id}>
-              <strong>{o.title}</strong>
-              <span>{o.description}</span>
-              <div className="admin-row-between">
-                <span
-                  className={`admin-badge ${o.status === 'closed' ? 'online' : o.status === 'in_progress' ? 'warning' : 'critical'}`}
-                >
-                  {o.status}
-                </span>
-                {o.status !== 'closed' && <button onClick={() => void closeOrder(o._id)}>Cerrar</button>}
+              <div className="col-sm-6 text-right">
+                <span className="badge badge-success shadow-sm">Panel Cliente</span>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section className="admin-panel">
-        <h2>Facturacion (ARCA)</h2>
-        <div className="admin-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Periodo</th>
-                <th>Monto</th>
-                <th>Estado</th>
-                <th>CAE</th>
-                <th>Comprobante</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map(inv => (
-                <tr key={inv._id}>
-                  <td>{inv.period}</td>
-                  <td>${inv.amountArs.toLocaleString('es-AR')}</td>
-                  <td>{inv.status}</td>
-                  <td>{inv.arca?.cae ?? '-'}</td>
-                  <td>{inv.arca?.cbteNro ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <section className="content">
+          <div className="container-fluid">
+            {/* Small boxes (Stat box) */}
+            <div className="row">
+              <div className="col-lg-3 col-6">
+                <div className="small-box bg-info shadow-sm">
+                  <div className="inner">
+                    <h3>{stats.total}</h3>
+                    <p>Dispositivos</p>
+                  </div>
+                  <div className="icon"><i className="fas fa-microchip"></i></div>
+                </div>
+              </div>
+              <div className="col-lg-3 col-6">
+                <div className="small-box bg-success shadow-sm">
+                  <div className="inner">
+                    <h3>{stats.online}</h3>
+                    <p>Online</p>
+                  </div>
+                  <div className="icon"><i className="fas fa-signal"></i></div>
+                </div>
+              </div>
+              <div className="col-lg-3 col-6">
+                <div className="small-box bg-danger shadow-sm">
+                  <div className="inner">
+                    <h3>{stats.critical}</h3>
+                    <p>Críticos</p>
+                  </div>
+                  <div className="icon"><i className="fas fa-exclamation-triangle"></i></div>
+                </div>
+              </div>
+              <div className="col-lg-3 col-6">
+                <div className="small-box bg-warning shadow-sm">
+                  <div className="inner">
+                    <h3>{stats.alerts}</h3>
+                    <p>Alertas Abiertas</p>
+                  </div>
+                  <div className="icon"><i className="fas fa-bell"></i></div>
+                </div>
+              </div>
+            </div>
 
-      <section className="admin-panel">
-        <h2>Configuracion ARCA</h2>
-        <div className="admin-form-grid">
-          <label>
-            <span>Habilitar ARCA</span>
-            <select
-              value={arcaConfig.enabled ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, enabled: e.target.value === 'yes' }))}
-            >
-              <option value="no">No</option>
-              <option value="yes">Si</option>
-            </select>
-          </label>
+            {/* Devices & Map */}
+            <div className="row">
+              <div className="col-12">
+                <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-map-marked-alt mr-2"></i>Mapa de Dispositivos</h3>
+                  </div>
+                  <div className="card-body p-0">
+                    <MapContainer center={[-34.62, -58.43]} zoom={10} style={{ height: '380px', width: '100%' }}>
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      {devices.map(d => (
+                        <CircleMarker
+                          key={d._id}
+                          center={[d.location.lat, d.location.lng]}
+                          radius={11}
+                          pathOptions={{ color: markerColor(d.status), fillOpacity: 0.8 }}
+                        >
+                          <Popup>
+                            <div className="p-1">
+                              <h6 className="font-weight-bold mb-1">{d.name}</h6>
+                              <p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span></p>
+                              <p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>
+                            </div>
+                          </Popup>
+                        </CircleMarker>
+                      ))}
+                    </MapContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <label>
-            <span>Modo mock</span>
-            <select
-              value={arcaConfig.mock ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, mock: e.target.value === 'yes' }))}
-            >
-              <option value="yes">Si (pruebas)</option>
-              <option value="no">No (real)</option>
-            </select>
-          </label>
+            <div className="row mt-4">
+              <div className="col-md-8">
+                <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-list mr-2"></i>Estado de Sensores</h3>
+                  </div>
+                  <div className="card-body p-0">
+                    <div className="table-responsive">
+                      <table className="table table-hover m-0">
+                        <thead className="bg-light">
+                          <tr><th>Sensor</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th className="text-right">Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                          {devices.map(d => (
+                            <tr key={d._id}>
+                              <td>
+                                <div className="font-weight-bold">{d.name}</div>
+                                <div className="small text-muted">{d.deviceId}</div>
+                              </td>
+                              <td className="align-middle">
+                                <div className="progress progress-xs" style={{ width: '80px' }}>
+                                  <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
+                                </div>
+                                <span className="small font-weight-bold">{d.levelPct}%</span>
+                              </td>
+                              <td className="align-middle">
+                                <span className={`badge ${d.pumpOn ? 'badge-info' : 'badge-light'}`}>{d.pumpOn ? 'Encendida' : 'Apagada'}</span>
+                              </td>
+                              <td className="align-middle">
+                                <span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span>
+                              </td>
+                              <td className="text-right align-middle">
+                                <div className="btn-group">
+                                  <button className="btn btn-xs btn-outline-primary" onClick={() => void pumpCommand(d.deviceId, 'pump_on')}>ON</button>
+                                  <button className="btn btn-xs btn-outline-secondary" onClick={() => void pumpCommand(d.deviceId, 'pump_off')}>OFF</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                 <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-exclamation-circle mr-2"></i>Notificaciones</h3>
+                  </div>
+                  <div className="card-body p-0" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <ul className="list-group list-group-flush">
+                      {alerts.map(a => (
+                        <li key={a._id} className="list-group-item px-3 py-2 border-0 mb-1 rounded mx-2 bg-light">
+                          <div className="d-flex justify-content-between">
+                            <span className="small font-weight-bold">{a.deviceId}</span>
+                            <span className={`badge badge-pill ${a.status === 'open' ? 'badge-danger' : 'badge-light'}`}>{a.status}</span>
+                          </div>
+                          <div className="small text-dark mt-1">{a.message}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <label>
-            <span>CUIT emisor</span>
-            <input
-              value={arcaConfig.cuit}
-              onChange={e => setArcaConfig(prev => ({ ...prev, cuit: e.target.value }))}
-              placeholder="30712345678"
-            />
-          </label>
+            <div className="row mt-4">
+              <div className="col-md-6">
+                <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-tools mr-2"></i>Órdenes de Trabajo</h3>
+                  </div>
+                  <div className="card-body p-3">
+                    {orders.map(o => (
+                      <div className="border rounded p-2 mb-2 bg-white shadow-none" key={o._id}>
+                        <div className="d-flex justify-content-between align-items-start">
+                          <h6 className="font-weight-bold mb-1">{o.title}</h6>
+                          <span className={`badge ${o.status === 'closed' ? 'badge-success' : o.status === 'in_progress' ? 'badge-warning' : 'badge-danger'}`}>{o.status}</span>
+                        </div>
+                        <p className="small text-muted mb-2">{o.description}</p>
+                        {o.status !== 'closed' && <button className="btn btn-xs btn-block btn-outline-success" onClick={() => void closeOrder(o._id)}>Cerrar Orden</button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice mr-2"></i>Facturación ARCA</h3>
+                  </div>
+                  <div className="card-body p-0">
+                    <table className="table table-sm m-0">
+                      <thead><tr><th>Período</th><th>Monto</th><th>Estado</th></tr></thead>
+                      <tbody>
+                        {invoices.map(inv => (
+                          <tr key={inv._id}>
+                            <td>{inv.period}</td>
+                            <td>${inv.amountArs.toLocaleString('es-AR')}</td>
+                            <td><span className={`badge ${inv.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>{inv.status}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="card shadow-sm mt-3 border-0">
+                  <div className="card-body p-3">
+                    <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
-          <label>
-            <span>Punto de venta</span>
-            <input
-              value={arcaConfig.ptoVta}
-              onChange={e => setArcaConfig(prev => ({ ...prev, ptoVta: e.target.value }))}
-              placeholder="1"
-            />
-          </label>
-
-          <label className="full">
-            <span>WSFE URL</span>
-            <input
-              value={arcaConfig.wsfeUrl}
-              onChange={e => setArcaConfig(prev => ({ ...prev, wsfeUrl: e.target.value }))}
-              placeholder="https://wswhomo.afip.gov.ar/wsfev1/service.asmx"
-            />
-          </label>
-
-          <label className="full">
-            <span>Token WSAA</span>
-            <textarea
-              value={arcaConfig.token ?? ''}
-              onChange={e => setArcaConfig(prev => ({ ...prev, token: e.target.value }))}
-              rows={3}
-            />
-          </label>
-
-          <label className="full">
-            <span>Sign WSAA</span>
-            <textarea
-              value={arcaConfig.sign ?? ''}
-              onChange={e => setArcaConfig(prev => ({ ...prev, sign: e.target.value }))}
-              rows={3}
-            />
-          </label>
-        </div>
-
-        <div className="admin-actions">
-          <button onClick={() => void saveArcaConfig()} disabled={savingArca}>
-            {savingArca ? 'Guardando...' : 'Guardar configuracion ARCA'}
-          </button>
-        </div>
-      </section>
-
-      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
-    </main>
+      <footer className="main-footer text-center small text-muted">
+        <strong>AgroSentinel &copy; 2026</strong>
+      </footer>
+    </div>
   );
 }
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -705,19 +745,23 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
   const loadCompanyData = async (targetTenant: string) => {
     const token = props.session.token;
-    const [p, d, i, arca, tenantUsers] = await Promise.all([
-      getJson<Plan[]>('/billing/plans', token),
-      getJson<Device[]>(`/devices?tenantId=${targetTenant}`, token),
-      getJson<Invoice[]>(`/billing/invoices?tenantId=${targetTenant}`, token),
-      getJson<ArcaConfig>(`/billing/arca-config?tenantId=${targetTenant}`, token),
-      getJson<AuthUser[]>(`/auth/admin/users?tenantId=${targetTenant}`, token)
-    ]);
+    try {
+      const [p, d, i, arca, tenantUsers] = await Promise.all([
+        getJson<Plan[]>('/billing/plans', token),
+        getJson<Device[]>(`/devices?tenantId=${targetTenant}`, token),
+        getJson<Invoice[]>(`/billing/invoices?tenantId=${targetTenant}`, token),
+        getJson<ArcaConfig>(`/billing/arca-config?tenantId=${targetTenant}`, token),
+        getJson<AuthUser[]>(`/auth/admin/users?tenantId=${targetTenant}`, token)
+      ]);
 
-    setPlans(p);
-    setDevices(d);
-    setInvoices(i);
-    setArcaConfig(arca);
-    setUsers(tenantUsers);
+      setPlans(p);
+      setDevices(d);
+      setInvoices(i);
+      setArcaConfig(arca);
+      setUsers(tenantUsers);
+    } catch (err) {
+      console.error('Error loading company data:', err);
+    }
   };
 
   useEffect(() => {
@@ -781,238 +825,241 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   };
 
   return (
-    <main className="company-shell">
-      <header className="company-header">
-        <div>
-          <p className="company-kicker">Administracion de empresa</p>
-          <h1>Consola central AgroSentinel</h1>
-        </div>
-        <div className="company-actions">
-          <a className="admin-link" href="/panel-cliente">
-            Ver panel cliente
-          </a>
-          <button className="admin-link admin-link-button" onClick={props.onLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-      </header>
+    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
+      {/* Navbar */}
+      <nav className="main-header navbar navbar-expand navbar-white navbar-light">
+        <ul className="navbar-nav">
+          <li className="nav-item">
+            <button className="nav-link btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+              <i className="fas fa-bars"></i>
+            </button>
+          </li>
+          <li className="nav-item d-none d-sm-inline-block">
+            <a href="/" className="nav-link text-muted">Web Principal</a>
+          </li>
+          <li className="nav-item d-none d-sm-inline-block">
+            <a href="/panel-cliente" className="nav-link text-muted">Panel Cliente</a>
+          </li>
+        </ul>
 
-      <section className="company-panel company-toolbar">
-        <div className="company-field">
-          <span>Tenant cliente</span>
-          <input value={tenantInput} onChange={e => setTenantInput(e.target.value)} placeholder="cliente-a" />
-        </div>
-        <button onClick={() => setTenantId(tenantInput.trim() || DEFAULT_TENANT_ID)}>Cargar cliente</button>
-      </section>
+        <ul className="navbar-nav ml-auto">
+          <li className="nav-item">
+            <button onClick={props.onLogout} className="btn nav-link">
+              <i className="fas fa-sign-out-alt"></i> Salir
+            </button>
+          </li>
+        </ul>
+      </nav>
 
-      <section className="company-panel">
-        <h2>Planes y facturacion base</h2>
-        <div className="company-grid-2">
-          <div className="company-list">
-            {plans.map(plan => (
-              <article key={plan._id} className="company-list-item">
-                <strong>{plan.name}</strong>
-                <span>${plan.monthlyPriceArs.toLocaleString('es-AR')} / mes</span>
-                <span>Max dispositivos: {plan.maxDevices}</span>
-              </article>
-            ))}
-          </div>
-          <div className="company-list">
-            {invoices.map(inv => (
-              <article key={inv._id} className="company-list-item">
-                <strong>{inv.period}</strong>
-                <span>Monto: ${inv.amountArs.toLocaleString('es-AR')}</span>
-                <span>Estado: {inv.status}</span>
-              </article>
-            ))}
-          </div>
+      {/* Sidebar */}
+      <aside className="main-sidebar sidebar-dark-primary elevation-4">
+        <div className="brand-link text-center pt-3 pb-3">
+          <span className="brand-text font-weight-bold h4">AgroSentinel</span>
         </div>
-      </section>
+        <div className="sidebar">
+          <nav className="mt-4">
+            <ul className="nav nav-pills nav-sidebar flex-column" role="menu">
+              <li className="nav-header">ADMINISTRACIÓN</li>
+              <li className="nav-item">
+                <a href="#" className="nav-link active">
+                  <i className="nav-icon fas fa-building"></i>
+                  <p>Consola Central</p>
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </aside>
 
-      <section className="company-panel">
-        <h2>Alta de sensores para cliente</h2>
-        <div className="company-form-grid">
-          <label>
-            <span>Device ID</span>
-            <input
-              value={newDevice.deviceId}
-              onChange={e => setNewDevice(prev => ({ ...prev, deviceId: e.target.value }))}
-              placeholder="ESP32-CENTRO-001"
-            />
-          </label>
-          <label>
-            <span>Nombre</span>
-            <input
-              value={newDevice.name}
-              onChange={e => setNewDevice(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Tanque centro"
-            />
-          </label>
-          <label>
-            <span>Lat</span>
-            <input value={newDevice.lat} onChange={e => setNewDevice(prev => ({ ...prev, lat: e.target.value }))} />
-          </label>
-          <label>
-            <span>Lng</span>
-            <input value={newDevice.lng} onChange={e => setNewDevice(prev => ({ ...prev, lng: e.target.value }))} />
-          </label>
-          <label className="full">
-            <span>Direccion</span>
-            <input
-              value={newDevice.address}
-              onChange={e => setNewDevice(prev => ({ ...prev, address: e.target.value }))}
-              placeholder="Lote 2"
-            />
-          </label>
-        </div>
-        <div className="company-actions">
-          <button onClick={() => void createDevice()} disabled={creatingDevice || !newDevice.deviceId || !newDevice.name}>
-            {creatingDevice ? 'Creando...' : 'Crear sensor'}
-          </button>
-        </div>
-      </section>
-
-      <section className="company-panel">
-        <h2>Sensores del cliente cargado</h2>
-        <div className="company-list">
-          {devices.map(d => (
-            <article key={d._id} className="company-list-item">
-              <strong>{d.name}</strong>
-              <span>{d.deviceId}</span>
-              <span>Estado: {d.status}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="company-panel">
-        <h2>Usuarios del cliente</h2>
-        <div className="company-grid-2">
-          <div>
-            <div className="company-list">
-              {users.map(user => (
-                <article key={user.id} className="company-list-item">
-                  <strong>{user.name}</strong>
-                  <span>{user.email}</span>
-                  <span>
-                    {user.role} {user.mustChangePassword ? '(debe cambiar clave)' : ''}
-                  </span>
-                </article>
-              ))}
+      {/* Content Wrapper */}
+      <div className="content-wrapper">
+        <section className="content-header">
+          <div className="container-fluid">
+            <div className="row mb-2">
+              <div className="col-sm-6">
+                <h1 className="m-0 text-dark">Consola Central</h1>
+              </div>
+              <div className="col-sm-6 text-right">
+                <span className="badge badge-info shadow-sm">Modo Admin Empresa</span>
+              </div>
             </div>
           </div>
-          <div>
-            <h3>Alta de usuario cliente</h3>
-            <div className="company-form-grid">
-              <label>
-                <span>Nombre</span>
-                <input value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))} />
-              </label>
-              <label>
-                <span>Email</span>
-                <input value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
-              </label>
-              <label>
-                <span>Rol</span>
-                <select
-                  value={newUser.role}
-                  onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as 'owner' | 'operator' | 'technician' }))}
-                >
-                  <option value="owner">owner</option>
-                  <option value="operator">operator</option>
-                  <option value="technician">technician</option>
-                </select>
-              </label>
-              <label>
-                <span>Contrasena inicial</span>
-                <input
-                  type="password"
-                  value={newUser.password}
-                  onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="company-actions">
-              <button onClick={() => void createUser()} disabled={creatingUser || !newUser.email || !newUser.name || !newUser.password}>
-                {creatingUser ? 'Creando...' : 'Crear usuario'}
-              </button>
+        </section>
+
+        <section className="content">
+          <div className="container-fluid">
+            {/* Tenant Switcher */}
+            <div className="card card-outline card-primary shadow-sm mb-4">
+              <div className="card-header border-0">
+                <h3 className="card-title text-primary font-weight-bold"><i className="fas fa-search mr-2"></i>Selección de Tenant Cliente</h3>
+              </div>
+              <div className="card-body">
+                <div className="row align-items-center">
+                  <div className="col-md-6">
+                    <div className="input-group">
+                      <input
+                        className="form-control"
+                        value={tenantInput}
+                        onChange={e => setTenantInput(e.target.value)}
+                        placeholder="Ej: tenant-123"
+                      />
+                      <div className="input-group-append">
+                        <button className="btn btn-primary" onClick={() => setTenantId(tenantInput)}>
+                           Cargar Datos
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-6 text-md-right mt-3 mt-md-0">
+                    <p className="mb-0 text-muted">Viendo: <span className="font-weight-bold text-dark">{tenantId}</span></p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <h3>Resetear contrasena</h3>
-            <div className="company-form-grid">
-              <label>
-                <span>Usuario</span>
-                <select value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
-                  <option value="">Seleccionar</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.email}
-                    </option>
+            <div className="row">
+              {/* Billing Info */}
+              <div className="col-lg-12">
+                <div className="card shadow-sm border-0">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturación y Planes</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-md-6 border-right">
+                        <h6 className="text-muted text-uppercase mb-3 small font-weight-bold">Planes Contratados</h6>
+                        <div className="list-group list-group-flush shadow-sm rounded">
+                           {plans.map(p => (
+                             <div key={p._id} className="list-group-item d-flex justify-content-between align-items-center">
+                               {p.name}
+                               <span className="badge badge-pill badge-info">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
+                             </div>
+                           ))}
+                        </div>
+                      </div>
+                      <div className="col-md-6 pl-md-4">
+                        <h6 className="text-muted text-uppercase mb-3 small font-weight-bold">Historial de Pagos</h6>
+                        <div className="list-group list-group-flush shadow-sm rounded">
+                           {invoices.map(i => (
+                             <div key={i._id} className="list-group-item d-flex justify-content-between align-items-center">
+                               {i.period}
+                               <span className={`badge ${i.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>{i.status}</span>
+                             </div>
+                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Devices Management */}
+            <div className="card shadow-sm mt-4 border-0">
+              <div className="card-header bg-white">
+                <h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Gestión de Sensores</h3>
+              </div>
+              <div className="card-body">
+                <div className="row mb-4">
+                  <div className="col-md-3">
+                    <div className="form-group mb-0">
+                      <label className="small font-weight-bold">Device ID</label>
+                      <input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-..." />
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="form-group mb-0">
+                      <label className="small font-weight-bold">Nombre</label>
+                      <input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" />
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="form-group mb-0">
+                      <label className="small font-weight-bold">Dirección</label>
+                      <input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" />
+                    </div>
+                  </div>
+                  <div className="col-md-2 d-flex align-items-end">
+                    <button className="btn btn-success btn-block font-weight-bold" onClick={() => void createDevice()} disabled={creatingDevice}>
+                       {creatingDevice ? '...' : 'Vincular'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="row">
+                  {devices.map(d => (
+                    <div key={d._id} className="col-md-3 col-sm-6 mb-3">
+                      <div className="info-box shadow-none border m-0 h-100">
+                        <span className="info-box-icon bg-light"><i className="fas fa-broadcast-tower text-muted"></i></span>
+                        <div className="info-box-content">
+                          <span className="info-box-text font-weight-bold">{d.name}</span>
+                          <span className="info-box-number small text-muted">{d.deviceId}</span>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </label>
-              <label>
-                <span>Nueva contrasena</span>
-                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} />
-              </label>
+                </div>
+              </div>
             </div>
-            <div className="company-actions">
-              <button onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>
-                Resetear contrasena
-              </button>
+
+            {/* Users & ARCA */}
+            <div className="row mt-4 mb-5">
+              <div className="col-md-8">
+                <div className="card shadow-sm border-0 h-100">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-users mr-2"></i>Usuarios del Cliente</h3>
+                  </div>
+                  <div className="card-body p-0">
+                    <div className="table-responsive">
+                      <table className="table table-hover table-sm m-0">
+                        <thead className="bg-light">
+                          <tr><th>Email</th><th>Rol</th><th>Estatus</th></tr>
+                        </thead>
+                        <tbody>
+                          {users.map(u => (
+                            <tr key={u.id}>
+                              <td>{u.email}</td>
+                              <td><span className="badge badge-light border">{u.role}</span></td>
+                              <td>{u.mustChangePassword ? <span className="text-warning small"><i className="fas fa-exclamation-triangle mr-1"></i>Pendiente</span> : <span className="text-success small">OK</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="card shadow-sm border-0 h-100">
+                  <div className="card-header bg-white">
+                    <h3 className="card-title font-weight-bold"><i className="fas fa-shield-alt mr-2"></i>Configuración ARCA</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="form-group font-weight-bold small">
+                      <label>CUIT Asociado</label>
+                      <input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} />
+                    </div>
+                    <div className="form-group font-weight-bold small">
+                      <label>Punto de Venta</label>
+                      <input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} />
+                    </div>
+                    <button className="btn btn-danger btn-block font-weight-bold mt-2" onClick={() => void saveArcaConfig()} disabled={savingArca}>
+                       {savingArca ? '...' : 'Actualizar Datos Fiscales'}
+                    </button>
+                    <hr />
+                    <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
-
-      <section className="company-panel">
-        <h2>Configuracion ARCA por cliente</h2>
-        <div className="company-form-grid">
-          <label>
-            <span>Habilitar ARCA</span>
-            <select
-              value={arcaConfig.enabled ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, enabled: e.target.value === 'yes' }))}
-            >
-              <option value="no">No</option>
-              <option value="yes">Si</option>
-            </select>
-          </label>
-          <label>
-            <span>Modo mock</span>
-            <select
-              value={arcaConfig.mock ? 'yes' : 'no'}
-              onChange={e => setArcaConfig(prev => ({ ...prev, mock: e.target.value === 'yes' }))}
-            >
-              <option value="yes">Si (pruebas)</option>
-              <option value="no">No (real)</option>
-            </select>
-          </label>
-          <label>
-            <span>CUIT</span>
-            <input value={arcaConfig.cuit} onChange={e => setArcaConfig(prev => ({ ...prev, cuit: e.target.value }))} />
-          </label>
-          <label>
-            <span>Punto de venta</span>
-            <input value={arcaConfig.ptoVta} onChange={e => setArcaConfig(prev => ({ ...prev, ptoVta: e.target.value }))} />
-          </label>
-          <label className="full">
-            <span>WSFE URL</span>
-            <input
-              value={arcaConfig.wsfeUrl}
-              onChange={e => setArcaConfig(prev => ({ ...prev, wsfeUrl: e.target.value }))}
-            />
-          </label>
-        </div>
-        <div className="company-actions">
-          <button onClick={() => void saveArcaConfig()} disabled={savingArca}>
-            {savingArca ? 'Guardando...' : 'Guardar ARCA cliente'}
-          </button>
-        </div>
-      </section>
-    </main>
+      <footer className="main-footer text-center small text-muted">
+        <strong>AgroSentinel Enterprise &copy; 2026</strong>
+      </footer>
+    </div>
   );
 }
 
