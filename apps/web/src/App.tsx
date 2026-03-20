@@ -1167,54 +1167,52 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                     <div className="card-body">
                       <div style={{ maxWidth: '500px' }}>
                         <label className="small font-weight-bold mb-1 d-block">Seleccionar Cliente</label>
-                        <div className="dropdown">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Buscar cliente..."
-                            value={clientSearch}
-                            onChange={e => setClientSearch(e.target.value)}
-                            onFocus={() => { if (!clientSearch) setClientSearch(' '); }}
-                            autoComplete="off"
-                          />
-                          {clientSearch.trim().length > 0 && (
-                            <div className="dropdown-menu show w-100 mt-1" style={{ maxHeight: '220px', overflowY: 'auto' }}>
-                              {loadingClients ? (
-                                <div className="dropdown-item-text text-muted small py-2">
-                                  <i className="fas fa-spinner fa-spin mr-2"></i>Cargando...
-                                </div>
-                              ) : clients
-                                  .filter(c =>
-                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                  ).length === 0 ? (
-                                <div className="dropdown-item-text text-muted small py-2">
-                                  No se encontraron clientes
-                                </div>
-                              ) : (
-                                clients
-                                  .filter(c =>
-                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                  )
-                                  .map(c => (
-                                    <button
-                                      key={c._id}
-                                      className={`dropdown-item ${tenantId === c.tenantId ? 'active' : ''}`}
-                                      onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
-                                    >
-                                      <div className="font-weight-bold small">{c.companyName}</div>
-                                      <div className="text-muted xsmall">{c.contactName || c.email || c.tenantId}</div>
-                                    </button>
-                                  ))
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Buscar cliente..."
+                          value={clientSearch}
+                          onChange={e => setClientSearch(e.target.value)}
+                          autoComplete="off"
+                        />
+                        {clientSearch && (
+                          <div className="border rounded mt-1 bg-white" style={{ maxHeight: '220px', overflowY: 'auto', zIndex: 100 }}>
+                            {loadingClients ? (
+                              <div className="p-2 text-muted small text-center">
+                                <i className="fas fa-spinner fa-spin mr-2"></i>Cargando...
+                              </div>
+                            ) : clients
+                                .filter(c =>
+                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                ).length === 0 ? (
+                              <div className="p-2 text-muted small text-center">
+                                No se encontraron clientes
+                              </div>
+                            ) : (
+                              clients
+                                .filter(c =>
+                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                )
+                                .map(c => (
+                                  <div
+                                    key={c._id}
+                                    className={`px-3 py-2 border-bottom ${tenantId === c.tenantId ? 'bg-primary text-white' : ''}`}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                  >
+                                    <div className="font-weight-bold small">{c.companyName}</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{c.contactName || c.email || c.tenantId}</div>
+                                  </div>
+                                ))
+                            )}
+                          </div>
+                        )}
                         {tenantId && (
                           <div className="mt-2 small text-muted">
                             <i className="fas fa-check text-success mr-1"></i>
