@@ -748,7 +748,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
-  const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
@@ -1166,89 +1165,85 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       </button>
                     </div>
                     <div className="card-body">
-                      <div style={{ position: 'relative', maxWidth: '600px' }}>
-                        <div className="input-group">
-                          <div className="input-group-prepend">
-                            <span className="input-group-text"><i className="fas fa-search"></i></span>
-                          </div>
-                          <input
-                            className="form-control"
-                            value={clientSearch}
-                            onChange={e => setClientSearch(e.target.value)}
-                            onBlur={() => setTimeout(() => setClientSearch(''), 200)}
-                            placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
-                          />
-                          {clientSearch && (
-                            <div className="input-group-append">
-                              <button className="btn btn-default" onMouseDown={e => e.preventDefault()} onClick={() => setClientSearch('')}>
-                                <i className="fas fa-times"></i>
-                              </button>
+                      <div className="row align-items-center mb-3">
+                        <div className="col-md-8">
+                          <div className="input-group">
+                            <div className="input-group-prepend">
+                              <span className="input-group-text"><i className="fas fa-search"></i></span>
                             </div>
-                          )}
+                            <input
+                              className="form-control"
+                              value={clientSearch}
+                              onChange={e => setClientSearch(e.target.value)}
+                              placeholder="Filtrar clientes..."
+                            />
+                          </div>
                         </div>
-                        {clientSearch && (
-                          <div
-                            ref={clientDropdownRef}
-                            className="list-group shadow-sm"
-                            style={{
-                              position: 'absolute',
-                              top: 'calc(100% + 2px)',
-                              left: 0,
-                              right: 0,
-                              zIndex: 9999,
-                              maxHeight: '260px',
-                              overflowY: 'auto',
-                              borderRadius: '4px',
-                              backgroundColor: 'white'
-                            }}
-                          >
-                            {loadingClients ? (
-                              <div className="list-group-item text-center text-muted py-3">
-                                <i className="fas fa-spinner fa-spin"></i> Cargando...
-                              </div>
-                            ) : clients
+                        <div className="col-md-4 text-right">
+                          <span className="text-muted small">{clients.length} cliente{clients.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      </div>
+                      {loadingClients ? (
+                        <div className="text-center text-muted py-4">
+                          <i className="fas fa-spinner fa-spin fa-2x"></i>
+                          <p className="mt-2 mb-0">Cargando clientes...</p>
+                        </div>
+                      ) : (
+                        <div className="table-responsive" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                          <table className="table table-hover table-sm m-0">
+                            <thead className="bg-light" style={{ position: 'sticky', top: 0 }}>
+                              <tr>
+                                <th>Empresa</th>
+                                <th>Contacto</th>
+                                <th>Email</th>
+                                <th>ID Tenant</th>
+                                <th></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {clients
                                 .filter(c =>
-                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                ).length === 0 ? (
-                              <div className="list-group-item text-center text-muted py-3">
-                                <i className="fas fa-search mr-2"></i>No se encontraron clientes
-                              </div>
-                            ) : (
-                              clients
-                                .filter(c =>
+                                  !clientSearch ||
                                   c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
                                 )
                                 .map(c => (
-                                  <div
+                                  <tr
                                     key={c._id}
-                                    className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
-                                    onMouseDown={e => e.preventDefault()}
-                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                    className={tenantId === c.tenantId ? 'table-primary' : ''}
                                     style={{ cursor: 'pointer' }}
+                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); }}
                                   >
-                                    <div>
-                                      <div className="font-weight-bold">{c.companyName}</div>
-                                      <div className="small">
-                                        <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
-                                        {c.email && <><span className="mx-1">·</span><span className="text-muted">{c.email}</span></>}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="small text-muted">{c.tenantId}</div>
-                                      {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
-                                    </div>
-                                  </div>
-                                ))
-                            )}
-                          </div>
-                        )}
-                      </div>
+                                    <td className="font-weight-bold">{c.companyName}</td>
+                                    <td className="small text-muted">{c.contactName || '—'}</td>
+                                    <td className="small text-muted">{c.email || '—'}</td>
+                                    <td><span className="badge badge-secondary small">{c.tenantId}</span></td>
+                                    <td>
+                                      {tenantId === c.tenantId
+                                        ? <span className="badge badge-success"><i className="fas fa-check mr-1"></i>Activo</span>
+                                        : <span className="small text-muted">Clic para seleccionar</span>
+                                      }
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                          {clients.filter(c =>
+                            !clientSearch ||
+                            c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                          ).length === 0 && (
+                            <div className="text-center text-muted py-4">
+                              <i className="fas fa-folder-open fa-2x mb-2"></i>
+                              <p className="mb-0">{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="card shadow-sm border-0 mt-3">
