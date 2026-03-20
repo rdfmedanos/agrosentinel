@@ -3,6 +3,13 @@ import { Schema, model } from 'mongoose';
 const tenantConfigSchema = new Schema(
   {
     tenantId: { type: String, required: true, unique: true, index: true },
+    companyName: { type: String, required: true },
+    contactName: { type: String, default: '' },
+    email: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    address: { type: String, default: '' },
+    planId: { type: Schema.Types.ObjectId, ref: 'Plan', default: null },
+    active: { type: Boolean, default: true },
     arca: {
       enabled: { type: Boolean, default: false },
       mock: { type: Boolean, default: true },

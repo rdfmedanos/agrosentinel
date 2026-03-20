@@ -4,6 +4,7 @@ import { alertsRouter } from './alerts.routes.js';
 import { authRouter } from './auth.routes.js';
 import { billingRouter } from './billing.routes.js';
 import { devicesRouter } from './devices.routes.js';
+import { tenantsRouter } from './tenants.routes.js';
 import { workOrdersRouter } from './workOrders.routes.js';
 
 export const apiRouter = Router();
@@ -13,6 +14,7 @@ apiRouter.get('/health', (_, res) => {
 });
 
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/tenants', tenantsRouter);
 
 apiRouter.use(requireAuth);
 

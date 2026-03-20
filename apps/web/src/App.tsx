@@ -749,6 +749,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   });
   const [resetPassword, setResetPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [newClient, setNewClient] = useState({
+    companyName: '',
+    contactName: '',
+    email: '',
+    phone: '',
+    address: '',
+    tenantId: '',
+    planId: ''
+  });
 
   const loadCompanyData = useCallback(async (targetTenant: string) => {
     const token = props.session.token;
@@ -1118,12 +1129,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
               <div className="row">
                 <div className="col-12">
                   <div className="card card-outline card-primary shadow-sm">
-                    <div className="card-header border-0">
-                      <h3 className="card-title text-primary font-weight-bold"><i className="fas fa-search mr-2"></i>Selector de Cliente</h3>
+                    <div className="card-header border-0 d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-primary font-weight-bold mb-0"><i className="fas fa-search mr-2"></i>Selector de Cliente</h3>
+                      <button className="btn btn-success btn-sm" onClick={() => setShowAddClient(true)}>
+                        <i className="fas fa-plus mr-1"></i>Agregar Cliente
+                      </button>
                     </div>
                     <div className="card-body">
                       <div className="row align-items-center">
-                        <div className="col-md-6">
+                        <div className="col-md-5">
                           <div className="input-group" style={{ maxWidth: '400px' }}>
                             <input className="form-control form-control-sm" value={tenantInput}
                               onChange={e => setTenantInput(e.target.value)} placeholder="ID del tenant (ej: demo-tenant)" />
@@ -1134,7 +1148,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                             </div>
                           </div>
                         </div>
-                        <div className="col-md-6 text-md-right mt-3 mt-md-0">
+                        <div className="col-md-7 text-md-right mt-3 mt-md-0">
                           <span className="font-weight-bold text-dark">Cliente actual: <span className="badge badge-primary">{tenantId}</span></span>
                         </div>
                       </div>
@@ -1463,6 +1477,102 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
           </div>
         </section>
       </div>
+
+      {showAddClient && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={e => { if ((e.target as HTMLElement).classList.contains('modal')) setShowAddClient(false); }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title"><i className="fas fa-building mr-2"></i>Agregar Nuevo Cliente</h5>
+                <button type="button" className="close text-white" onClick={() => setShowAddClient(false)}>
+                  <span>&times;</span>
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="small font-weight-bold">Nombre de la Empresa *</label>
+                  <input className="form-control" value={newClient.companyName}
+                    onChange={e => setNewClient(p => ({ ...p, companyName: e.target.value }))}
+                    placeholder="Estancia Don Juan" />
+                </div>
+                <div className="row">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label className="small font-weight-bold">Nombre del Contacto</label>
+                      <input className="form-control" value={newClient.contactName}
+                        onChange={e => setNewClient(p => ({ ...p, contactName: e.target.value }))}
+                        placeholder="Juan Perez" />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label className="small font-weight-bold">Teléfono</label>
+                      <input className="form-control" value={newClient.phone}
+                        onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))}
+                        placeholder="+54 9 11 1234-5678" />
+                    </div>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="small font-weight-bold">Email de Contacto *</label>
+                  <input className="form-control" type="email" value={newClient.email}
+                    onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))}
+                    placeholder="contacto@estancia.com" />
+                </div>
+                <div className="form-group">
+                  <label className="small font-weight-bold">Dirección</label>
+                  <input className="form-control" value={newClient.address}
+                    onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))}
+                    placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
+                </div>
+                <div className="form-group">
+                  <label className="small font-weight-bold">ID de Tenant * <span className="text-muted small">(usado internamente)</span></label>
+                  <input className="form-control" value={newClient.tenantId}
+                    onChange={e => setNewClient(p => ({ ...p, tenantId: e.target.value }))}
+                    placeholder="estancia-juan-001" />
+                </div>
+                <div className="form-group">
+                  <label className="small font-weight-bold">Plan</label>
+                  <select className="form-control" value={newClient.planId}
+                    onChange={e => setNewClient(p => ({ ...p, planId: e.target.value }))}>
+                    <option value="">Seleccionar plan...</option>
+                    {plans.map(p => <option key={p._id} value={p._id}>{p.name} - ${p.monthlyPriceArs.toLocaleString('es-AR')}/mes</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
+                <button type="button" className="btn btn-success"
+                  disabled={!newClient.companyName || !newClient.email || !newClient.tenantId || creatingClient}
+                  onClick={async () => {
+                    setCreatingClient(true);
+                    try {
+                      await postJson('/tenants', {
+                        tenantId: newClient.tenantId,
+                        companyName: newClient.companyName,
+                        contactName: newClient.contactName,
+                        email: newClient.email,
+                        phone: newClient.phone,
+                        address: newClient.address,
+                        planId: newClient.planId || undefined
+                      }, props.session.token);
+                      setShowAddClient(false);
+                      setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', tenantId: '', planId: '' });
+                      setTenantId(newClient.tenantId);
+                      setTenantInput(newClient.tenantId);
+                    } catch {
+                      alert('Error al crear el cliente');
+                    } finally {
+                      setCreatingClient(false);
+                    }
+                  }}>
+                  {creatingClient ? 'Creando...' : <><i className="fas fa-check mr-1"></i>Crear Cliente</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="main-footer" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
         <div className="float-right d-none d-sm-inline-block">
