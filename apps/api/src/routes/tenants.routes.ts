@@ -4,7 +4,6 @@ import { TenantConfigModel } from '../models/TenantConfig.js';
 import { requireCompanyAdmin } from '../auth/auth.js';
 
 const createTenantSchema = z.object({
-  tenantId: z.string().min(1),
   companyName: z.string().min(1),
   contactName: z.string().optional(),
   email: z.string().optional(),
@@ -12,6 +11,20 @@ const createTenantSchema = z.object({
   address: z.string().optional(),
   planId: z.string().optional()
 });
+
+function generateTenantId(companyName: string): string {
+  const base = companyName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 30);
+  const suffix = Math.random().toString(36).substring(2, 7);
+  return `${base}-${suffix}`;
+}
 
 export const tenantsRouter = Router();
 
@@ -25,14 +38,20 @@ tenantsRouter.get('/', async (req, res) => {
 tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
   const data = createTenantSchema.parse(req.body);
 
-  const existing = await TenantConfigModel.findOne({ tenantId: data.tenantId });
-  if (existing) {
-    res.status(409).json({ error: 'El tenant ya existe' });
+  const tenantId = generateTenantId(data.companyName);
+  let attempts = 0;
+
+  while (await TenantConfigModel.findOne({ tenantId }) && attempts < 5) {
+    attempts++;
+  }
+
+  if (attempts >= 5) {
+    res.status(500).json({ error: 'No se pudo generar un ID único para el cliente' });
     return;
   }
 
   const created = await TenantConfigModel.create({
-    tenantId: data.tenantId,
+    tenantId,
     companyName: data.companyName,
     contactName: data.contactName ?? '',
     email: data.email ?? '',

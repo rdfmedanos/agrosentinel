@@ -757,7 +757,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     email: '',
     phone: '',
     address: '',
-    tenantId: '',
     planId: ''
   });
 
@@ -1526,12 +1525,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                     placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
                 </div>
                 <div className="form-group">
-                  <label className="small font-weight-bold">ID de Tenant * <span className="text-muted small">(usado internamente)</span></label>
-                  <input className="form-control" value={newClient.tenantId}
-                    onChange={e => setNewClient(p => ({ ...p, tenantId: e.target.value }))}
-                    placeholder="estancia-juan-001" />
-                </div>
-                <div className="form-group">
                   <label className="small font-weight-bold">Plan</label>
                   <select className="form-control" value={newClient.planId}
                     onChange={e => setNewClient(p => ({ ...p, planId: e.target.value }))}>
@@ -1543,12 +1536,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
               <div className="modal-footer">
                 <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
                 <button type="button" className="btn btn-success"
-                  disabled={!newClient.companyName || !newClient.email || !newClient.tenantId || creatingClient}
+                  disabled={!newClient.companyName || !newClient.email || creatingClient}
                   onClick={async () => {
                     setCreatingClient(true);
                     try {
-                      await postJson('/tenants', {
-                        tenantId: newClient.tenantId,
+                      const res = await postJson('/tenants', {
                         companyName: newClient.companyName,
                         contactName: newClient.contactName,
                         email: newClient.email,
@@ -1556,10 +1548,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                         address: newClient.address,
                         planId: newClient.planId || undefined
                       }, props.session.token);
+                      const data = await res.json() as { tenantId: string };
                       setShowAddClient(false);
-                      setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', tenantId: '', planId: '' });
-                      setTenantId(newClient.tenantId);
-                      setTenantInput(newClient.tenantId);
+                      setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
+                      setTenantId(data.tenantId);
+                      setTenantInput(data.tenantId);
                     } catch {
                       alert('Error al crear el cliente');
                     } finally {
