@@ -776,10 +776,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     void loadCompanyData(tenantId);
   }, [tenantId, loadCompanyData]);
 
-  useEffect(() => {
-    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection));
-    setConfigOpen(['facturacion', 'arca', 'reportes'].includes(activeSection));
-  }, [activeSection]);
+  const setSection = (section: AdminSection) => {
+    setActiveSection(section);
+    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(section));
+    setConfigOpen(['facturacion', 'arca', 'reportes'].includes(section));
+  };
 
   const createDevice = async () => {
     setCreatingDevice(true);
@@ -840,17 +841,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     tenants: allTenants.length
   }), [devices, alerts, users, allTenants]);
 
-  const navLink = (section: AdminSection, icon: string, label: string, extra?: string) => (
-    <a
-      href="#"
-      className={`nav-link ${activeSection === section ? 'active' : ''} ${extra || ''}`}
-      onClick={e => { e.preventDefault(); setActiveSection(section); }}
-    >
-      <i className={`nav-icon fas ${icon}`}></i>
-      <p>{label}</p>
-    </a>
-  );
-
   const sectionTitle = () => {
     const map: Record<AdminSection, string> = {
       dashboard: 'Dashboard',
@@ -905,36 +895,41 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         <div className="sidebar">
           <nav className="mt-2">
             <ul className="nav nav-pills nav-sidebar flex-column nav-child-indent" role="menu">
-              <li className="nav-item">{navLink('dashboard', 'fa-tachometer-alt', 'Dashboard')}</li>
+              <li className="nav-item">
+                <a href="#" className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`}
+                  onClick={e => { e.preventDefault(); setSection('dashboard'); }}>
+                  <i className="nav-icon fas fa-tachometer-alt"></i><p>Dashboard</p>
+                </a>
+              </li>
 
               <li className="nav-item has-treeview">
                 <a href="#" className="nav-link"
-                  onClick={e => { e.preventDefault(); setOperacionOpen(!operacionOpen); }}>
+                  onClick={e => { e.preventDefault(); setSection('clientes'); }}>
                   <i className="nav-icon fas fa-cogs"></i>
                   <p>Operación <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
                 <ul className={`nav nav-treeview ${operacionOpen ? 'd-block' : ''}`}>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'clientes' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('clientes'); }}>
+                      onClick={e => { e.preventDefault(); setSection('clientes'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Clientes</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'dispositivos' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('dispositivos'); }}>
+                      onClick={e => { e.preventDefault(); setSection('dispositivos'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Dispositivos</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('usuarios'); }}>
+                      onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('notificaciones'); }}>
+                      onClick={e => { e.preventDefault(); setSection('notificaciones'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
                     </a>
                   </li>
@@ -943,33 +938,38 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
               <li className="nav-item has-treeview">
                 <a href="#" className="nav-link"
-                  onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); }}>
+                  onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
                   <i className="nav-icon fas fa-cog"></i>
                   <p>Configuración <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
                 <ul className={`nav nav-treeview ${configOpen ? 'd-block' : ''}`}>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('facturacion'); }}>
+                      onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Facturación y Planes</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('arca'); }}>
+                      onClick={e => { e.preventDefault(); setSection('arca'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Configuración ARCA</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setActiveSection('reportes'); }}>
+                      onClick={e => { e.preventDefault(); setSection('reportes'); }}>
                       <i className="far fa-circle nav-icon"></i><p>Reportes</p>
                     </a>
                   </li>
                 </ul>
               </li>
 
-              <li className="nav-item">{navLink('actividad', 'fa-history', 'Actividad')}</li>
+              <li className="nav-item">
+                <a href="#" className={`nav-link ${activeSection === 'actividad' ? 'active' : ''}`}
+                  onClick={e => { e.preventDefault(); setSection('actividad'); }}>
+                  <i className="nav-icon fas fa-history"></i><p>Actividad</p>
+                </a>
+              </li>
             </ul>
           </nav>
         </div>
@@ -984,7 +984,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
               </div>
               <div className="col-sm-6">
                 <ol className="breadcrumb float-sm-right bg-white shadow-sm rounded px-3 py-2 mb-0">
-                  <li className="breadcrumb-item"><a href="#" onClick={e => { e.preventDefault(); setActiveSection('dashboard'); }}>Home</a></li>
+                  <li className="breadcrumb-item"><a href="#" onClick={e => { e.preventDefault(); setSection('dashboard'); }}>Home</a></li>
                   <li className="breadcrumb-item active">{sectionTitle()}</li>
                 </ol>
               </div>
