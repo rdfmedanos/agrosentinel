@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
@@ -747,7 +747,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
@@ -815,6 +817,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   useEffect(() => {
     void loadClients();
   }, [loadClients]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const setSection = (section: AdminSection) => {
     setActiveSection(section);
@@ -1165,7 +1177,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       </button>
                     </div>
                     <div className="card-body">
-                      <div style={{ position: 'relative', maxWidth: '600px' }}>
+                      <div ref={clientDropdownRef} style={{ position: 'relative', maxWidth: '600px' }}>
                         <div className="input-group">
                           <div className="input-group-prepend">
                             <span className="input-group-text"><i className="fas fa-search"></i></span>
@@ -1173,78 +1185,80 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                           <input
                             className="form-control"
                             value={clientSearch}
-                            onChange={e => setClientSearch(e.target.value)}
-                            onFocus={() => setClientSearch('')}
+                            onChange={e => { setClientSearch(e.target.value); setShowClientDropdown(true); }}
+                            onFocus={() => setShowClientDropdown(true)}
                             placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
                           />
-                          <div className="input-group-append">
-                            <button className="btn btn-default" onClick={() => { setClientSearch(''); setClientSearch(clients.find(c => c.tenantId === tenantId)?.companyName || ''); }}>
-                              <i className="fas fa-sync-alt"></i>
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          className="list-group shadow"
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            zIndex: 1000,
-                            maxHeight: '280px',
-                            overflowY: 'auto',
-                            marginTop: '4px',
-                            borderRadius: '4px'
-                          }}
-                        >
-                          {loadingClients ? (
-                            <div className="list-group-item text-center text-muted py-3">
-                              <i className="fas fa-spinner fa-spin"></i> Cargando...
+                          {clientSearch && (
+                            <div className="input-group-append">
+                              <button className="btn btn-default" onClick={() => { setClientSearch(''); setShowClientDropdown(false); }}>
+                                <i className="fas fa-times"></i>
+                              </button>
                             </div>
-                          ) : (
-                            <>
-                              {clients
-                                .filter(c =>
-                                  !clientSearch ||
+                          )}
+                        </div>
+                        {showClientDropdown && clientSearch && (
+                          <div
+                            className="list-group shadow-sm"
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              zIndex: 1050,
+                              maxHeight: '260px',
+                              overflowY: 'auto',
+                              marginTop: '2px',
+                              borderRadius: '4px'
+                            }}
+                          >
+                            {loadingClients ? (
+                              <div className="list-group-item text-center text-muted py-3">
+                                <i className="fas fa-spinner fa-spin"></i> Cargando...
+                              </div>
+                            ) : (
+                              <>
+                                {clients
+                                  .filter(c =>
+                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                  )
+                                  .map(c => (
+                                    <div
+                                      key={c._id}
+                                      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
+                                      onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); setShowClientDropdown(false); }}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      <div>
+                                        <div className="font-weight-bold">{c.companyName}</div>
+                                        <div className="small">
+                                          <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
+                                          {c.email && <><span className="mx-1">·</span><span className="text-muted">{c.email}</span></>}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="small text-muted">{c.tenantId}</div>
+                                        {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                {clients.filter(c =>
                                   c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                )
-                                .map(c => (
-                                  <div
-                                    key={c._id}
-                                    className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
-                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
-                                    style={{ cursor: 'pointer' }}
-                                  >
-                                    <div>
-                                      <div className="font-weight-bold">{c.companyName}</div>
-                                      <div className="small">
-                                        <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
-                                        {c.email && <><span className="mx-1 text-muted">·</span><span className="text-muted">{c.email}</span></>}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="small text-muted">{c.tenantId}</div>
-                                      {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
-                                    </div>
+                                ).length === 0 && (
+                                  <div className="list-group-item text-center text-muted py-3">
+                                    <i className="fas fa-search mr-2"></i>No se encontraron clientes
                                   </div>
-                                ))}
-                              {clients.filter(c =>
-                                !clientSearch ||
-                                c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                              ).length === 0 && (
-                                <div className="list-group-item text-center text-muted py-3">
-                                  <i className="fas fa-search mr-2"></i>{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
