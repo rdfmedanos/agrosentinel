@@ -1478,16 +1478,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
       </div>
 
       {showAddClient && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={e => { if ((e.target as HTMLElement).classList.contains('modal')) setShowAddClient(false); }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflow: 'hidden' }} onClick={e => { if ((e.target as HTMLElement).classList.contains('modal')) setShowAddClient(false); }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxHeight: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+            <div className="modal-content" style={{ maxHeight: '100%', display: 'flex', flexDirection: 'column' }}>
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title"><i className="fas fa-building mr-2"></i>Agregar Nuevo Cliente</h5>
                 <button type="button" className="close text-white" onClick={() => setShowAddClient(false)}>
                   <span>&times;</span>
                 </button>
               </div>
-              <div className="modal-body">
+              <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
                 <div className="form-group">
                   <label className="small font-weight-bold">Nombre de la Empresa *</label>
                   <input className="form-control" value={newClient.companyName}
@@ -1533,7 +1533,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                   </select>
                 </div>
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
                 <button type="button" className="btn btn-success"
                   disabled={!newClient.companyName || !newClient.email || creatingClient}
