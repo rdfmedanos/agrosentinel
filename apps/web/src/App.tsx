@@ -725,7 +725,8 @@ type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'fa
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [configMenuOpen, setConfigMenuOpen] = useState(true);
+  const [operacionOpen, setOperacionOpen] = useState(true);
+  const [configOpen, setConfigOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
@@ -774,6 +775,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   useEffect(() => {
     void loadCompanyData(tenantId);
   }, [tenantId, props.session.token]);
+
+  useEffect(() => {
+    setOperacionOpen(false);
+    setConfigOpen(false);
+  }, [activeSection]);
 
   const createDevice = async () => {
     setCreatingDevice(true);
@@ -901,39 +907,63 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             <ul className="nav nav-pills nav-sidebar flex-column nav-child-indent" role="menu">
               <li className="nav-item">{navLink('dashboard', 'fa-tachometer-alt', 'Dashboard')}</li>
 
-              <li className="nav-header text-uppercase text-gray">Operación</li>
-              <li className="nav-item">{navLink('clientes', 'fa-building', 'Clientes')}</li>
-              <li className="nav-item">{navLink('dispositivos', 'fa-microchip', 'Dispositivos')}</li>
-              <li className="nav-item">{navLink('usuarios', 'fa-users', 'Usuarios')}</li>
-              <li className="nav-item">{navLink('notificaciones', 'fa-bell', 'Notificaciones')}</li>
-
-              <li className="nav-header text-uppercase text-gray">Configuración</li>
               <li className="nav-item has-treeview">
-                <a href="#" className={`nav-link ${configMenuOpen ? '' : ''}`}
-                  onClick={e => { e.preventDefault(); setConfigMenuOpen(!configMenuOpen); }}>
-                  <i className="nav-icon fas fa-cog"></i>
-                  <p>Configuración <i className={`right fas fa-angle-left ${configMenuOpen ? 'fa-rotate-90' : ''}`}></i></p>
+                <a href="#" className="nav-link"
+                  onClick={e => { e.preventDefault(); setOperacionOpen(!operacionOpen); }}>
+                  <i className="nav-icon fas fa-cogs"></i>
+                  <p>Operación <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
-                <ul className={`nav nav-treeview ${configMenuOpen ? 'd-block' : ''}`}>
+                <ul className={`nav nav-treeview ${operacionOpen ? 'd-block' : ''}`}>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'clientes' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('clientes'); }}>
+                      <i className="far fa-circle nav-icon"></i><p>Clientes</p>
+                    </a>
+                  </li>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'dispositivos' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('dispositivos'); }}>
+                      <i className="far fa-circle nav-icon"></i><p>Dispositivos</p>
+                    </a>
+                  </li>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('usuarios'); }}>
+                      <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
+                    </a>
+                  </li>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('notificaciones'); }}>
+                      <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+
+              <li className="nav-item has-treeview">
+                <a href="#" className="nav-link"
+                  onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); }}>
+                  <i className="nav-icon fas fa-cog"></i>
+                  <p>Configuración <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
+                </a>
+                <ul className={`nav nav-treeview ${configOpen ? 'd-block' : ''}`}>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
                       onClick={e => { e.preventDefault(); setActiveSection('facturacion'); }}>
-                      <i className="far fa-circle nav-icon"></i>
-                      <p>Facturación y Planes</p>
+                      <i className="far fa-circle nav-icon"></i><p>Facturación y Planes</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
                       onClick={e => { e.preventDefault(); setActiveSection('arca'); }}>
-                      <i className="far fa-circle nav-icon"></i>
-                      <p>Configuración ARCA</p>
+                      <i className="far fa-circle nav-icon"></i><p>Configuración ARCA</p>
                     </a>
                   </li>
                   <li className="nav-item" style={{ marginLeft: '1rem' }}>
                     <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
                       onClick={e => { e.preventDefault(); setActiveSection('reportes'); }}>
-                      <i className="far fa-circle nav-icon"></i>
-                      <p>Reportes</p>
+                      <i className="far fa-circle nav-icon"></i><p>Reportes</p>
                     </a>
                   </li>
                 </ul>
