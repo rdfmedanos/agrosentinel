@@ -861,38 +861,59 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
       <nav className="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
         <ul className="navbar-nav">
           <li className="nav-item">
-            <button className="nav-link btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            <a className="nav-link" data-widget="pushmenu" href="#" onClick={e => { e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed); }}>
               <i className="fas fa-bars"></i>
-            </button>
+            </a>
           </li>
-          <li className="nav-item d-none d-sm-inline-block">
-            <a href="/" className="nav-link">Web Principal</a>
+          <li className="nav-item d-none d-md-inline-block">
+            <a href="/" className="nav-link"><i className="fas fa-home"></i> Web Principal</a>
           </li>
-          <li className="nav-item d-none d-sm-inline-block">
-            <a href="/panel-cliente" className="nav-link">Panel Cliente</a>
+          <li className="nav-item d-none d-md-inline-block">
+            <a href="/panel-cliente" className="nav-link"><i className="fas fa-warehouse"></i> Panel Cliente</a>
           </li>
         </ul>
         <ul className="navbar-nav ml-auto">
           <li className="nav-item dropdown">
-            <span className="nav-link">
-              <i className="far fa-user"></i>
-              <span className="ml-2 text-sm text-muted">{props.session.user.name}</span>
-            </span>
+            <a className="nav-link dropdown-toggle" data-toggle="dropdown" href="#">
+              <i className="far fa-user-circle"></i>
+              <span className="d-none d-md-inline ml-1 text-sm">{props.session.user.name}</span>
+            </a>
+            <div className="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+              <a href="#" className="dropdown-item">
+                <i className="fas fa-user mr-2"></i> {props.session.user.name}
+              </a>
+              <div className="dropdown-divider"></div>
+              <a href="#" className="dropdown-item">
+                <i className="fas fa-envelope mr-2"></i> {props.session.user.email}
+              </a>
+              <div className="dropdown-divider"></div>
+              <a href="#" className="dropdown-item text-danger" onClick={e => { e.preventDefault(); props.onLogout(); }}>
+                <i className="fas fa-sign-out-alt mr-2"></i> Cerrar sesión
+              </a>
+            </div>
           </li>
           <li className="nav-item">
-            <button onClick={props.onLogout} className="btn nav-link">
-              <i className="fas fa-sign-out-alt"></i>
-            </button>
+            <a className="nav-link" data-widget="fullscreen" href="#" onClick={e => e.preventDefault()}>
+              <i className="fas fa-expand-arrows-alt"></i>
+            </a>
           </li>
         </ul>
       </nav>
 
-      <aside className="main-sidebar sidebar-dark-primary elevation-4" style={{ overflowY: 'auto', maxHeight: '100vh', position: 'fixed', top: 0, bottom: 0, overflowX: 'hidden', zIndex: 1 }}>
-        <div className="brand-link text-center py-3">
+      <aside className="main-sidebar sidebar-dark-primary elevation-4" style={{ position: 'fixed', top: 0, bottom: 0, overflowX: 'hidden', zIndex: 1031 }}>
+        <a href="/" className="brand-link text-center py-2">
           <span className="brand-text font-weight-bold h4 text-white">AgroSentinel</span>
-          <div className="small text-white-50">Panel de Administración</div>
-        </div>
+        </a>
         <div className="sidebar">
+          <div className="user-panel mt-3 pb-3 mb-3 d-flex">
+            <div className="image">
+              <i className="fas fa-user-circle text-white" style={{ fontSize: '2rem' }}></i>
+            </div>
+            <div className="info">
+              <a href="#" className="d-block text-white font-weight-bold">{props.session.user.name}</a>
+              <span className="text-white-50 small text-uppercase">{props.session.user.role.replace('_', ' ')}</span>
+            </div>
+          </div>
           <nav className="mt-2">
             <ul className="nav nav-pills nav-sidebar flex-column nav-child-indent" role="menu">
               <li className="nav-item">
@@ -975,7 +996,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         </div>
       </aside>
 
-      <div className="content-wrapper" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
+      <div className="content-wrapper" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s', minHeight: 'calc(100vh - 57px - 52px)' }}>
         <section className="content-header">
           <div className="container-fluid">
             <div className="row mb-2 align-items-center">
@@ -1439,8 +1460,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         </section>
       </div>
 
-      <footer className="main-footer text-center small text-muted" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
-        <strong>AgroSentinel Enterprise &copy; 2026</strong>
+      <footer className="main-footer" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
+        <div className="float-right d-none d-sm-inline-block">
+          <strong>AgroSentinel Enterprise</strong> &copy; 2026
+        </div>
+        <strong>Plataforma de monitoreo IoT para aguadas rurales</strong>
       </footer>
     </div>
   );
