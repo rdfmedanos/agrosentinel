@@ -721,14 +721,20 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   );
 }
 
+type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad';
+
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [configMenuOpen, setConfigMenuOpen] = useState(true);
+  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
   const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [allTenants] = useState<string[]>([DEFAULT_TENANT_ID]);
   const [users, setUsers] = useState<AuthUser[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
   const [creatingDevice, setCreatingDevice] = useState(false);
@@ -746,19 +752,20 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const loadCompanyData = async (targetTenant: string) => {
     const token = props.session.token;
     try {
-      const [p, d, i, arca, tenantUsers] = await Promise.all([
+      const [p, d, i, arca, tenantUsers, a] = await Promise.all([
         getJson<Plan[]>('/billing/plans', token),
         getJson<Device[]>(`/devices?tenantId=${targetTenant}`, token),
         getJson<Invoice[]>(`/billing/invoices?tenantId=${targetTenant}`, token),
         getJson<ArcaConfig>(`/billing/arca-config?tenantId=${targetTenant}`, token),
-        getJson<AuthUser[]>(`/auth/admin/users?tenantId=${targetTenant}`, token)
+        getJson<AuthUser[]>(`/auth/admin/users?tenantId=${targetTenant}`, token),
+        getJson<Alert[]>(`/alerts?tenantId=${targetTenant}`, token)
       ]);
-
       setPlans(p);
       setDevices(d);
       setInvoices(i);
       setArcaConfig(arca);
       setUsers(tenantUsers);
+      setAlerts(a);
     } catch (err) {
       console.error('Error loading company data:', err);
     }
@@ -801,13 +808,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     try {
       await postJson(
         '/auth/admin/create-user',
-        {
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-          tenantId,
-          password: newUser.password
-        },
+        { name: newUser.name, email: newUser.email, role: newUser.role, tenantId, password: newUser.password },
         props.session.token
       );
       setNewUser({ name: '', email: '', role: 'owner', password: 'Cliente123!' });
@@ -824,10 +825,44 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     await loadCompanyData(tenantId);
   };
 
+  const stats = useMemo(() => ({
+    total: devices.length,
+    online: devices.filter(d => d.status === 'online').length,
+    offline: devices.filter(d => d.status === 'offline' || d.status === 'critical').length,
+    alerts: alerts.filter(a => a.status === 'open').length,
+    users: users.length,
+    tenants: allTenants.length
+  }), [devices, alerts, users, allTenants]);
+
+  const navLink = (section: AdminSection, icon: string, label: string, extra?: string) => (
+    <a
+      href="#"
+      className={`nav-link ${activeSection === section ? 'active' : ''} ${extra || ''}`}
+      onClick={e => { e.preventDefault(); setActiveSection(section); }}
+    >
+      <i className={`nav-icon fas ${icon}`}></i>
+      <p>{label}</p>
+    </a>
+  );
+
+  const sectionTitle = () => {
+    const map: Record<AdminSection, string> = {
+      dashboard: 'Dashboard',
+      clientes: 'Clientes',
+      dispositivos: 'Dispositivos',
+      usuarios: 'Usuarios',
+      facturacion: 'Facturación y Planes',
+      arca: 'Configuración ARCA',
+      notificaciones: 'Notificaciones',
+      reportes: 'Reportes',
+      actividad: 'Actividad'
+    };
+    return map[activeSection];
+  };
+
   return (
     <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
-      {/* Navbar */}
-      <nav className="main-header navbar navbar-expand navbar-white navbar-light">
+      <nav className="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
         <ul className="navbar-nav">
           <li className="nav-item">
             <button className="nav-link btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
@@ -835,52 +870,93 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             </button>
           </li>
           <li className="nav-item d-none d-sm-inline-block">
-            <a href="/" className="nav-link text-muted">Web Principal</a>
+            <a href="/" className="nav-link">Web Principal</a>
           </li>
           <li className="nav-item d-none d-sm-inline-block">
-            <a href="/panel-cliente" className="nav-link text-muted">Panel Cliente</a>
+            <a href="/panel-cliente" className="nav-link">Panel Cliente</a>
           </li>
         </ul>
-
         <ul className="navbar-nav ml-auto">
+          <li className="nav-item dropdown">
+            <span className="nav-link">
+              <i className="far fa-user"></i>
+              <span className="ml-2 text-sm text-muted">{props.session.user.name}</span>
+            </span>
+          </li>
           <li className="nav-item">
             <button onClick={props.onLogout} className="btn nav-link">
-              <i className="fas fa-sign-out-alt"></i> Salir
+              <i className="fas fa-sign-out-alt"></i>
             </button>
           </li>
         </ul>
       </nav>
 
-      {/* Sidebar */}
-      <aside className="main-sidebar sidebar-dark-primary elevation-4">
-        <div className="brand-link text-center pt-3 pb-3">
-          <span className="brand-text font-weight-bold h4">AgroSentinel</span>
+      <aside className="main-sidebar sidebar-dark-primary elevation-4" style={{ overflowY: 'auto', maxHeight: '100vh', position: 'fixed', top: 0, bottom: 0, overflowX: 'hidden', zIndex: 1 }}>
+        <div className="brand-link text-center py-3">
+          <span className="brand-text font-weight-bold h4 text-white">AgroSentinel</span>
+          <div className="small text-white-50">Panel de Administración</div>
         </div>
         <div className="sidebar">
-          <nav className="mt-4">
-            <ul className="nav nav-pills nav-sidebar flex-column" role="menu">
-              <li className="nav-header">ADMINISTRACIÓN</li>
-              <li className="nav-item">
-                <a href="#" className="nav-link active">
-                  <i className="nav-icon fas fa-building"></i>
-                  <p>Consola Central</p>
+          <nav className="mt-2">
+            <ul className="nav nav-pills nav-sidebar flex-column nav-child-indent" role="menu">
+              <li className="nav-item">{navLink('dashboard', 'fa-tachometer-alt', 'Dashboard')}</li>
+
+              <li className="nav-header text-uppercase text-gray">Operación</li>
+              <li className="nav-item">{navLink('clientes', 'fa-building', 'Clientes')}</li>
+              <li className="nav-item">{navLink('dispositivos', 'fa-microchip', 'Dispositivos')}</li>
+              <li className="nav-item">{navLink('usuarios', 'fa-users', 'Usuarios')}</li>
+              <li className="nav-item">{navLink('notificaciones', 'fa-bell', 'Notificaciones')}</li>
+
+              <li className="nav-header text-uppercase text-gray">Configuración</li>
+              <li className="nav-item has-treeview">
+                <a href="#" className={`nav-link ${configMenuOpen ? '' : ''}`}
+                  onClick={e => { e.preventDefault(); setConfigMenuOpen(!configMenuOpen); }}>
+                  <i className="nav-icon fas fa-cog"></i>
+                  <p>Configuración <i className={`right fas fa-angle-left ${configMenuOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
+                <ul className={`nav nav-treeview ${configMenuOpen ? 'd-block' : ''}`}>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('facturacion'); }}>
+                      <i className="far fa-circle nav-icon"></i>
+                      <p>Facturación y Planes</p>
+                    </a>
+                  </li>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('arca'); }}>
+                      <i className="far fa-circle nav-icon"></i>
+                      <p>Configuración ARCA</p>
+                    </a>
+                  </li>
+                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
+                    <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
+                      onClick={e => { e.preventDefault(); setActiveSection('reportes'); }}>
+                      <i className="far fa-circle nav-icon"></i>
+                      <p>Reportes</p>
+                    </a>
+                  </li>
+                </ul>
               </li>
+
+              <li className="nav-item">{navLink('actividad', 'fa-history', 'Actividad')}</li>
             </ul>
           </nav>
         </div>
       </aside>
 
-      {/* Content Wrapper */}
-      <div className="content-wrapper">
+      <div className="content-wrapper" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
         <section className="content-header">
           <div className="container-fluid">
-            <div className="row mb-2">
+            <div className="row mb-2 align-items-center">
               <div className="col-sm-6">
-                <h1 className="m-0 text-dark">Consola Central</h1>
+                <h1 className="m-0">{sectionTitle()}</h1>
               </div>
-              <div className="col-sm-6 text-right">
-                <span className="badge badge-info shadow-sm">Modo Admin Empresa</span>
+              <div className="col-sm-6">
+                <ol className="breadcrumb float-sm-right bg-white shadow-sm rounded px-3 py-2 mb-0">
+                  <li className="breadcrumb-item"><a href="#" onClick={e => { e.preventDefault(); setActiveSection('dashboard'); }}>Home</a></li>
+                  <li className="breadcrumb-item active">{sectionTitle()}</li>
+                </ol>
               </div>
             </div>
           </div>
@@ -888,139 +964,437 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
         <section className="content">
           <div className="container-fluid">
-            {/* Tenant Switcher */}
-            <div className="card card-outline card-primary shadow-sm mb-4">
-              <div className="card-header border-0">
-                <h3 className="card-title text-primary font-weight-bold"><i className="fas fa-search mr-2"></i>Selección de Tenant Cliente</h3>
-              </div>
-              <div className="card-body">
-                <div className="row align-items-center">
-                  <div className="col-md-6">
-                    <div className="input-group">
-                      <input
-                        className="form-control"
-                        value={tenantInput}
-                        onChange={e => setTenantInput(e.target.value)}
-                        placeholder="Ej: tenant-123"
-                      />
-                      <div className="input-group-append">
-                        <button className="btn btn-primary" onClick={() => setTenantId(tenantInput)}>
-                           Cargar Datos
-                        </button>
-                      </div>
+
+            {activeSection === 'dashboard' && (
+              <>
+                <div className="row">
+                  <div className="col-lg-3 col-6">
+                    <div className="small-box bg-info shadow-sm">
+                      <div className="inner"><h3>{stats.tenants}</h3><p>Clientes Activos</p></div>
+                      <div className="icon"><i className="fas fa-building"></i></div>
                     </div>
                   </div>
-                  <div className="col-md-6 text-md-right mt-3 mt-md-0">
-                    <p className="mb-0 text-muted">Viendo: <span className="font-weight-bold text-dark">{tenantId}</span></p>
+                  <div className="col-lg-3 col-6">
+                    <div className="small-box bg-primary shadow-sm">
+                      <div className="inner"><h3>{stats.total}</h3><p>Dispositivos Totales</p></div>
+                      <div className="icon"><i className="fas fa-microchip"></i></div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              {/* Billing Info */}
-              <div className="col-lg-12">
-                <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturación y Planes</h3>
+                  <div className="col-lg-3 col-6">
+                    <div className="small-box bg-success shadow-sm">
+                      <div className="inner"><h3>{stats.online}</h3><p>Online</p></div>
+                      <div className="icon"><i className="fas fa-signal"></i></div>
+                    </div>
                   </div>
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-6 border-right">
-                        <h6 className="text-muted text-uppercase mb-3 small font-weight-bold">Planes Contratados</h6>
-                        <div className="list-group list-group-flush shadow-sm rounded">
-                           {plans.map(p => (
-                             <div key={p._id} className="list-group-item d-flex justify-content-between align-items-center">
-                               {p.name}
-                               <span className="badge badge-pill badge-info">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
-                             </div>
-                           ))}
-                        </div>
-                      </div>
-                      <div className="col-md-6 pl-md-4">
-                        <h6 className="text-muted text-uppercase mb-3 small font-weight-bold">Historial de Pagos</h6>
-                        <div className="list-group list-group-flush shadow-sm rounded">
-                           {invoices.map(i => (
-                             <div key={i._id} className="list-group-item d-flex justify-content-between align-items-center">
-                               {i.period}
-                               <span className={`badge ${i.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>{i.status}</span>
-                             </div>
-                           ))}
-                        </div>
-                      </div>
+                  <div className="col-lg-3 col-6">
+                    <div className="small-box bg-danger shadow-sm">
+                      <div className="inner"><h3>{stats.offline}</h3><p>Offline / Críticos</p></div>
+                      <div className="icon"><i className="fas fa-exclamation-triangle"></i></div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Devices Management */}
-            <div className="card shadow-sm mt-4 border-0">
-              <div className="card-header bg-white">
-                <h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Gestión de Sensores</h3>
-              </div>
-              <div className="card-body">
-                <div className="row mb-4">
-                  <div className="col-md-3">
-                    <div className="form-group mb-0">
-                      <label className="small font-weight-bold">Device ID</label>
-                      <input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-..." />
+                <div className="row">
+                  <div className="col-lg-4 col-6">
+                    <div className="small-box bg-warning shadow-sm">
+                      <div className="inner"><h3>{stats.alerts}</h3><p>Alertas Abiertas</p></div>
+                      <div className="icon"><i className="fas fa-bell"></i></div>
                     </div>
                   </div>
-                  <div className="col-md-3">
-                    <div className="form-group mb-0">
-                      <label className="small font-weight-bold">Nombre</label>
-                      <input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" />
+                  <div className="col-lg-4 col-6">
+                    <div className="small-box bg-secondary shadow-sm">
+                      <div className="inner"><h3>{stats.users}</h3><p>Usuarios Totales</p></div>
+                      <div className="icon"><i className="fas fa-users"></i></div>
+                    </div>
+                  </div>
+                  <div className="col-lg-4 col-6">
+                    <div className="small-box bg-indigo shadow-sm">
+                      <div className="inner"><h3>{invoices.length}</h3><p>Facturas Registradas</p></div>
+                      <div className="icon"><i className="fas fa-file-invoice-dollar"></i></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-md-8">
+                    <div className="card shadow-sm border-0">
+                      <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Estado de Dispositivos</h3></div>
+                      <div className="card-body p-0">
+                        <table className="table table-hover m-0">
+                          <thead className="bg-light"><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Estado</th><th>Dirección</th></tr></thead>
+                          <tbody>
+                            {devices.map(d => (
+                              <tr key={d._id}>
+                                <td className="font-weight-bold">{d.name}</td>
+                                <td className="small text-muted">{d.deviceId}</td>
+                                <td><span className={`badge ${d.levelPct < 20 ? 'badge-danger' : d.levelPct < 50 ? 'badge-warning' : 'badge-success'}`}>{d.levelPct}%</span></td>
+                                <td><span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span></td>
+                                <td className="small">{d.location.address}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                   <div className="col-md-4">
-                    <div className="form-group mb-0">
-                      <label className="small font-weight-bold">Dirección</label>
-                      <input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" />
+                    <div className="card shadow-sm border-0">
+                      <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-bell mr-2"></i>Alertas Recientes</h3></div>
+                      <div className="card-body p-0" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        {alerts.filter(a => a.status === 'open').length === 0 ? (
+                          <p className="text-center text-muted p-3 small">Sin alertas abiertas</p>
+                        ) : (
+                          <ul className="list-group list-group-flush">
+                            {alerts.filter(a => a.status === 'open').slice(0, 10).map(a => (
+                              <li key={a._id} className="list-group-item border-0 px-3 py-2">
+                                <div className="d-flex justify-content-between">
+                                  <span className="font-weight-bold small">{a.deviceId}</span>
+                                  <span className={`badge badge-pill ${a.type === 'critical_level' ? 'badge-danger' : 'badge-secondary'}`}>{a.type}</span>
+                                </div>
+                                <p className="small mb-0 text-muted">{a.message}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
-                    <button className="btn btn-success btn-block font-weight-bold" onClick={() => void createDevice()} disabled={creatingDevice}>
-                       {creatingDevice ? '...' : 'Vincular'}
-                    </button>
-                  </div>
                 </div>
+              </>
+            )}
 
-                <div className="row">
-                  {devices.map(d => (
-                    <div key={d._id} className="col-md-3 col-sm-6 mb-3">
-                      <div className="info-box shadow-none border m-0 h-100">
-                        <span className="info-box-icon bg-light"><i className="fas fa-broadcast-tower text-muted"></i></span>
-                        <div className="info-box-content">
-                          <span className="info-box-text font-weight-bold">{d.name}</span>
-                          <span className="info-box-number small text-muted">{d.deviceId}</span>
+            {activeSection === 'clientes' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card card-outline card-primary shadow-sm">
+                    <div className="card-header border-0">
+                      <h3 className="card-title text-primary font-weight-bold"><i className="fas fa-search mr-2"></i>Selector de Cliente</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row align-items-center">
+                        <div className="col-md-6">
+                          <div className="input-group">
+                            <input className="form-control" value={tenantInput}
+                              onChange={e => setTenantInput(e.target.value)} placeholder="ID del tenant (ej: demo-tenant)" />
+                            <div className="input-group-append">
+                              <button className="btn btn-primary" onClick={() => setTenantId(tenantInput)}>Cargar</button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-md-6 text-md-right mt-3 mt-md-0">
+                          <span className="font-weight-bold text-dark">Cliente actual: <span className="badge badge-primary">{tenantId}</span></span>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <div className="card shadow-sm border-0 mt-3">
+                    <div className="card-header bg-white">
+                      <h3 className="card-title font-weight-bold"><i className="fas fa-list mr-2"></i>Resumen del Cliente</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Dispositivos</div><div className="h4 font-weight-bold text-primary">{stats.total}</div></div></div>
+                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Online</div><div className="h4 font-weight-bold text-success">{stats.online}</div></div></div>
+                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Alertas</div><div className="h4 font-weight-bold text-danger">{stats.alerts}</div></div></div>
+                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Usuarios</div><div className="h4 font-weight-bold text-info">{stats.users}</div></div></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Users & ARCA */}
-            <div className="row mt-4 mb-5">
-              <div className="col-md-8">
-                <div className="card shadow-sm border-0 h-100">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-users mr-2"></i>Usuarios del Cliente</h3>
+            {activeSection === 'dispositivos' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white">
+                      <h3 className="card-title font-weight-bold"><i className="fas fa-plus-circle mr-2 text-success"></i>Agregar Dispositivo</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Device ID</label><input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" /></div></div>
+                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Nombre</label><input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" /></div></div>
+                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Dirección</label><input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" /></div></div>
+                        <div className="col-md-2 d-flex align-items-end"><button className="btn btn-success btn-block font-weight-bold" onClick={() => void createDevice()} disabled={creatingDevice}>{creatingDevice ? '...' : 'Vincular'}</button></div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="card-body p-0">
-                    <div className="table-responsive">
-                      <table className="table table-hover table-sm m-0">
-                        <thead className="bg-light">
-                          <tr><th>Email</th><th>Rol</th><th>Estatus</th></tr>
-                        </thead>
+                  <div className="card shadow-sm border-0 mt-3">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Dispositivos Registrados ({devices.length})</h3></div>
+                    <div className="card-body p-0">
+                      <div className="table-responsive">
+                        <table className="table table-hover m-0">
+                          <thead className="bg-light"><tr><th>Nombre</th><th>Device ID</th><th>Dirección</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <tbody>
+                            {devices.map(d => (
+                              <tr key={d._id}>
+                                <td className="font-weight-bold">{d.name}</td>
+                                <td className="small text-muted">{d.deviceId}</td>
+                                <td className="small">{d.location.address}</td>
+                                <td>
+                                  <div className="d-flex align-items-center">
+                                    <div className="progress progress-xs mr-2" style={{ width: '60px' }}>
+                                      <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
+                                    </div>
+                                    <span className="small font-weight-bold">{d.levelPct}%</span>
+                                  </div>
+                                </td>
+                                <td><span className={`badge ${d.pumpOn ? 'badge-info' : 'badge-light'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                <td><span className={`badge ${d.status === 'online' ? 'badge-success' : d.status === 'warning' ? 'badge-warning' : 'badge-danger'}`}>{d.status}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'usuarios' && (
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-user-plus mr-2 text-success"></i>Crear Usuario</h3></div>
+                    <div className="card-body">
+                      <div className="form-group"><label className="small font-weight-bold">Nombre</label><input className="form-control" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder="Juan Perez" /></div>
+                      <div className="form-group"><label className="small font-weight-bold">Email</label><input className="form-control" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="juan@cliente.com" /></div>
+                      <div className="form-group"><label className="small font-weight-bold">Rol</label>
+                        <select className="form-control" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'owner' | 'operator' | 'technician' }))}>
+                          <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
+                        </select>
+                      </div>
+                      <div className="form-group"><label className="small font-weight-bold">Contraseña</label><input className="form-control" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} /></div>
+                      <button className="btn btn-success btn-block font-weight-bold" onClick={() => void createUser()} disabled={creatingUser}>{creatingUser ? '...' : 'Crear Usuario'}</button>
+                    </div>
+                  </div>
+                  <div className="card shadow-sm border-0 mt-3">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-key mr-2 text-warning"></i>Resetear Contraseña</h3></div>
+                    <div className="card-body">
+                      <div className="form-group"><label className="small font-weight-bold">Usuario</label>
+                        <select className="form-control" value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
+                          <option value="">Seleccionar...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group"><label className="small font-weight-bold">Nueva Contraseña</label><input className="form-control" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="Nueva contrasena" /></div>
+                      <button className="btn btn-warning btn-block font-weight-bold" onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>Resetear</button>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-8">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-users mr-2"></i>Usuarios ({users.length})</h3></div>
+                    <div className="card-body p-0">
+                      <div className="table-responsive">
+                        <table className="table table-hover m-0">
+                          <thead className="bg-light"><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Tenant</th></tr></thead>
+                          <tbody>
+                            {users.map(u => (
+                              <tr key={u.id}>
+                                <td className="font-weight-bold">{u.name}</td>
+                                <td className="small text-muted">{u.email}</td>
+                                <td><span className="badge badge-primary">{u.role}</span></td>
+                                <td>{u.mustChangePassword ? <span className="badge badge-warning"><i className="fas fa-exclamation-triangle mr-1"></i>Pendiente</span> : <span className="badge badge-success">OK</span>}</td>
+                                <td className="small text-muted">{u.tenantId}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'facturacion' && (
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-tags mr-2 text-info"></i>Planes Disponibles</h3></div>
+                    <div className="card-body p-0">
+                      <table className="table m-0">
+                        <thead className="bg-light"><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual</th></tr></thead>
+                        <tbody>{plans.map(p => (
+                          <tr key={p._id}>
+                            <td className="font-weight-bold">{p.name}</td>
+                            <td>{p.maxDevices}</td>
+                            <td className="text-primary font-weight-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice-dollar mr-2 text-success"></i>Historial de Facturación</h3></div>
+                    <div className="card-body p-0">
+                      <table className="table m-0">
+                        <thead className="bg-light"><tr><th>Período</th><th>Monto</th><th>CAE</th><th>Estado</th></tr></thead>
+                        <tbody>{invoices.map(i => (
+                          <tr key={i._id}>
+                            <td className="font-weight-bold">{i.period}</td>
+                            <td>${i.amountArs.toLocaleString('es-AR')}</td>
+                            <td className="small text-muted">{i.arca?.cae || '—'}</td>
+                            <td><span className={`badge ${i.status === 'paid' ? 'badge-success' : i.status === 'issued' ? 'badge-info' : 'badge-secondary'}`}>{i.status}</span></td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'arca' && (
+              <div className="row">
+                <div className="col-md-8">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-danger">
+                      <h3 className="card-title font-weight-bold text-white"><i className="fas fa-shield-alt mr-2"></i>Configuración ARCA / AFIP</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6">
+                          <div className="form-group"><label className="small font-weight-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="form-group"><label className="small font-weight-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="form-group"><label className="small font-weight-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="form-group"><label className="small font-weight-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="form-group"><label className="small font-weight-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="form-group mt-4">
+                            <div className="custom-control custom-switch">
+                              <input type="checkbox" className="custom-control-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                              <label className="custom-control-label font-weight-bold" htmlFor="arcaEnabled">Habilitar Facturación ARCA</label>
+                            </div>
+                            <div className="custom-control custom-switch mt-2">
+                              <input type="checkbox" className="custom-control-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
+                              <label className="custom-control-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-12 mt-3">
+                          <button className="btn btn-danger font-weight-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuración'}</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-key mr-2 text-warning"></i>Mi Contraseña</h3></div>
+                    <div className="card-body">
+                      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
+                    </div>
+                  </div>
+                  <div className="card shadow-sm border-0 mt-3">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-info-circle mr-2 text-info"></i>Datos Actuales</h3></div>
+                    <div className="card-body small">
+                      <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
+                      <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
+                      <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'badge-success' : 'badge-secondary'}`}>{arcaConfig.enabled ? 'Sí' : 'No'}</span></p>
+                      <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'badge-warning' : 'badge-success'}`}>{arcaConfig.mock ? 'Sí' : 'No'}</span></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'notificaciones' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-bell mr-2 text-warning"></i>Notificaciones y Alertas ({alerts.length})</h3></div>
+                    <div className="card-body p-0">
+                      {alerts.length === 0 ? (
+                        <p className="text-center text-muted p-4">Sin notificaciones registradas</p>
+                      ) : (
+                        <table className="table table-hover m-0">
+                          <thead className="bg-light"><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
+                          <tbody>{alerts.map(a => (
+                            <tr key={a._id}>
+                              <td className="font-weight-bold">{a.deviceId}</td>
+                              <td><span className={`badge ${a.type === 'critical_level' ? 'badge-danger' : 'badge-secondary'}`}>{a.type}</span></td>
+                              <td>{a.message}</td>
+                              <td><span className={`badge ${a.status === 'open' ? 'badge-danger' : 'badge-success'}`}>{a.status}</span></td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'reportes' && (
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-chart-bar mr-2 text-info"></i>Resumen Operativo</h3></div>
+                    <div className="card-body">
+                      <div className="border rounded p-3 mb-3">
+                        <div className="d-flex justify-content-between mb-2"><span>Dispositivos Totales</span><span className="font-weight-bold">{stats.total}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Online</span><span className="font-weight-bold text-success">{stats.online}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Offline/Críticos</span><span className="font-weight-bold text-danger">{stats.offline}</span></div>
+                        <div className="d-flex justify-content-between"><span>Alertas Abiertas</span><span className="font-weight-bold text-warning">{stats.alerts}</span></div>
+                      </div>
+                      <div className="border rounded p-3">
+                        <div className="d-flex justify-content-between mb-2"><span>Clientes</span><span className="font-weight-bold">{stats.tenants}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Usuarios</span><span className="font-weight-bold">{stats.users}</span></div>
+                        <div className="d-flex justify-content-between"><span>Facturas</span><span className="font-weight-bold">{invoices.length}</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-chart-pie mr-2 text-primary"></i>Estado de Dispositivos</h3></div>
+                    <div className="card-body text-center">
+                      <div className="h1 font-weight-bold text-success">{stats.online}</div>
+                      <div className="text-muted small">Dispositivos Online</div>
+                      <div className="progress mt-3" style={{ height: '10px' }}>
+                        <div className="progress-bar bg-success" style={{ width: stats.total > 0 ? `${(stats.online / stats.total) * 100}%` : '0%' }}></div>
+                        <div className="progress-bar bg-danger" style={{ width: stats.total > 0 ? `${(stats.offline / stats.total) * 100}%` : '0%' }}></div>
+                      </div>
+                      <div className="d-flex justify-content-between mt-1 small text-muted">
+                        <span>Online</span><span>Offline/Críticos</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'actividad' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-history mr-2 text-secondary"></i>Registro de Actividad</h3></div>
+                    <div className="card-body p-0">
+                      <table className="table table-hover m-0">
+                        <thead className="bg-light"><tr><th>Fecha</th><th>Evento</th><th>Detalle</th></tr></thead>
                         <tbody>
-                          {users.map(u => (
-                            <tr key={u.id}>
-                              <td>{u.email}</td>
-                              <td><span className="badge badge-light border">{u.role}</span></td>
-                              <td>{u.mustChangePassword ? <span className="text-warning small"><i className="fas fa-exclamation-triangle mr-1"></i>Pendiente</span> : <span className="text-success small">OK</span>}</td>
+                          {[
+                            { date: new Date().toLocaleString('es-AR'), event: 'Acceso', detail: `Login exitoso: ${props.session.user.email}` },
+                            { date: new Date().toLocaleString('es-AR'), event: 'Sesión', detail: `Rol: ${props.session.user.role} | Tenant: ${props.session.user.tenantId}` },
+                            { date: new Date().toLocaleString('es-AR'), event: 'Dispositivos', detail: `${stats.total} dispositivos cargados para ${tenantId}` },
+                            { date: new Date().toLocaleString('es-AR'), event: 'Alertas', detail: `${stats.alerts} alertas abiertas` },
+                          ].map((row, i) => (
+                            <tr key={i}>
+                              <td className="small text-muted">{row.date}</td>
+                              <td><span className="badge badge-info">{row.event}</span></td>
+                              <td className="small">{row.detail}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1029,34 +1403,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                   </div>
                 </div>
               </div>
-              <div className="col-md-4">
-                <div className="card shadow-sm border-0 h-100">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-shield-alt mr-2"></i>Configuración ARCA</h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="form-group font-weight-bold small">
-                      <label>CUIT Asociado</label>
-                      <input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} />
-                    </div>
-                    <div className="form-group font-weight-bold small">
-                      <label>Punto de Venta</label>
-                      <input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} />
-                    </div>
-                    <button className="btn btn-danger btn-block font-weight-bold mt-2" onClick={() => void saveArcaConfig()} disabled={savingArca}>
-                       {savingArca ? '...' : 'Actualizar Datos Fiscales'}
-                    </button>
-                    <hr />
-                    <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
+
           </div>
         </section>
       </div>
 
-      <footer className="main-footer text-center small text-muted">
+      <footer className="main-footer text-center small text-muted" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
         <strong>AgroSentinel Enterprise &copy; 2026</strong>
       </footer>
     </div>
