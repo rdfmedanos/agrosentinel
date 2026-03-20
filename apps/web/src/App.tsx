@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
@@ -750,7 +750,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [resetPassword, setResetPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
 
-  const loadCompanyData = async (targetTenant: string) => {
+  const loadCompanyData = useCallback(async (targetTenant: string) => {
     const token = props.session.token;
     try {
       const [p, d, i, arca, tenantUsers, a] = await Promise.all([
@@ -770,11 +770,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     } catch (err) {
       console.error('Error loading company data:', err);
     }
-  };
+  }, [props.session.token]);
 
   useEffect(() => {
     void loadCompanyData(tenantId);
-  }, [tenantId, props.session.token]);
+  }, [tenantId, loadCompanyData]);
 
   useEffect(() => {
     setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection));
