@@ -1165,73 +1165,87 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       </button>
                     </div>
                     <div className="card-body">
-                      <div className="input-group mb-3" style={{ maxWidth: '500px' }}>
-                        <div className="input-group-prepend">
-                          <span className="input-group-text"><i className="fas fa-search"></i></span>
-                        </div>
-                        <input className="form-control" value={clientSearch}
-                          onChange={e => setClientSearch(e.target.value)}
-                          placeholder="Buscar por nombre, email o ID del cliente..." />
-                        {clientSearch && (
+                      <div style={{ position: 'relative', maxWidth: '600px' }}>
+                        <div className="input-group">
+                          <div className="input-group-prepend">
+                            <span className="input-group-text"><i className="fas fa-search"></i></span>
+                          </div>
+                          <input
+                            className="form-control"
+                            value={clientSearch}
+                            onChange={e => setClientSearch(e.target.value)}
+                            onFocus={() => setClientSearch('')}
+                            placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
+                          />
                           <div className="input-group-append">
-                            <button className="btn btn-default" onClick={() => setClientSearch('')}>
-                              <i className="fas fa-times"></i>
+                            <button className="btn btn-default" onClick={() => { setClientSearch(''); setClientSearch(clients.find(c => c.tenantId === tenantId)?.companyName || ''); }}>
+                              <i className="fas fa-sync-alt"></i>
                             </button>
                           </div>
-                        )}
-                      </div>
-                      {loadingClients ? (
-                        <div className="text-center text-muted py-4">
-                          <i className="fas fa-spinner fa-spin fa-2x"></i>
-                          <p className="mt-2 mb-0">Cargando clientes...</p>
                         </div>
-                      ) : (
-                        <div className="list-group" style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                          {clients
-                            .filter(c =>
-                              !clientSearch ||
-                              c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                              c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                              c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                              c.contactName.toLowerCase().includes(clientSearch.toLowerCase())
-                            )
-                            .map(c => (
-                              <div
-                                key={c._id}
-                                className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
-                                onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
-                                style={{ cursor: 'pointer' }}
-                              >
-                                <div>
-                                  <div className="font-weight-bold">{c.companyName}</div>
-                                  <div className="small">
-                                    <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
-                                    <span className="mx-2">·</span>
-                                    <span className="text-muted">{c.email || 'Sin email'}</span>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="small font-weight-bold text-muted">{c.tenantId}</div>
-                                  <span className={`badge ${tenantId === c.tenantId ? 'badge-light' : 'badge-secondary'}`}>
-                                    {tenantId === c.tenantId ? 'Seleccionado' : 'Clic para seleccionar'}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          {clients.filter(c =>
-                            !clientSearch ||
-                            c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            c.contactName.toLowerCase().includes(clientSearch.toLowerCase())
-                          ).length === 0 && (
-                            <div className="text-center text-muted py-4">
-                              <i className="fas fa-folder-open fa-2x mb-2"></i>
-                              <p className="mb-0">{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
+                        <div
+                          className="list-group shadow"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            maxHeight: '280px',
+                            overflowY: 'auto',
+                            marginTop: '4px',
+                            borderRadius: '4px'
+                          }}
+                        >
+                          {loadingClients ? (
+                            <div className="list-group-item text-center text-muted py-3">
+                              <i className="fas fa-spinner fa-spin"></i> Cargando...
                             </div>
+                          ) : (
+                            <>
+                              {clients
+                                .filter(c =>
+                                  !clientSearch ||
+                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                )
+                                .map(c => (
+                                  <div
+                                    key={c._id}
+                                    className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
+                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <div>
+                                      <div className="font-weight-bold">{c.companyName}</div>
+                                      <div className="small">
+                                        <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
+                                        {c.email && <><span className="mx-1 text-muted">·</span><span className="text-muted">{c.email}</span></>}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="small text-muted">{c.tenantId}</div>
+                                      {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              {clients.filter(c =>
+                                !clientSearch ||
+                                c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                              ).length === 0 && (
+                                <div className="list-group-item text-center text-muted py-3">
+                                  <i className="fas fa-search mr-2"></i>{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                   <div className="card shadow-sm border-0 mt-3">
