@@ -997,15 +997,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
       </aside>
 
       <div className="content-wrapper" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s', minHeight: 'calc(100vh - 57px - 52px)' }}>
-        <section className="content-header">
+        <section className="content-header border-bottom py-2">
           <div className="container-fluid">
-            <div className="row mb-2 align-items-center">
+            <div className="row">
               <div className="col-sm-6">
-                <h1 className="m-0">{sectionTitle()}</h1>
+                <h1 className="m-0 text-dark" style={{ fontSize: '1.5rem', fontWeight: '600' }}>{sectionTitle()}</h1>
               </div>
               <div className="col-sm-6">
-                <ol className="breadcrumb float-sm-right bg-white shadow-sm rounded px-3 py-2 mb-0">
-                  <li className="breadcrumb-item"><a href="#" onClick={e => { e.preventDefault(); setSection('dashboard'); }}>Home</a></li>
+                <ol className="breadcrumb float-sm-right mb-0" style={{ background: 'transparent' }}>
+                  <li className="breadcrumb-item">
+                    <a href="#" onClick={e => { e.preventDefault(); setSection('dashboard'); }}><i className="fas fa-home"></i></a>
+                  </li>
                   <li className="breadcrumb-item active">{sectionTitle()}</li>
                 </ol>
               </div>
