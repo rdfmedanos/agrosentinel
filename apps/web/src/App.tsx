@@ -209,16 +209,16 @@ function LandingPage() {
         </p>
 
         <div className="hero-actions reveal" style={{ '--delay': '420ms' } as CSSProperties}>
-          <a className="btn btn-primary" href="#impacto">
+          <a className="lp-btn lp-btn-primary" href="#impacto">
             Ver impacto
           </a>
-          <a className="btn btn-ghost" href="#flujo">
+          <a className="lp-btn lp-btn-ghost" href="#flujo">
             Explorar flujo tecnico
           </a>
-          <a className="btn btn-ghost" href="/panel-cliente">
+          <a className="lp-btn lp-btn-ghost" href="/panel-cliente">
             Ingresar al panel cliente
           </a>
-          <a className="btn btn-ghost" href="/admin-empresa">
+          <a className="lp-btn lp-btn-ghost" href="/admin-empresa">
             Ir a admin empresa
           </a>
         </div>
@@ -285,13 +285,13 @@ function LandingPage() {
           del agua deje de depender del azar.
         </p>
         <div className="hero-actions">
-          <a className="btn btn-primary" href="mailto:rdfmedanos@yahoo.com.ar">
+          <a className="lp-btn lp-btn-primary" href="mailto:rdfmedanos@yahoo.com.ar">
             Solicitar implementacion
           </a>
-          <a className="btn btn-ghost" href="/panel-cliente">
+          <a className="lp-btn lp-btn-ghost" href="/panel-cliente">
             Acceso panel cliente
           </a>
-          <a className="btn btn-ghost" href="/admin-empresa">
+          <a className="lp-btn lp-btn-ghost" href="/admin-empresa">
             Acceso admin empresa
           </a>
         </div>
@@ -469,7 +469,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       <nav className="main-header navbar navbar-expand navbar-white navbar-light">
         <ul className="navbar-nav">
           <li className="nav-item">
-            <button className="nav-link btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            <button className="nav-link" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
               <i className="fas fa-bars"></i>
             </button>
           </li>
@@ -480,7 +480,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 
         <ul className="navbar-nav ml-auto">
           <li className="nav-item">
-            <button onClick={props.onLogout} className="btn nav-link">
+            <button onClick={props.onLogout} className="nav-link">
               <i className="fas fa-sign-out-alt"></i> Salir
             </button>
           </li>
