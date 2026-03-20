@@ -1165,85 +1165,63 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                       </button>
                     </div>
                     <div className="card-body">
-                      <div className="row align-items-center mb-3">
-                        <div className="col-md-8">
-                          <div className="input-group">
-                            <div className="input-group-prepend">
-                              <span className="input-group-text"><i className="fas fa-search"></i></span>
-                            </div>
-                            <input
-                              className="form-control"
-                              value={clientSearch}
-                              onChange={e => setClientSearch(e.target.value)}
-                              placeholder="Filtrar clientes..."
-                            />
-                          </div>
-                        </div>
-                        <div className="col-md-4 text-right">
-                          <span className="text-muted small">{clients.length} cliente{clients.length !== 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                      {loadingClients ? (
-                        <div className="text-center text-muted py-4">
-                          <i className="fas fa-spinner fa-spin fa-2x"></i>
-                          <p className="mt-2 mb-0">Cargando clientes...</p>
-                        </div>
-                      ) : (
-                        <div className="table-responsive" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                          <table className="table table-hover table-sm m-0">
-                            <thead className="bg-light" style={{ position: 'sticky', top: 0 }}>
-                              <tr>
-                                <th>Empresa</th>
-                                <th>Contacto</th>
-                                <th>Email</th>
-                                <th>ID Tenant</th>
-                                <th></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {clients
-                                .filter(c =>
-                                  !clientSearch ||
-                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                )
-                                .map(c => (
-                                  <tr
-                                    key={c._id}
-                                    className={tenantId === c.tenantId ? 'table-primary' : ''}
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); }}
-                                  >
-                                    <td className="font-weight-bold">{c.companyName}</td>
-                                    <td className="small text-muted">{c.contactName || '—'}</td>
-                                    <td className="small text-muted">{c.email || '—'}</td>
-                                    <td><span className="badge badge-secondary small">{c.tenantId}</span></td>
-                                    <td>
-                                      {tenantId === c.tenantId
-                                        ? <span className="badge badge-success"><i className="fas fa-check mr-1"></i>Activo</span>
-                                        : <span className="small text-muted">Clic para seleccionar</span>
-                                      }
-                                    </td>
-                                  </tr>
-                                ))}
-                            </tbody>
-                          </table>
-                          {clients.filter(c =>
-                            !clientSearch ||
-                            c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                            (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                          ).length === 0 && (
-                            <div className="text-center text-muted py-4">
-                              <i className="fas fa-folder-open fa-2x mb-2"></i>
-                              <p className="mb-0">{clientSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
+                      <div style={{ maxWidth: '500px' }}>
+                        <label className="small font-weight-bold mb-1 d-block">Seleccionar Cliente</label>
+                        <div className="dropdown">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Buscar cliente..."
+                            value={clientSearch}
+                            onChange={e => setClientSearch(e.target.value)}
+                            onFocus={() => { if (!clientSearch) setClientSearch(' '); }}
+                            autoComplete="off"
+                          />
+                          {clientSearch.trim().length > 0 && (
+                            <div className="dropdown-menu show w-100 mt-1" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                              {loadingClients ? (
+                                <div className="dropdown-item-text text-muted small py-2">
+                                  <i className="fas fa-spinner fa-spin mr-2"></i>Cargando...
+                                </div>
+                              ) : clients
+                                  .filter(c =>
+                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                  ).length === 0 ? (
+                                <div className="dropdown-item-text text-muted small py-2">
+                                  No se encontraron clientes
+                                </div>
+                              ) : (
+                                clients
+                                  .filter(c =>
+                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                  )
+                                  .map(c => (
+                                    <button
+                                      key={c._id}
+                                      className={`dropdown-item ${tenantId === c.tenantId ? 'active' : ''}`}
+                                      onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                    >
+                                      <div className="font-weight-bold small">{c.companyName}</div>
+                                      <div className="text-muted xsmall">{c.contactName || c.email || c.tenantId}</div>
+                                    </button>
+                                  ))
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                        {tenantId && (
+                          <div className="mt-2 small text-muted">
+                            <i className="fas fa-check text-success mr-1"></i>
+                            Cliente seleccionado: <strong>{clients.find(c => c.tenantId === tenantId)?.companyName || tenantId}</strong>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="card shadow-sm border-0 mt-3">
