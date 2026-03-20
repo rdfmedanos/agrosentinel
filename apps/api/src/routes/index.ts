@@ -14,10 +14,10 @@ apiRouter.get('/health', (_, res) => {
 });
 
 apiRouter.use('/auth', authRouter);
-apiRouter.use('/tenants', tenantsRouter);
 
 apiRouter.use(requireAuth);
 
+apiRouter.use('/tenants', tenantsRouter);
 apiRouter.use('/devices', devicesRouter);
 apiRouter.use('/alerts', alertsRouter);
 apiRouter.use('/work-orders', workOrdersRouter);

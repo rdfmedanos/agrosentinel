@@ -1478,9 +1478,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
       </div>
 
       {showAddClient && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', overflow: 'hidden' }} onClick={e => { if ((e.target as HTMLElement).classList.contains('modal')) setShowAddClient(false); }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxHeight: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-            <div className="modal-content" style={{ maxHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-backdrop-custom" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if ((e.target as HTMLElement) === e.currentTarget) setShowAddClient(false); }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', margin: '1rem' }}>
+            <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title"><i className="fas fa-building mr-2"></i>Agregar Nuevo Cliente</h5>
                 <button type="button" className="close text-white" onClick={() => setShowAddClient(false)}>
@@ -1533,7 +1533,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                   </select>
                 </div>
               </div>
-              <div className="modal-footer" style={{ flexShrink: 0 }}>
+              <div className="modal-footer">
                 <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
                 <button type="button" className="btn btn-success"
                   disabled={!newClient.companyName || !newClient.email || creatingClient}
