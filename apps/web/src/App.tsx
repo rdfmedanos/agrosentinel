@@ -777,8 +777,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   }, [tenantId, props.session.token]);
 
   useEffect(() => {
-    setOperacionOpen(false);
-    setConfigOpen(false);
+    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection));
+    setConfigOpen(['facturacion', 'arca', 'reportes'].includes(activeSection));
   }, [activeSection]);
 
   const createDevice = async () => {
