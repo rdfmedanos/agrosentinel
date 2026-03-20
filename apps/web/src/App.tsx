@@ -747,7 +747,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -821,7 +820,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
-        setShowClientDropdown(false);
+        setClientSearch('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -1185,19 +1184,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                           <input
                             className="form-control"
                             value={clientSearch}
-                            onChange={e => { setClientSearch(e.target.value); setShowClientDropdown(true); }}
-                            onFocus={() => setShowClientDropdown(true)}
+                            onChange={e => setClientSearch(e.target.value)}
                             placeholder={clients.find(c => c.tenantId === tenantId)?.companyName || 'Escribí para buscar un cliente...'}
                           />
                           {clientSearch && (
                             <div className="input-group-append">
-                              <button className="btn btn-default" onClick={() => { setClientSearch(''); setShowClientDropdown(false); }}>
+                              <button className="btn btn-default" onClick={() => setClientSearch('')}>
                                 <i className="fas fa-times"></i>
                               </button>
                             </div>
                           )}
                         </div>
-                        {showClientDropdown && clientSearch && (
+                        {clientSearch && (
                           <div
                             className="list-group shadow-sm"
                             style={{
@@ -1216,46 +1214,44 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                               <div className="list-group-item text-center text-muted py-3">
                                 <i className="fas fa-spinner fa-spin"></i> Cargando...
                               </div>
-                            ) : (
-                              <>
-                                {clients
-                                  .filter(c =>
-                                    c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                    (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                  )
-                                  .map(c => (
-                                    <div
-                                      key={c._id}
-                                      className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
-                                      onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); setShowClientDropdown(false); }}
-                                      style={{ cursor: 'pointer' }}
-                                    >
-                                      <div>
-                                        <div className="font-weight-bold">{c.companyName}</div>
-                                        <div className="small">
-                                          <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
-                                          {c.email && <><span className="mx-1">·</span><span className="text-muted">{c.email}</span></>}
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <div className="small text-muted">{c.tenantId}</div>
-                                        {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                {clients.filter(c =>
+                            ) : clients
+                                .filter(c =>
                                   c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
                                   (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                ).length === 0 && (
-                                  <div className="list-group-item text-center text-muted py-3">
-                                    <i className="fas fa-search mr-2"></i>No se encontraron clientes
+                                ).length === 0 ? (
+                              <div className="list-group-item text-center text-muted py-3">
+                                <i className="fas fa-search mr-2"></i>No se encontraron clientes
+                              </div>
+                            ) : (
+                              clients
+                                .filter(c =>
+                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
+                                )
+                                .map(c => (
+                                  <div
+                                    key={c._id}
+                                    className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${tenantId === c.tenantId ? 'active' : ''}`}
+                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    <div>
+                                      <div className="font-weight-bold">{c.companyName}</div>
+                                      <div className="small">
+                                        <span className="text-muted">{c.contactName || 'Sin contacto'}</span>
+                                        {c.email && <><span className="mx-1">·</span><span className="text-muted">{c.email}</span></>}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="small text-muted">{c.tenantId}</div>
+                                      {tenantId === c.tenantId && <span className="badge badge-success mt-1"><i className="fas fa-check mr-1"></i>Seleccionado</span>}
+                                    </div>
                                   </div>
-                                )}
-                              </>
+                                ))
                             )}
                           </div>
                         )}
