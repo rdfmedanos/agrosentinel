@@ -1124,11 +1124,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                     <div className="card-body">
                       <div className="row align-items-center">
                         <div className="col-md-6">
-                          <div className="input-group">
-                            <input className="form-control" value={tenantInput}
+                          <div className="input-group" style={{ maxWidth: '400px' }}>
+                            <input className="form-control form-control-sm" value={tenantInput}
                               onChange={e => setTenantInput(e.target.value)} placeholder="ID del tenant (ej: demo-tenant)" />
                             <div className="input-group-append">
-                              <button className="btn btn-primary" onClick={() => setTenantId(tenantInput)}>Cargar</button>
+                              <button className="btn btn-primary btn-sm" onClick={() => setTenantId(tenantInput)}>
+                                <i className="fas fa-search mr-1"></i>Cargar
+                              </button>
                             </div>
                           </div>
                         </div>
