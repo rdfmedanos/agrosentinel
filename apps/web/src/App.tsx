@@ -1,44 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
-
-type ModalProps = {
-  show: boolean;
-  onClose: () => void;
-  title: string;
-  icon?: string;
-  size?: 'sm' | 'lg';
-  children: ReactNode;
-  footer?: ReactNode;
-};
-
-function AdminModal({ show, onClose, title, icon, size, children, footer }: ModalProps) {
-  if (!show) return null;
-  return (
-    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={e => { if ((e.target as HTMLElement) === e.currentTarget) onClose(); }}>
-      <div className={`modal-dialog ${size === 'sm' ? 'modal-sm' : size === 'lg' ? 'modal-lg' : ''} modal-dialog-centered`}>
-        <div className="modal-content">
-          <div className="modal-header">
-            <h4 className="modal-title">
-              {icon && <i className={`${icon} mr-2`}></i>}
-              {title}
-            </h4>
-            <button type="button" className="close" onClick={onClose}>&times;</button>
-          </div>
-          <div className="modal-body">
-            {children}
-          </div>
-          {footer && (
-            <div className="modal-footer justify-content-end">
-              {footer}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 type Device = {
   _id: string;
