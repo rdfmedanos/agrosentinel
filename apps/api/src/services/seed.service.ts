@@ -13,41 +13,38 @@ export async function seedInitialData() {
     ]);
   }
 
-  const owner = await UserModel.findOne({ email: 'owner@agrosentinel.com' });
   const ownerPasswordHash = await bcrypt.hash('Cliente123!', 10);
-  if (!owner) {
-    const starter = await PlanModel.findOne({ name: 'Starter' });
-    await UserModel.create({
-      name: 'Establecimiento Demo',
-      email: 'owner@agrosentinel.com',
-      role: 'owner',
-      tenantId: 'demo-tenant',
-      planId: starter?._id,
-      passwordHash: ownerPasswordHash,
-      mustChangePassword: true
-    });
-  } else if (!owner.passwordHash) {
-    owner.passwordHash = ownerPasswordHash;
-    owner.mustChangePassword = true;
-    await owner.save();
-  }
+  const owner = await UserModel.findOneAndUpdate(
+    { email: 'owner@agrosentinel.com' },
+    {
+      $setOnInsert: {
+        name: 'Establecimiento Demo',
+        email: 'owner@agrosentinel.com',
+        role: 'owner',
+        tenantId: 'demo-tenant',
+        planId: (await PlanModel.findOne({ name: 'Starter' }))?._id,
+        mustChangePassword: true
+      },
+      $set: { passwordHash: ownerPasswordHash }
+    },
+    { upsert: true, new: true }
+  );
 
-  const companyAdmin = await UserModel.findOne({ email: 'admin@agrosentinel.com' });
   const companyAdminPasswordHash = await bcrypt.hash('Empresa123!', 10);
-  if (!companyAdmin) {
-    await UserModel.create({
-      name: 'Administrador AgroSentinel',
-      email: 'admin@agrosentinel.com',
-      role: 'company_admin',
-      tenantId: 'agrosentinel-company',
-      passwordHash: companyAdminPasswordHash,
-      mustChangePassword: true
-    });
-  } else if (!companyAdmin.passwordHash) {
-    companyAdmin.passwordHash = companyAdminPasswordHash;
-    companyAdmin.mustChangePassword = true;
-    await companyAdmin.save();
-  }
+  const companyAdmin = await UserModel.findOneAndUpdate(
+    { email: 'admin@agrosentinel.com' },
+    {
+      $setOnInsert: {
+        name: 'Administrador AgroSentinel',
+        email: 'admin@agrosentinel.com',
+        role: 'company_admin',
+        tenantId: 'agrosentinel-company',
+        mustChangePassword: true
+      },
+      $set: { passwordHash: companyAdminPasswordHash }
+    },
+    { upsert: true, new: true }
+  );
 
   const devices = await DeviceModel.countDocuments({ tenantId: 'demo-tenant' });
   if (devices === 0) {

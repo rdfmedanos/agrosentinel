@@ -105,6 +105,21 @@ authRouter.post('/change-password', requireAuth, async (req, res) => {
   res.json({ status: 'ok' });
 });
 
+authRouter.post('/change-password-first', requireAuth, async (req, res) => {
+  const data = z.object({ newPassword: z.string().min(8) }).parse(req.body);
+  const user = await UserModel.findById(req.auth?.sub);
+  if (!user) {
+    res.status(404).json({ error: 'Usuario no encontrado' });
+    return;
+  }
+
+  user.passwordHash = await bcrypt.hash(data.newPassword, 10);
+  user.mustChangePassword = false;
+  await user.save();
+
+  res.json({ status: 'ok' });
+});
+
 authRouter.post('/admin/create-user', requireAuth, requireCompanyAdmin, async (req, res) => {
   const data = createUserSchema.parse(req.body);
   const passwordHash = await bcrypt.hash(data.password, 10);

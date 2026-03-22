@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Types } from 'mongoose';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 import { requireCompanyAdmin } from '../auth/auth.js';
 
@@ -30,9 +31,23 @@ export const tenantsRouter = Router();
 
 tenantsRouter.get('/', async (req, res) => {
   const tenants = await TenantConfigModel.find()
+    .populate('planId', 'name')
     .select('_id tenantId companyName contactName email phone address active createdAt')
     .sort({ createdAt: -1 });
-  res.json(tenants);
+  const result = tenants.map(t => ({
+    _id: t._id,
+    tenantId: t.tenantId,
+    companyName: t.companyName,
+    contactName: t.contactName,
+    email: t.email,
+    phone: t.phone,
+    address: t.address,
+    active: t.active,
+    createdAt: t.createdAt,
+    planId: (t.planId as unknown as { _id: string })?._id || null,
+    planName: (t.planId as unknown as { name: string })?.name || null
+  }));
+  res.json(result);
 });
 
 tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
@@ -61,4 +76,32 @@ tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
   });
 
   res.status(201).json({ id: String(created._id), tenantId: created.tenantId, companyName: created.companyName });
+});
+
+tenantsRouter.put('/:id', requireCompanyAdmin, async (req, res) => {
+  const data = createTenantSchema.parse(req.body);
+  const updateData: Record<string, unknown> = {
+    companyName: data.companyName,
+    contactName: data.contactName ?? '',
+    email: data.email ?? '',
+    phone: data.phone ?? '',
+    address: data.address ?? ''
+  };
+  
+  if (data.planId && data.planId.trim() !== '') {
+    updateData.planId = new Types.ObjectId(data.planId);
+  } else {
+    updateData.planId = null;
+  }
+
+  const updated = await TenantConfigModel.findByIdAndUpdate(
+    req.params.id,
+    updateData,
+    { new: true }
+  );
+  if (!updated) {
+    res.status(404).json({ error: 'Cliente no encontrado' });
+    return;
+  }
+  res.json(updated);
 });

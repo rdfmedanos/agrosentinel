@@ -1,7 +1,44 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+
+type ModalProps = {
+  show: boolean;
+  onClose: () => void;
+  title: string;
+  icon?: string;
+  size?: 'sm' | 'lg';
+  children: ReactNode;
+  footer?: ReactNode;
+};
+
+function AdminModal({ show, onClose, title, icon, size, children, footer }: ModalProps) {
+  if (!show) return null;
+  return (
+    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={e => { if ((e.target as HTMLElement) === e.currentTarget) onClose(); }}>
+      <div className={`modal-dialog ${size === 'sm' ? 'modal-sm' : size === 'lg' ? 'modal-lg' : ''} modal-dialog-centered`}>
+        <div className="modal-content">
+          <div className="modal-header">
+            <h4 className="modal-title">
+              {icon && <i className={`${icon} mr-2`}></i>}
+              {title}
+            </h4>
+            <button type="button" className="close" onClick={onClose}>&times;</button>
+          </div>
+          <div className="modal-body">
+            {children}
+          </div>
+          {footer && (
+            <div className="modal-footer justify-content-end">
+              {footer}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type Device = {
   _id: string;
@@ -13,6 +50,7 @@ type Device = {
   status: 'online' | 'warning' | 'critical' | 'offline';
   location: { lat: number; lng: number; address: string };
   lastHeartbeatAt?: string;
+  createdAt?: string;
 };
 
 type Alert = {
@@ -75,6 +113,8 @@ type TenantClient = {
   address: string;
   active: boolean;
   createdAt: string;
+  planId?: string;
+  planName?: string;
 };
 
 type AuthSession = {
@@ -181,6 +221,20 @@ function saveSession(session: AuthSession | null) {
     return;
   }
   localStorage.setItem('agrosentinel_session', JSON.stringify(session));
+}
+
+function saveNavState(state: { section: string; clientId?: string }) {
+  localStorage.setItem('agrosentinel_nav', JSON.stringify(state));
+}
+
+function loadNavState(): { section: string; clientId?: string } | null {
+  const stored = localStorage.getItem('agrosentinel_nav');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
 }
 
 function markerColor(status: Device['status']) {
@@ -342,23 +396,34 @@ function LoginPanel(props: {
   };
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <h1>{props.title}</h1>
-        <p>Ingresar con email y contrasena.</p>
-        <label>
-          <span>Email</span>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@dominio.com" />
-        </label>
-        <label>
-          <span>Contrasena</span>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="********" />
-        </label>
-        {error && <p className="auth-error">{error}</p>}
-        <button onClick={() => void submit()} disabled={loading || !email || !password}>
-          {loading ? 'Ingresando...' : 'Ingresar'}
-        </button>
-      </section>
+    <main className="login-page">
+      <div className="login-box">
+        <div className="card card-outline card-primary">
+          <div className="card-header text-center">
+            <h1 className="h3 mb-0 font-weight-bold">AgroSentinel</h1>
+            <p className="text-muted small mb-0 mt-1">{props.title}</p>
+          </div>
+          <div className="card-body">
+            <p className="login-box-msg text-muted">Ingresar con email y contrasena.</p>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Email</label>
+              <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@dominio.com" />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Contrasena</label>
+              <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="********" />
+            </div>
+            {error && <div className="alert alert-danger py-2 small">{error}</div>}
+            <div className="row">
+              <div className="col-12">
+                <button type="button" className="btn btn-primary btn-block" onClick={() => void submit()} disabled={loading || !email || !password}>
+                  {loading ? 'Ingresando...' : 'Ingresar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
@@ -381,26 +446,22 @@ function PasswordSection(props: { token: string; mustChangePassword: boolean }) 
   };
 
   return (
-    <section className="admin-panel">
-      <h2>Gestion de contrasena</h2>
-      {props.mustChangePassword && <p className="auth-warning">Debes cambiar la contrasena inicial.</p>}
-      <div className="admin-form-grid">
-        <label>
-          <span>Contrasena actual</span>
-          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
-        </label>
-        <label>
-          <span>Nueva contrasena</span>
-          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-        </label>
+    <div>
+      <h6 className="fw-bold mb-3">Gestion de contrasena</h6>
+      {props.mustChangePassword && <div className="alert alert-warning py-2 small">Debes cambiar la contrasena inicial.</div>}
+      <div className="mb-3">
+        <label className="form-label small fw-semibold">Contrasena actual</label>
+        <input type="password" className="form-control form-control-sm" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
       </div>
-      <div className="admin-actions">
-        <button onClick={() => void save()} disabled={!currentPassword || !newPassword}>
-          Cambiar contrasena
-        </button>
+      <div className="mb-3">
+        <label className="form-label small fw-semibold">Nueva contrasena</label>
+        <input type="password" className="form-control form-control-sm" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
       </div>
-      {message && <p className="auth-message">{message}</p>}
-    </section>
+      <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={!currentPassword || !newPassword}>
+        Cambiar contrasena
+      </button>
+      {message && <div className="alert alert-success py-2 small mt-2 mb-0">{message}</div>}
+    </div>
   );
 }
 
@@ -476,20 +537,18 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   };
 
   return (
-    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
-      {/* Navbar */}
+    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh' }}>
       <nav className="main-header navbar navbar-expand navbar-white navbar-light">
         <ul className="navbar-nav">
           <li className="nav-item">
-            <button className="nav-link" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            <button className="nav-link" data-lte-toggle="sidebar" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
               <i className="fas fa-bars"></i>
             </button>
           </li>
           <li className="nav-item d-none d-sm-inline-block">
-            <a href="/" className="nav-link text-muted">Web Principal</a>
+            <a href="/" className="nav-link">Web Principal</a>
           </li>
         </ul>
-
         <ul className="navbar-nav ml-auto">
           <li className="nav-item">
             <button onClick={props.onLogout} className="nav-link">
@@ -499,15 +558,13 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
         </ul>
       </nav>
 
-      {/* Sidebar */}
       <aside className="main-sidebar sidebar-dark-primary elevation-4">
-        <div className="brand-link text-center pt-3 pb-3">
-          <span className="brand-text font-weight-bold h4">AgroSentinel</span>
-        </div>
+        <a href="/" className="brand-link text-center">
+          <span className="brand-text fw-bold h4">AgroSentinel</span>
+        </a>
         <div className="sidebar">
-          <nav className="mt-4">
-            <ul className="nav nav-pills nav-sidebar flex-column" role="menu">
-              <li className="nav-header">MONITOREO</li>
+          <nav className="mt-3">
+            <ul className="nav nav-pills nav-sidebar flex-column" data-lte-menu="treeview" role="menu">
               <li className="nav-item">
                 <a href="#" className="nav-link active">
                   <i className="nav-icon fas fa-tachometer-alt"></i>
@@ -519,27 +576,28 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
         </div>
       </aside>
 
-      {/* Content Wrapper */}
       <div className="content-wrapper">
-        <section className="content-header">
+        <div className="content-header">
           <div className="container-fluid">
             <div className="row mb-2">
               <div className="col-sm-6">
-                <h1 className="m-0 text-dark">Operación AgroSentinel</h1>
+                <h1 className="m-0">Operacion AgroSentinel</h1>
               </div>
-              <div className="col-sm-6 text-right">
-                <span className="badge badge-success shadow-sm">Panel Cliente</span>
+              <div className="col-sm-6">
+                <ol className="breadcrumb float-sm-end">
+                  <li className="breadcrumb-item"><a href="#">Home</a></li>
+                  <li className="breadcrumb-item active">Dashboard</li>
+                </ol>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="content">
+        <div className="content content-card">
           <div className="container-fluid">
-            {/* Small boxes (Stat box) */}
             <div className="row">
               <div className="col-lg-3 col-6">
-                <div className="small-box bg-info shadow-sm">
+                <div className="small-box bg-info">
                   <div className="inner">
                     <h3>{stats.total}</h3>
                     <p>Dispositivos</p>
@@ -548,7 +606,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                 </div>
               </div>
               <div className="col-lg-3 col-6">
-                <div className="small-box bg-success shadow-sm">
+                <div className="small-box bg-primary">
                   <div className="inner">
                     <h3>{stats.online}</h3>
                     <p>Online</p>
@@ -557,16 +615,16 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                 </div>
               </div>
               <div className="col-lg-3 col-6">
-                <div className="small-box bg-danger shadow-sm">
+                <div className="small-box bg-danger">
                   <div className="inner">
                     <h3>{stats.critical}</h3>
-                    <p>Críticos</p>
+                    <p>Criticos</p>
                   </div>
                   <div className="icon"><i className="fas fa-exclamation-triangle"></i></div>
                 </div>
               </div>
               <div className="col-lg-3 col-6">
-                <div className="small-box bg-warning shadow-sm">
+                <div className="small-box bg-warning">
                   <div className="inner">
                     <h3>{stats.alerts}</h3>
                     <p>Alertas Abiertas</p>
@@ -576,12 +634,11 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
               </div>
             </div>
 
-            {/* Devices & Map */}
             <div className="row">
               <div className="col-12">
-                <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-map-marked-alt mr-2"></i>Mapa de Dispositivos</h3>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-map-marked-alt me-2"></i>Mapa de Dispositivos</h3>
                   </div>
                   <div className="card-body p-0">
                     <MapContainer center={[-34.62, -58.43]} zoom={10} style={{ height: '380px', width: '100%' }}>
@@ -595,8 +652,8 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                         >
                           <Popup>
                             <div className="p-1">
-                              <h6 className="font-weight-bold mb-1">{d.name}</h6>
-                              <p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span></p>
+                              <h6 className="fw-bold mb-1">{d.name}</h6>
+                              <p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p>
                               <p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>
                             </div>
                           </Popup>
@@ -610,39 +667,41 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 
             <div className="row mt-4">
               <div className="col-md-8">
-                <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-list mr-2"></i>Estado de Sensores</h3>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-list me-2"></i>Estado de Sensores</h3>
                   </div>
                   <div className="card-body p-0">
                     <div className="table-responsive">
                       <table className="table table-hover m-0">
-                        <thead className="bg-light">
-                          <tr><th>Sensor</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th className="text-right">Acciones</th></tr>
+                        <thead>
+                          <tr><th>Sensor</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th className="text-end">Acciones</th></tr>
                         </thead>
                         <tbody>
                           {devices.map(d => (
                             <tr key={d._id}>
                               <td>
-                                <div className="font-weight-bold">{d.name}</div>
+                                <div className="fw-bold">{d.name}</div>
                                 <div className="small text-muted">{d.deviceId}</div>
                               </td>
                               <td className="align-middle">
-                                <div className="progress progress-xs" style={{ width: '80px' }}>
-                                  <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
+                                <div className="d-flex align-items-center">
+                                  <div className="progress me-2" style={{ width: '80px', height: '6px' }}>
+                                    <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
+                                  </div>
+                                  <span className="small fw-bold">{d.levelPct}%</span>
                                 </div>
-                                <span className="small font-weight-bold">{d.levelPct}%</span>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge ${d.pumpOn ? 'badge-info' : 'badge-light'}`}>{d.pumpOn ? 'Encendida' : 'Apagada'}</span>
+                                <span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'Encendida' : 'Apagada'}</span>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span>
+                                <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span>
                               </td>
-                              <td className="text-right align-middle">
+                              <td className="text-end align-middle">
                                 <div className="btn-group">
-                                  <button className="btn btn-xs btn-outline-primary" onClick={() => void pumpCommand(d.deviceId, 'pump_on')}>ON</button>
-                                  <button className="btn btn-xs btn-outline-secondary" onClick={() => void pumpCommand(d.deviceId, 'pump_off')}>OFF</button>
+                                  <button className="btn btn-sm btn-outline-primary" onClick={() => void pumpCommand(d.deviceId, 'pump_on')}>ON</button>
+                                  <button className="btn btn-sm btn-outline-secondary" onClick={() => void pumpCommand(d.deviceId, 'pump_off')}>OFF</button>
                                 </div>
                               </td>
                             </tr>
@@ -654,19 +713,19 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                 </div>
               </div>
               <div className="col-md-4">
-                 <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-exclamation-circle mr-2"></i>Notificaciones</h3>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-exclamation-circle me-2"></i>Notificaciones</h3>
                   </div>
                   <div className="card-body p-0" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     <ul className="list-group list-group-flush">
                       {alerts.map(a => (
-                        <li key={a._id} className="list-group-item px-3 py-2 border-0 mb-1 rounded mx-2 bg-light">
+                        <li key={a._id} className="list-group-item px-3 py-2">
                           <div className="d-flex justify-content-between">
-                            <span className="small font-weight-bold">{a.deviceId}</span>
-                            <span className={`badge badge-pill ${a.status === 'open' ? 'badge-danger' : 'badge-light'}`}>{a.status}</span>
+                            <span className="small fw-bold">{a.deviceId}</span>
+                            <span className={`badge ${a.status === 'open' ? 'text-bg-danger' : 'text-bg-secondary'}`}>{a.status}</span>
                           </div>
-                          <div className="small text-dark mt-1">{a.message}</div>
+                          <div className="small mt-1">{a.message}</div>
                         </li>
                       ))}
                     </ul>
@@ -677,45 +736,45 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 
             <div className="row mt-4">
               <div className="col-md-6">
-                <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-tools mr-2"></i>Órdenes de Trabajo</h3>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-tools me-2"></i>Ordenes de Trabajo</h3>
                   </div>
                   <div className="card-body p-3">
                     {orders.map(o => (
-                      <div className="border rounded p-2 mb-2 bg-white shadow-none" key={o._id}>
+                      <div className="border rounded p-2 mb-2" key={o._id}>
                         <div className="d-flex justify-content-between align-items-start">
-                          <h6 className="font-weight-bold mb-1">{o.title}</h6>
-                          <span className={`badge ${o.status === 'closed' ? 'badge-success' : o.status === 'in_progress' ? 'badge-warning' : 'badge-danger'}`}>{o.status}</span>
+                          <h6 className="fw-bold mb-1">{o.title}</h6>
+                          <span className={`badge ${o.status === 'closed' ? 'text-bg-success' : o.status === 'in_progress' ? 'text-bg-warning' : 'text-bg-danger'}`}>{o.status}</span>
                         </div>
                         <p className="small text-muted mb-2">{o.description}</p>
-                        {o.status !== 'closed' && <button className="btn btn-xs btn-block btn-outline-success" onClick={() => void closeOrder(o._id)}>Cerrar Orden</button>}
+                        {o.status !== 'closed' && <button className="btn btn-sm btn-outline-success w-100" onClick={() => void closeOrder(o._id)}>Cerrar Orden</button>}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
               <div className="col-md-6">
-                <div className="card shadow-sm border-0">
-                  <div className="card-header bg-white">
-                    <h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice mr-2"></i>Facturación ARCA</h3>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice me-2"></i>Facturacion ARCA</h3>
                   </div>
                   <div className="card-body p-0">
                     <table className="table table-sm m-0">
-                      <thead><tr><th>Período</th><th>Monto</th><th>Estado</th></tr></thead>
+                      <thead><tr><th>Periodo</th><th>Monto</th><th>Estado</th></tr></thead>
                       <tbody>
                         {invoices.map(inv => (
                           <tr key={inv._id}>
                             <td>{inv.period}</td>
                             <td>${inv.amountArs.toLocaleString('es-AR')}</td>
-                            <td><span className={`badge ${inv.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>{inv.status}</span></td>
+                            <td><span className={`badge ${inv.status === 'paid' ? 'text-bg-success' : 'text-bg-warning'}`}>{inv.status}</span></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-                <div className="card shadow-sm mt-3 border-0">
+                <div className="card mt-3">
                   <div className="card-body p-3">
                     <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
                   </div>
@@ -723,10 +782,10 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </div>
 
-      <footer className="main-footer text-center small text-muted">
+      <footer className="main-footer text-center">
         <strong>AgroSentinel &copy; 2026</strong>
       </footer>
     </div>
@@ -735,13 +794,13 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 
 type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad';
 
-function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }) {
+function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operacionOpen, setOperacionOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
-  const [tenantId, setTenantId] = useState(DEFAULT_TENANT_ID);
-  const [tenantInput, setTenantInput] = useState(DEFAULT_TENANT_ID);
+  const [tenantId, setTenantId] = useState<string>('');
+  const [tenantInput, setTenantInput] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -753,7 +812,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
   const [creatingDevice, setCreatingDevice] = useState(false);
+  const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPwd, setChangingPwd] = useState(false);
+  const [pwdError, setPwdError] = useState('');
   const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
   const [newUser, setNewUser] = useState({
     name: '',
@@ -764,6 +827,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   const [resetPassword, setResetPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showEditClient, setShowEditClient] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
   const [newClient, setNewClient] = useState({
     companyName: '',
@@ -773,6 +837,76 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     address: '',
     planId: ''
   });
+  const [editClient, setEditClient] = useState({
+    companyName: '',
+    contactName: '',
+    email: '',
+    phone: '',
+    address: '',
+    planId: ''
+  });
+  const [savingClient, setSavingClient] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<TenantClient | null>(null);
+  const [clientTab, setClientTab] = useState<'info' | 'sensores'>('info');
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [editDevice, setEditDevice] = useState({ name: '', address: '', lat: '', lng: '' });
+  const [savingDevice, setSavingDevice] = useState(false);
+  const [showAddSensorModal, setShowAddSensorModal] = useState(false);
+  const [newSensor, setNewSensor] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
+  const [creatingSensor, setCreatingSensor] = useState(false);
+
+  const changePassword = async () => {
+    setPwdError('');
+    setChangingPwd(true);
+    try {
+      await postJson('/auth/change-password-first', { newPassword }, props.session.token);
+      props.onPasswordChanged();
+    } catch {
+      setPwdError('No se pudo cambiar la contrasena');
+      setChangingPwd(false);
+    }
+  };
+
+  if (props.session.user.mustChangePassword) {
+    return (
+      <div className="login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="login-box">
+          <div className="card card-outline card-primary">
+            <div className="card-header text-center">
+              <h1 className="h3 mb-0 font-weight-bold">AgroSentinel</h1>
+              <p className="text-muted small mb-0 mt-1">Cambio de contrasena obligatorio</p>
+            </div>
+            <div className="card-body">
+              <div className="alert alert-warning py-2 mb-3">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Debes cambiar tu contrasena antes de continuar
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Nueva contrasena</label>
+                <input type="password" className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimo 8 caracteres" minLength={8} />
+              </div>
+              {pwdError && <div className="alert alert-danger py-2 small">{pwdError}</div>}
+              <button className="btn btn-primary btn-block" onClick={() => void changePassword()} disabled={changingPwd || newPassword.length < 8}>
+                {changingPwd ? 'Guardando...' : 'Cambiar contrasena'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearch.trim()) return clients;
+    const search = clientSearch.toLowerCase();
+    return clients.filter(c =>
+      c.companyName.toLowerCase().includes(search) ||
+      c.email?.toLowerCase().includes(search) ||
+      c.contactName?.toLowerCase().includes(search) ||
+      c.phone?.includes(search)
+    );
+  }, [clients, clientSearch]);
 
   const loadClients = useCallback(async () => {
     setLoadingClients(true);
@@ -787,6 +921,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   }, [props.session.token]);
 
   const loadCompanyData = useCallback(async (targetTenant: string) => {
+    if (!targetTenant) return;
     const token = props.session.token;
     try {
       const [p, d, i, arca, tenantUsers, a] = await Promise.all([
@@ -809,17 +944,101 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   }, [props.session.token]);
 
   useEffect(() => {
-    void loadCompanyData(tenantId);
+    if (tenantId) {
+      void loadCompanyData(tenantId);
+    }
   }, [tenantId, loadCompanyData]);
 
   useEffect(() => {
     void loadClients();
   }, [loadClients]);
 
+  useEffect(() => {
+    const nav = loadNavState();
+    if (nav) {
+      setActiveSection(nav.section as AdminSection);
+      setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(nav.section));
+      setConfigOpen(['facturacion', 'arca', 'reportes'].includes(nav.section));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (clients.length > 0 && !tenantId && restoreClient) {
+      const nav = loadNavState();
+      if (nav?.clientId) {
+        const client = clients.find(c => c._id === nav.clientId);
+        if (client) {
+          setSelectedClient(client);
+          setTenantId(client.tenantId);
+          setTenantInput(client.tenantId);
+          void loadCompanyData(client.tenantId);
+          return;
+        }
+      }
+      setTenantId(clients[0].tenantId);
+      setTenantInput(clients[0].tenantId);
+      void loadCompanyData(clients[0].tenantId);
+    }
+    if (!restoreClient) {
+      setRestoreClient(true);
+    }
+  }, [clients, tenantId]);
+
   const setSection = (section: AdminSection) => {
     setActiveSection(section);
     setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(section));
     setConfigOpen(['facturacion', 'arca', 'reportes'].includes(section));
+    if (section === 'clientes') {
+      setSelectedClient(null);
+      setRestoreClient(false);
+      saveNavState({ section: 'clientes' });
+    } else {
+      saveNavState({ section, clientId: selectedClient?._id });
+    }
+  };
+
+  const openEditClient = () => {
+    if (!selectedClient) return;
+    setEditClient({
+      companyName: selectedClient.companyName,
+      contactName: selectedClient.contactName || '',
+      email: selectedClient.email || '',
+      phone: selectedClient.phone || '',
+      address: selectedClient.address || '',
+      planId: (selectedClient as TenantClient & { planId?: string }).planId || ''
+    });
+    setShowEditClient(true);
+  };
+
+  const saveClient = async () => {
+    if (!selectedClient || !editClient.companyName || !editClient.email) return;
+    setSavingClient(true);
+    try {
+      await putJson(`/tenants/${selectedClient._id}`, {
+        companyName: editClient.companyName,
+        contactName: editClient.contactName,
+        email: editClient.email,
+        phone: editClient.phone,
+        address: editClient.address,
+        planId: editClient.planId || undefined
+      }, props.session.token);
+      setShowEditClient(false);
+      void loadClients();
+      const updated = clients.find(c => c._id === selectedClient._id);
+      if (updated) {
+        setSelectedClient({
+          ...updated,
+          companyName: editClient.companyName,
+          contactName: editClient.contactName,
+          email: editClient.email,
+          phone: editClient.phone,
+          address: editClient.address,
+          planName: plans.find(p => p._id === editClient.planId)?.name
+        });
+      }
+    } finally {
+      setSavingClient(false);
+    }
   };
 
   const createDevice = async () => {
@@ -872,6 +1091,55 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
     await loadCompanyData(tenantId);
   };
 
+  const openDeviceModal = (device: Device) => {
+    setSelectedDevice(device);
+    setEditDevice({
+      name: device.name,
+      address: device.location.address,
+      lat: String(device.location.lat),
+      lng: String(device.location.lng)
+    });
+    setShowDeviceModal(true);
+  };
+
+  const saveDevice = async () => {
+    if (!selectedDevice) return;
+    setSavingDevice(true);
+    try {
+      await patchJson(`/devices/${selectedDevice._id}`, {
+        name: editDevice.name,
+        address: editDevice.address,
+        lat: Number(editDevice.lat),
+        lng: Number(editDevice.lng)
+      }, props.session.token);
+      setShowDeviceModal(false);
+      setSelectedDevice(null);
+      await loadCompanyData(tenantId);
+    } finally {
+      setSavingDevice(false);
+    }
+  };
+
+  const createSensor = async () => {
+    if (!newSensor.deviceId || !newSensor.name) return;
+    setCreatingSensor(true);
+    try {
+      await postJson('/devices', {
+        tenantId,
+        deviceId: newSensor.deviceId,
+        name: newSensor.name,
+        lat: Number(newSensor.lat),
+        lng: Number(newSensor.lng),
+        address: newSensor.address
+      }, props.session.token);
+      setShowAddSensorModal(false);
+      setNewSensor({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
+      await loadCompanyData(tenantId);
+    } finally {
+      setCreatingSensor(false);
+    }
+  };
+
   const stats = useMemo(() => ({
     total: devices.length,
     online: devices.filter(d => d.status === 'online').length,
@@ -887,8 +1155,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
       clientes: 'Clientes',
       dispositivos: 'Dispositivos',
       usuarios: 'Usuarios',
-      facturacion: 'Facturación y Planes',
-      arca: 'Configuración ARCA',
+      facturacion: 'Facturacion y Planes',
+      arca: 'Configuracion ARCA',
       notificaciones: 'Notificaciones',
       reportes: 'Reportes',
       actividad: 'Actividad'
@@ -897,11 +1165,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
   };
 
   return (
-    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh', backgroundColor: '#f4f6f9' }}>
-      <nav className="main-header navbar navbar-expand navbar-white navbar-light border-bottom">
+    <div className={`wrapper ${sidebarCollapsed ? 'sidebar-collapse' : ''}`} style={{ minHeight: '100vh' }}>
+      <nav className="main-header navbar navbar-expand navbar-white navbar-light">
         <ul className="navbar-nav">
           <li className="nav-item">
-            <a className="nav-link" data-widget="pushmenu" href="#" onClick={e => { e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed); }}>
+            <a className="nav-link" data-lte-toggle="sidebar" href="#" onClick={e => { e.preventDefault(); setSidebarCollapsed(!sidebarCollapsed); }}>
               <i className="fas fa-bars"></i>
             </a>
           </li>
@@ -912,37 +1180,37 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             <a href="/panel-cliente" className="nav-link"><i className="fas fa-warehouse"></i> Panel Cliente</a>
           </li>
         </ul>
-        <ul className="navbar-nav ml-auto">
+        <ul className="navbar-nav ms-auto">
           <li className="nav-item dropdown">
-            <a className="nav-link dropdown-toggle" data-toggle="dropdown" href="#">
+            <a className="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
               <i className="far fa-user-circle"></i>
-              <span className="d-none d-md-inline ml-1 text-sm">{props.session.user.name}</span>
+              <span className="d-none d-md-inline ms-1">{props.session.user.name}</span>
             </a>
-            <div className="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+            <div className="dropdown-menu dropdown-menu-lg dropdown-menu-end">
               <a href="#" className="dropdown-item">
-                <i className="fas fa-user mr-2"></i> {props.session.user.name}
+                <i className="fas fa-user me-2"></i> {props.session.user.name}
               </a>
               <div className="dropdown-divider"></div>
               <a href="#" className="dropdown-item">
-                <i className="fas fa-envelope mr-2"></i> {props.session.user.email}
+                <i className="fas fa-envelope me-2"></i> {props.session.user.email}
               </a>
               <div className="dropdown-divider"></div>
               <a href="#" className="dropdown-item text-danger" onClick={e => { e.preventDefault(); props.onLogout(); }}>
-                <i className="fas fa-sign-out-alt mr-2"></i> Cerrar sesión
+                <i className="fas fa-sign-out-alt me-2"></i> Cerrar sesion
               </a>
             </div>
           </li>
           <li className="nav-item">
-            <a className="nav-link" data-widget="fullscreen" href="#" onClick={e => e.preventDefault()}>
+            <a className="nav-link" href="#" data-lte-toggle="fullscreen" onClick={e => e.preventDefault()}>
               <i className="fas fa-expand-arrows-alt"></i>
             </a>
           </li>
         </ul>
       </nav>
 
-      <aside className="main-sidebar sidebar-dark-primary elevation-4" style={{ position: 'fixed', top: 0, bottom: 0, overflowX: 'hidden', zIndex: 1031 }}>
-        <a href="/" className="brand-link text-center py-2">
-          <span className="brand-text font-weight-bold h4 text-white">AgroSentinel</span>
+      <aside className="main-sidebar sidebar-dark-primary elevation-4">
+        <a href="/" className="brand-link text-center">
+          <span className="brand-text fw-bold h3 text-white">AgroSentinel</span>
         </a>
         <div className="sidebar">
           <div className="user-panel mt-3 pb-3 mb-3 d-flex">
@@ -950,12 +1218,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
               <i className="fas fa-user-circle text-white" style={{ fontSize: '2rem' }}></i>
             </div>
             <div className="info">
-              <a href="#" className="d-block text-white font-weight-bold">{props.session.user.name}</a>
+              <a href="#" className="d-block text-white fw-bold">{props.session.user.name}</a>
               <span className="text-white-50 small text-uppercase">{props.session.user.role.replace('_', ' ')}</span>
             </div>
           </div>
           <nav className="mt-2">
-            <ul className="nav nav-pills nav-sidebar flex-column nav-child-indent" role="menu">
+            <ul className="nav nav-pills nav-sidebar flex-column" data-lte-menu="treeview" role="menu">
               <li className="nav-item">
                 <a href="#" className={`nav-link ${activeSection === 'dashboard' ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setSection('dashboard'); }}>
@@ -963,66 +1231,70 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                 </a>
               </li>
 
-              <li className="nav-item has-treeview">
-                <a href="#" className="nav-link"
-                  onClick={e => { e.preventDefault(); setSection('clientes'); }}>
+              <li className={`nav-item has-treeview ${operacionOpen ? 'menu-open' : ''}`}>
+                <a href="#" className={`nav-link ${['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection) ? 'active' : ''}`}
+                  onClick={e => { e.preventDefault(); setOperacionOpen(!operacionOpen); setConfigOpen(false); }}>
                   <i className="nav-icon fas fa-cogs"></i>
-                  <p>Operación <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
+                  <p>Operacion <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
-                <ul className={`nav nav-treeview ${operacionOpen ? 'd-block' : ''}`}>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'clientes' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('clientes'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Clientes</p>
-                    </a>
-                  </li>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'dispositivos' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('dispositivos'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Dispositivos</p>
-                    </a>
-                  </li>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
-                    </a>
-                  </li>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('notificaciones'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
-                    </a>
-                  </li>
-                </ul>
+                {operacionOpen && (
+                  <ul className="nav nav-treeview" style={{ marginLeft: '1rem' }}>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'clientes' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('clientes'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Clientes</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'dispositivos' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('dispositivos'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Dispositivos</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('notificaciones'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
+                      </a>
+                    </li>
+                  </ul>
+                )}
               </li>
 
-              <li className="nav-item has-treeview">
-                <a href="#" className="nav-link"
-                  onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
+              <li className={`nav-item has-treeview ${configOpen ? 'menu-open' : ''}`}>
+                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes'].includes(activeSection) ? 'active' : ''}`}
+                  onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); setOperacionOpen(false); }}>
                   <i className="nav-icon fas fa-cog"></i>
-                  <p>Configuración <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
+                  <p>Configuracion <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
-                <ul className={`nav nav-treeview ${configOpen ? 'd-block' : ''}`}>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Facturación y Planes</p>
-                    </a>
-                  </li>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('arca'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Configuración ARCA</p>
-                    </a>
-                  </li>
-                  <li className="nav-item" style={{ marginLeft: '1rem' }}>
-                    <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
-                      onClick={e => { e.preventDefault(); setSection('reportes'); }}>
-                      <i className="far fa-circle nav-icon"></i><p>Reportes</p>
-                    </a>
-                  </li>
-                </ul>
+                {configOpen && (
+                  <ul className="nav nav-treeview" style={{ marginLeft: '1rem' }}>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Facturacion y Planes</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('arca'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Configuracion ARCA</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('reportes'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Reportes</p>
+                      </a>
+                    </li>
+                  </ul>
+                )}
               </li>
 
               <li className="nav-item">
@@ -1036,15 +1308,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
         </div>
       </aside>
 
-      <div className="content-wrapper" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s', minHeight: 'calc(100vh - 57px - 52px)' }}>
-        <section className="content-header border-bottom py-2">
+      <div className="content-wrapper">
+        <div className="content-header">
           <div className="container-fluid">
-            <div className="row">
+            <div className="row mb-2">
               <div className="col-sm-6">
-                <h1 className="m-0 text-dark" style={{ fontSize: '1.5rem', fontWeight: '600' }}>{sectionTitle()}</h1>
+                <h1 className="m-0" style={{ fontSize: '1.5rem', fontWeight: '600' }}>{sectionTitle()}</h1>
               </div>
               <div className="col-sm-6">
-                <ol className="breadcrumb float-sm-right mb-0" style={{ background: 'transparent' }}>
+                <ol className="breadcrumb float-sm-end mb-0" style={{ background: 'transparent' }}>
                   <li className="breadcrumb-item">
                     <a href="#" onClick={e => { e.preventDefault(); setSection('dashboard'); }}><i className="fas fa-home"></i></a>
                   </li>
@@ -1053,54 +1325,54 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="content">
+        <div className="content">
           <div className="container-fluid">
 
             {activeSection === 'dashboard' && (
               <>
                 <div className="row">
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-info shadow-sm">
+                    <div className="small-box bg-info">
                       <div className="inner"><h3>{stats.tenants}</h3><p>Clientes Activos</p></div>
                       <div className="icon"><i className="fas fa-building"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-primary shadow-sm">
+                    <div className="small-box bg-primary">
                       <div className="inner"><h3>{stats.total}</h3><p>Dispositivos Totales</p></div>
                       <div className="icon"><i className="fas fa-microchip"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-success shadow-sm">
+                    <div className="small-box bg-primary">
                       <div className="inner"><h3>{stats.online}</h3><p>Online</p></div>
                       <div className="icon"><i className="fas fa-signal"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-danger shadow-sm">
-                      <div className="inner"><h3>{stats.offline}</h3><p>Offline / Críticos</p></div>
+                    <div className="small-box bg-danger">
+                      <div className="inner"><h3>{stats.offline}</h3><p>Offline / Criticos</p></div>
                       <div className="icon"><i className="fas fa-exclamation-triangle"></i></div>
                     </div>
                   </div>
                 </div>
                 <div className="row">
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-warning shadow-sm">
+                    <div className="small-box bg-warning">
                       <div className="inner"><h3>{stats.alerts}</h3><p>Alertas Abiertas</p></div>
                       <div className="icon"><i className="fas fa-bell"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-secondary shadow-sm">
+                    <div className="small-box bg-secondary">
                       <div className="inner"><h3>{stats.users}</h3><p>Usuarios Totales</p></div>
                       <div className="icon"><i className="fas fa-users"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-indigo shadow-sm">
+                    <div className="small-box bg-indigo">
                       <div className="inner"><h3>{invoices.length}</h3><p>Facturas Registradas</p></div>
                       <div className="icon"><i className="fas fa-file-invoice-dollar"></i></div>
                     </div>
@@ -1108,18 +1380,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                 </div>
                 <div className="row">
                   <div className="col-md-8">
-                    <div className="card shadow-sm border-0">
-                      <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Estado de Dispositivos</h3></div>
+                    <div className="card">
+                      <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Estado de Dispositivos</h3></div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
-                          <thead className="bg-light"><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Estado</th><th>Dirección</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Estado</th><th>Direccion</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
                               <tr key={d._id}>
-                                <td className="font-weight-bold">{d.name}</td>
+                                <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
-                                <td><span className={`badge ${d.levelPct < 20 ? 'badge-danger' : d.levelPct < 50 ? 'badge-warning' : 'badge-success'}`}>{d.levelPct}%</span></td>
-                                <td><span className={`badge ${d.status === 'online' ? 'badge-success' : 'badge-danger'}`}>{d.status}</span></td>
+                                <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
+                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></td>
                                 <td className="small">{d.location.address}</td>
                               </tr>
                             ))}
@@ -1129,8 +1401,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                     </div>
                   </div>
                   <div className="col-md-4">
-                    <div className="card shadow-sm border-0">
-                      <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-bell mr-2"></i>Alertas Recientes</h3></div>
+                    <div className="card">
+                      <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Alertas Recientes</h3></div>
                       <div className="card-body p-0" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         {alerts.filter(a => a.status === 'open').length === 0 ? (
                           <p className="text-center text-muted p-3 small">Sin alertas abiertas</p>
@@ -1139,8 +1411,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                             {alerts.filter(a => a.status === 'open').slice(0, 10).map(a => (
                               <li key={a._id} className="list-group-item border-0 px-3 py-2">
                                 <div className="d-flex justify-content-between">
-                                  <span className="font-weight-bold small">{a.deviceId}</span>
-                                  <span className={`badge badge-pill ${a.type === 'critical_level' ? 'badge-danger' : 'badge-secondary'}`}>{a.type}</span>
+                                  <span className="fw-bold small">{a.deviceId}</span>
+                                  <span className={`badge ${a.type === 'critical_level' ? 'text-bg-danger' : 'text-bg-secondary'}`}>{a.type}</span>
                                 </div>
                                 <p className="small mb-0 text-muted">{a.message}</p>
                               </li>
@@ -1156,127 +1428,233 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
 
             {activeSection === 'clientes' && (
               <div className="row">
-                <div className="col-12">
-                  <div className="card card-outline card-primary shadow-sm">
-                    <div className="card-header border-0 d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-primary font-weight-bold mb-0"><i className="fas fa-building mr-2"></i>Clientes</h3>
-                      <button className="btn btn-success btn-sm" onClick={() => setShowAddClient(true)}>
-                        <i className="fas fa-plus mr-1"></i>Agregar Cliente
-                      </button>
+                {selectedClient ? (
+                  <div className="col-12">
+                    <div className="row">
+                      <div className="col-md-3"><div className="text-center p-3 border rounded bg-white"><div className="text-muted small">Dispositivos</div><div className="h4 fw-bold text-primary">{stats.total}</div></div></div>
+                      <div className="col-md-3"><div className="text-center p-3 border rounded bg-white"><div className="text-muted small">Online</div><div className="h4 fw-bold text-success">{stats.online}</div></div></div>
+                      <div className="col-md-3"><div className="text-center p-3 border rounded bg-white"><div className="text-muted small">Alertas</div><div className="h4 fw-bold text-danger">{stats.alerts}</div></div></div>
+                      <div className="col-md-3"><div className="text-center p-3 border rounded bg-white"><div className="text-muted small">Usuarios</div><div className="h4 fw-bold text-info">{stats.users}</div></div></div>
                     </div>
-                    <div className="card-body">
-                      <div style={{ maxWidth: '500px' }}>
-                        <label className="small font-weight-bold mb-1 d-block">Seleccionar Cliente</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Buscar cliente..."
-                          value={clientSearch}
-                          onChange={e => setClientSearch(e.target.value)}
-                          autoComplete="off"
-                        />
-                        {clientSearch && (
-                          <div className="border rounded mt-1 bg-white" style={{ maxHeight: '220px', overflowY: 'auto', zIndex: 100 }}>
-                            {loadingClients ? (
-                              <div className="p-2 text-muted small text-center">
-                                <i className="fas fa-spinner fa-spin mr-2"></i>Cargando...
+
+                    <div className="card card-primary card-outline card-tabs mt-3">
+                      <div className="card-header">
+                        <div className="d-flex justify-content-between align-items-center w-100">
+                          <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-building mr-2"></i>{selectedClient.companyName}</h3>
+                          <button className="btn btn-default btn-sm" onClick={() => { setSelectedClient(null); setRestoreClient(false); }}>
+                            <i className="fas fa-arrow-left mr-1"></i>Volver a Clientes
+                          </button>
+                        </div>
+                        <ul className="nav nav-tabs mt-3" role="tablist">
+                          <li className="nav-item">
+                            <a className={`nav-link ${clientTab === 'info' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('info'); }}>
+                              <i className="fas fa-info-circle mr-1"></i> Informacion
+                            </a>
+                          </li>
+                          <li className="nav-item">
+                            <a className={`nav-link ${clientTab === 'sensores' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('sensores'); }}>
+                              <i className="fas fa-microchip mr-1"></i> Sensores
+                            </a>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="card-body">
+                        {clientTab === 'info' && (
+                          <div className="tab-content">
+                            <div className="tab-pane active show">
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h5 className="mb-0"><i className="fas fa-building mr-2 text-primary"></i>Datos del Cliente</h5>
+                                <button className="btn btn-primary btn-sm" onClick={() => openEditClient()}>
+                                  <i className="fas fa-edit mr-1"></i>Editar Cliente
+                                </button>
                               </div>
-                            ) : clients
-                                .filter(c =>
-                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                ).length === 0 ? (
-                              <div className="p-2 text-muted small text-center">
-                                No se encontraron clientes
+                              <table className="table table-sm table-borderless">
+                                <tbody>
+                                  <tr><td className="text-muted">Tenant ID:</td><td className="fw-bold">{selectedClient.tenantId}</td></tr>
+                                  <tr><td className="text-muted">Empresa:</td><td>{selectedClient.companyName}</td></tr>
+                                  <tr><td className="text-muted">Contacto:</td><td>{selectedClient.contactName || '—'}</td></tr>
+                                  <tr><td className="text-muted">Email:</td><td>{selectedClient.email || '—'}</td></tr>
+                                  <tr><td className="text-muted">Telefono:</td><td>{selectedClient.phone || '—'}</td></tr>
+                                  <tr><td className="text-muted">Direccion:</td><td>{selectedClient.address || '—'}</td></tr>
+                                  <tr><td className="text-muted">Plan:</td><td>{selectedClient.planName || '—'}</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                        {clientTab === 'sensores' && (
+                          <div className="tab-content">
+                            <div className="tab-pane active show">
+                              <div className="table-responsive">
+                                <div className="mb-3">
+                                  <button className="btn btn-primary btn-sm" onClick={() => setShowAddSensorModal(true)}>
+                                    <i className="fas fa-plus me-1"></i>Agregar Sensor
+                                  </button>
+                                </div>
+                                <table className="table table-hover table-striped">
+                                  <thead>
+                                    <tr>
+                                      <th>Nombre</th>
+                                      <th>Device ID</th>
+                                      <th>Nivel</th>
+                                      <th>Bomba</th>
+                                      <th>Estado</th>
+                                      <th>Ultima Comunicacion</th>
+                                      <th>Acciones</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {devices.length === 0 ? (
+                                      <tr><td colSpan={7} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
+                                    ) : (
+                                      devices.map(d => (
+                                        <tr key={d._id}>
+                                          <td className="fw-bold">{d.name}</td>
+                                          <td className="small text-muted">{d.deviceId}</td>
+                                          <td>
+                                            <div className="d-flex align-items-center">
+                                              <div className="progress me-2" style={{ width: '60px', height: '6px' }}>
+                                                <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
+                                              </div>
+                                              <span className="small fw-bold">{d.levelPct}%</span>
+                                            </div>
+                                          </td>
+                                          <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                          <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
+                                          <td className="small text-muted">{d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td>
+                                          <td>
+                                            <button className="btn btn-primary btn-xs" onClick={() => openDeviceModal(d)}>
+                                              <i className="fas fa-edit"></i>
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))
+                                    )}
+                                  </tbody>
+                                </table>
                               </div>
-                            ) : (
-                              clients
-                                .filter(c =>
-                                  c.companyName.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  c.tenantId.toLowerCase().includes(clientSearch.toLowerCase()) ||
-                                  (c.contactName && c.contactName.toLowerCase().includes(clientSearch.toLowerCase()))
-                                )
-                                .map(c => (
-                                  <div
-                                    key={c._id}
-                                    className={`px-3 py-2 border-bottom ${tenantId === c.tenantId ? 'bg-primary text-white' : ''}`}
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => { setTenantId(c.tenantId); setTenantInput(c.tenantId); setClientSearch(''); }}
-                                  >
-                                    <div className="font-weight-bold small">{c.companyName}</div>
-                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{c.contactName || c.email || c.tenantId}</div>
-                                  </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-12">
+                    <div className="card card-header-blue">
+                      <div className="card-header d-flex justify-content-between align-items-center">
+                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-building me-2"></i>Clientes</h3>
+                        <button className="btn btn-light btn-sm" onClick={() => setShowAddClient(true)}>
+                          <i className="fas fa-plus me-1"></i>Agregar Cliente
+                        </button>
+                      </div>
+                      <div className="card-body">
+                        <div className="mb-3">
+                          <div className="input-group">
+                            <div className="input-group-prepend">
+                              <span className="input-group-text"><i className="fas fa-search"></i></span>
+                            </div>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Buscar cliente por nombre, email o contacto..."
+                              value={clientSearch}
+                              onChange={e => setClientSearch(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="table-responsive">
+                          <table className="table table-hover table-striped">
+                            <thead>
+                              <tr>
+                                <th>Empresa</th>
+                                <th>Contacto</th>
+                                <th>Email</th>
+                                <th>Telefono</th>
+                                <th>Direccion</th>
+                                <th>Plan</th>
+                                <th>Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {loadingClients ? (
+                                <tr><td colSpan={7} className="text-center text-muted py-3"><i className="fas fa-spinner fa-spin me-1"></i>Cargando clientes...</td></tr>
+                              ) : filteredClients.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center text-muted py-3">No se encontraron clientes</td></tr>
+                              ) : (
+                                filteredClients.map(c => (
+                                  <tr key={c._id}>
+                                    <td className="fw-bold">{c.companyName}</td>
+                                    <td>{c.contactName || '—'}</td>
+                                    <td>{c.email || '—'}</td>
+                                    <td>{c.phone || '—'}</td>
+                                    <td className="small">{c.address || '—'}</td>
+                                    <td>{c.planName || '—'}</td>
+                                    <td>
+                                      <button
+                                        className="btn btn-primary btn-xs"
+                                        onClick={async () => {
+                                          setSelectedClient(c);
+                                          setTenantId(c.tenantId);
+                                          setRestoreClient(true);
+                                          await loadCompanyData(c.tenantId);
+                                          saveNavState({ section: 'clientes', clientId: c._id });
+                                        }}
+                                      >
+                                        <i className="fas fa-eye mr-1"></i>Ver Detalle
+                                      </button>
+                                    </td>
+                                  </tr>
                                 ))
-                            )}
-                          </div>
-                        )}
-                        {tenantId && (
-                          <div className="mt-2 small text-muted">
-                            <i className="fas fa-check text-success mr-1"></i>
-                            Cliente seleccionado: <strong>{clients.find(c => c.tenantId === tenantId)?.companyName || tenantId}</strong>
-                          </div>
-                        )}
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="card shadow-sm border-0 mt-3">
-                    <div className="card-header bg-white">
-                      <h3 className="card-title font-weight-bold"><i className="fas fa-list mr-2"></i>Resumen del Cliente</h3>
-                    </div>
-                    <div className="card-body">
-                      <div className="row">
-                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Dispositivos</div><div className="h4 font-weight-bold text-primary">{stats.total}</div></div></div>
-                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Online</div><div className="h4 font-weight-bold text-success">{stats.online}</div></div></div>
-                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Alertas</div><div className="h4 font-weight-bold text-danger">{stats.alerts}</div></div></div>
-                        <div className="col-md-3"><div className="text-center p-3 border rounded"><div className="text-muted small">Usuarios</div><div className="h4 font-weight-bold text-info">{stats.users}</div></div></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
             {activeSection === 'dispositivos' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white">
-                      <h3 className="card-title font-weight-bold"><i className="fas fa-plus-circle mr-2 text-success"></i>Agregar Dispositivo</h3>
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-plus-circle me-2"></i>Agregar Dispositivo</h3>
                     </div>
                     <div className="card-body">
                       <div className="row">
-                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Device ID</label><input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" /></div></div>
-                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Nombre</label><input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" /></div></div>
-                        <div className="col-md-3"><div className="form-group"><label className="small font-weight-bold">Dirección</label><input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" /></div></div>
-                        <div className="col-md-2 d-flex align-items-end"><button className="btn btn-success btn-block font-weight-bold" onClick={() => void createDevice()} disabled={creatingDevice}>{creatingDevice ? '...' : 'Vincular'}</button></div>
+                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Device ID</label><input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" /></div>
+                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" /></div>
+                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" /></div>
+                        <div className="col-md-2 mb-3 d-flex align-items-end"><button className="btn btn-primary w-100 fw-bold" onClick={() => void createDevice()} disabled={creatingDevice}>{creatingDevice ? '...' : 'Vincular'}</button></div>
                       </div>
                     </div>
                   </div>
-                  <div className="card shadow-sm border-0 mt-3">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-microchip mr-2"></i>Dispositivos Registrados ({devices.length})</h3></div>
+                  <div className="card mt-3">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({devices.length})</h3></div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead className="bg-light"><tr><th>Nombre</th><th>Device ID</th><th>Dirección</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Direccion</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
                               <tr key={d._id}>
-                                <td className="font-weight-bold">{d.name}</td>
+                                <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td className="small">{d.location.address}</td>
                                 <td>
                                   <div className="d-flex align-items-center">
-                                    <div className="progress progress-xs mr-2" style={{ width: '60px' }}>
+                                    <div className="progress me-2" style={{ width: '60px', height: '6px' }}>
                                       <div className={`progress-bar ${d.levelPct < 20 ? 'bg-danger' : d.levelPct < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${d.levelPct}%` }}></div>
                                     </div>
-                                    <span className="small font-weight-bold">{d.levelPct}%</span>
+                                    <span className="small fw-bold">{d.levelPct}%</span>
                                   </div>
                                 </td>
-                                <td><span className={`badge ${d.pumpOn ? 'badge-info' : 'badge-light'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
-                                <td><span className={`badge ${d.status === 'online' ? 'badge-success' : d.status === 'warning' ? 'badge-warning' : 'badge-danger'}`}>{d.status}</span></td>
+                                <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
                               </tr>
                             ))}
                           </tbody>
@@ -1291,47 +1669,47 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'usuarios' && (
               <div className="row">
                 <div className="col-md-4">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-user-plus mr-2 text-success"></i>Crear Usuario</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-plus me-2"></i>Crear Usuario</h3></div>
                     <div className="card-body">
-                      <div className="form-group"><label className="small font-weight-bold">Nombre</label><input className="form-control" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder="Juan Perez" /></div>
-                      <div className="form-group"><label className="small font-weight-bold">Email</label><input className="form-control" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="juan@cliente.com" /></div>
-                      <div className="form-group"><label className="small font-weight-bold">Rol</label>
+                      <div className="mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder="Juan Perez" /></div>
+                      <div className="mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="juan@cliente.com" /></div>
+                      <div className="mb-3"><label className="form-label small fw-bold">Rol</label>
                         <select className="form-control" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'owner' | 'operator' | 'technician' }))}>
                           <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
                         </select>
                       </div>
-                      <div className="form-group"><label className="small font-weight-bold">Contraseña</label><input className="form-control" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} /></div>
-                      <button className="btn btn-success btn-block font-weight-bold" onClick={() => void createUser()} disabled={creatingUser}>{creatingUser ? '...' : 'Crear Usuario'}</button>
+                      <div className="mb-3"><label className="form-label small fw-bold">Contrasena</label><input className="form-control" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} /></div>
+                      <button className="btn btn-primary w-100 fw-bold" onClick={() => void createUser()} disabled={creatingUser}>{creatingUser ? '...' : 'Crear Usuario'}</button>
                     </div>
                   </div>
-                  <div className="card shadow-sm border-0 mt-3">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-key mr-2 text-warning"></i>Resetear Contraseña</h3></div>
+                  <div className="card mt-3">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-key me-2"></i>Resetear Contrasena</h3></div>
                     <div className="card-body">
-                      <div className="form-group"><label className="small font-weight-bold">Usuario</label>
+                      <div className="mb-3"><label className="form-label small fw-bold">Usuario</label>
                         <select className="form-control" value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
                           <option value="">Seleccionar...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
                         </select>
                       </div>
-                      <div className="form-group"><label className="small font-weight-bold">Nueva Contraseña</label><input className="form-control" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="Nueva contrasena" /></div>
-                      <button className="btn btn-warning btn-block font-weight-bold" onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>Resetear</button>
+                      <div className="mb-3"><label className="form-label small fw-bold">Nueva Contrasena</label><input className="form-control" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="Nueva contrasena" /></div>
+                      <button className="btn btn-warning w-100 fw-bold" onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>Resetear</button>
                     </div>
                   </div>
                 </div>
                 <div className="col-md-8">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-users mr-2"></i>Usuarios ({users.length})</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({users.length})</h3></div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead className="bg-light"><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Tenant</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Tenant</th></tr></thead>
                           <tbody>
                             {users.map(u => (
                               <tr key={u.id}>
-                                <td className="font-weight-bold">{u.name}</td>
+                                <td className="fw-bold">{u.name}</td>
                                 <td className="small text-muted">{u.email}</td>
-                                <td><span className="badge badge-primary">{u.role}</span></td>
-                                <td>{u.mustChangePassword ? <span className="badge badge-warning"><i className="fas fa-exclamation-triangle mr-1"></i>Pendiente</span> : <span className="badge badge-success">OK</span>}</td>
+                                <td><span className="badge text-bg-primary">{u.role}</span></td>
+                                <td>{u.mustChangePassword ? <span className="badge text-bg-warning"><i className="fas fa-exclamation-triangle me-1"></i>Pendiente</span> : <span className="badge text-bg-success">OK</span>}</td>
                                 <td className="small text-muted">{u.tenantId}</td>
                               </tr>
                             ))}
@@ -1347,16 +1725,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'facturacion' && (
               <div className="row">
                 <div className="col-md-6">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-tags mr-2 text-info"></i>Planes Disponibles</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-tags me-2"></i>Planes Disponibles</h3></div>
                     <div className="card-body p-0">
                       <table className="table m-0">
-                        <thead className="bg-light"><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual</th></tr></thead>
+                        <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual</th></tr></thead>
                         <tbody>{plans.map(p => (
                           <tr key={p._id}>
-                            <td className="font-weight-bold">{p.name}</td>
+                            <td className="fw-bold">{p.name}</td>
                             <td>{p.maxDevices}</td>
-                            <td className="text-primary font-weight-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</td>
+                            <td className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -1364,17 +1742,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
                   </div>
                 </div>
                 <div className="col-md-6">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-file-invoice-dollar mr-2 text-success"></i>Historial de Facturación</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar me-2"></i>Historial de Facturacion</h3></div>
                     <div className="card-body p-0">
                       <table className="table m-0">
-                        <thead className="bg-light"><tr><th>Período</th><th>Monto</th><th>CAE</th><th>Estado</th></tr></thead>
+                        <thead><tr><th>Periodo</th><th>Monto</th><th>CAE</th><th>Estado</th></tr></thead>
                         <tbody>{invoices.map(i => (
                           <tr key={i._id}>
-                            <td className="font-weight-bold">{i.period}</td>
+                            <td className="fw-bold">{i.period}</td>
                             <td>${i.amountArs.toLocaleString('es-AR')}</td>
                             <td className="small text-muted">{i.arca?.cae || '—'}</td>
-                            <td><span className={`badge ${i.status === 'paid' ? 'badge-success' : i.status === 'issued' ? 'badge-info' : 'badge-secondary'}`}>{i.status}</span></td>
+                            <td><span className={`badge ${i.status === 'paid' ? 'text-bg-success' : i.status === 'issued' ? 'text-bg-info' : 'text-bg-secondary'}`}>{i.status}</span></td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -1387,60 +1765,48 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'arca' && (
               <div className="row">
                 <div className="col-md-8">
-                  <div className="card shadow-sm border-0">
+                  <div className="card">
                     <div className="card-header bg-danger">
-                      <h3 className="card-title font-weight-bold text-white"><i className="fas fa-shield-alt mr-2"></i>Configuración ARCA / AFIP</h3>
+                      <h3 className="card-title fw-bold text-white"><i className="fas fa-shield-alt me-2"></i>Configuracion ARCA / AFIP</h3>
                     </div>
                     <div className="card-body">
                       <div className="row">
-                        <div className="col-md-6">
-                          <div className="form-group"><label className="small font-weight-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="form-group"><label className="small font-weight-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="form-group"><label className="small font-weight-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="form-group"><label className="small font-weight-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="form-group"><label className="small font-weight-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="form-group mt-4">
-                            <div className="custom-control custom-switch">
-                              <input type="checkbox" className="custom-control-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
-                              <label className="custom-control-label font-weight-bold" htmlFor="arcaEnabled">Habilitar Facturación ARCA</label>
-                            </div>
-                            <div className="custom-control custom-switch mt-2">
-                              <input type="checkbox" className="custom-control-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
-                              <label className="custom-control-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
-                            </div>
+                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
+                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
+                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
+                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
+                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
+                        <div className="col-md-6 mb-3">
+                          <div className="form-check form-switch mt-4">
+                            <input type="checkbox" className="form-check-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                            <label className="form-check-label fw-bold" htmlFor="arcaEnabled">Habilitar Facturacion ARCA</label>
+                          </div>
+                          <div className="form-check form-switch mt-2">
+                            <input type="checkbox" className="form-check-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
+                            <label className="form-check-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
                           </div>
                         </div>
-                        <div className="col-12 mt-3">
-                          <button className="btn btn-danger font-weight-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuración'}</button>
+                        <div className="col-12">
+                          <button className="btn btn-danger fw-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuracion'}</button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="col-md-4">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-key mr-2 text-warning"></i>Mi Contraseña</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-key me-2"></i>Mi Contrasena</h3></div>
                     <div className="card-body">
                       <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
                     </div>
                   </div>
-                  <div className="card shadow-sm border-0 mt-3">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-info-circle mr-2 text-info"></i>Datos Actuales</h3></div>
+                  <div className="card mt-3">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-info-circle me-2"></i>Datos Actuales</h3></div>
                     <div className="card-body small">
                       <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
                       <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
-                      <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'badge-success' : 'badge-secondary'}`}>{arcaConfig.enabled ? 'Sí' : 'No'}</span></p>
-                      <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'badge-warning' : 'badge-success'}`}>{arcaConfig.mock ? 'Sí' : 'No'}</span></p>
+                      <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'text-bg-success' : 'text-bg-secondary'}`}>{arcaConfig.enabled ? 'Si' : 'No'}</span></p>
+                      <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'text-bg-warning' : 'text-bg-success'}`}>{arcaConfig.mock ? 'Si' : 'No'}</span></p>
                     </div>
                   </div>
                 </div>
@@ -1450,20 +1816,20 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'notificaciones' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-bell mr-2 text-warning"></i>Notificaciones y Alertas ({alerts.length})</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3></div>
                     <div className="card-body p-0">
                       {alerts.length === 0 ? (
                         <p className="text-center text-muted p-4">Sin notificaciones registradas</p>
                       ) : (
                         <table className="table table-hover m-0">
-                          <thead className="bg-light"><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
                           <tbody>{alerts.map(a => (
                             <tr key={a._id}>
-                              <td className="font-weight-bold">{a.deviceId}</td>
-                              <td><span className={`badge ${a.type === 'critical_level' ? 'badge-danger' : 'badge-secondary'}`}>{a.type}</span></td>
+                              <td className="fw-bold">{a.deviceId}</td>
+                              <td><span className={`badge ${a.type === 'critical_level' ? 'text-bg-danger' : 'text-bg-secondary'}`}>{a.type}</span></td>
                               <td>{a.message}</td>
-                              <td><span className={`badge ${a.status === 'open' ? 'badge-danger' : 'badge-success'}`}>{a.status}</span></td>
+                              <td><span className={`badge ${a.status === 'open' ? 'text-bg-danger' : 'text-bg-success'}`}>{a.status}</span></td>
                             </tr>
                           ))}</tbody>
                         </table>
@@ -1477,35 +1843,35 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'reportes' && (
               <div className="row">
                 <div className="col-md-6">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-chart-bar mr-2 text-info"></i>Resumen Operativo</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-chart-bar me-2"></i>Resumen Operativo</h3></div>
                     <div className="card-body">
                       <div className="border rounded p-3 mb-3">
-                        <div className="d-flex justify-content-between mb-2"><span>Dispositivos Totales</span><span className="font-weight-bold">{stats.total}</span></div>
-                        <div className="d-flex justify-content-between mb-2"><span>Online</span><span className="font-weight-bold text-success">{stats.online}</span></div>
-                        <div className="d-flex justify-content-between mb-2"><span>Offline/Críticos</span><span className="font-weight-bold text-danger">{stats.offline}</span></div>
-                        <div className="d-flex justify-content-between"><span>Alertas Abiertas</span><span className="font-weight-bold text-warning">{stats.alerts}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Dispositivos Totales</span><span className="fw-bold">{stats.total}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Online</span><span className="fw-bold text-success">{stats.online}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Offline/Criticos</span><span className="fw-bold text-danger">{stats.offline}</span></div>
+                        <div className="d-flex justify-content-between"><span>Alertas Abiertas</span><span className="fw-bold text-warning">{stats.alerts}</span></div>
                       </div>
                       <div className="border rounded p-3">
-                        <div className="d-flex justify-content-between mb-2"><span>Clientes</span><span className="font-weight-bold">{stats.tenants}</span></div>
-                        <div className="d-flex justify-content-between mb-2"><span>Usuarios</span><span className="font-weight-bold">{stats.users}</span></div>
-                        <div className="d-flex justify-content-between"><span>Facturas</span><span className="font-weight-bold">{invoices.length}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Clientes</span><span className="fw-bold">{stats.tenants}</span></div>
+                        <div className="d-flex justify-content-between mb-2"><span>Usuarios</span><span className="fw-bold">{stats.users}</span></div>
+                        <div className="d-flex justify-content-between"><span>Facturas</span><span className="fw-bold">{invoices.length}</span></div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="col-md-6">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-chart-pie mr-2 text-primary"></i>Estado de Dispositivos</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-chart-pie me-2"></i>Estado de Dispositivos</h3></div>
                     <div className="card-body text-center">
-                      <div className="h1 font-weight-bold text-success">{stats.online}</div>
+                      <div className="display-1 fw-bold text-success">{stats.online}</div>
                       <div className="text-muted small">Dispositivos Online</div>
                       <div className="progress mt-3" style={{ height: '10px' }}>
                         <div className="progress-bar bg-success" style={{ width: stats.total > 0 ? `${(stats.online / stats.total) * 100}%` : '0%' }}></div>
                         <div className="progress-bar bg-danger" style={{ width: stats.total > 0 ? `${(stats.offline / stats.total) * 100}%` : '0%' }}></div>
                       </div>
                       <div className="d-flex justify-content-between mt-1 small text-muted">
-                        <span>Online</span><span>Offline/Críticos</span>
+                        <span>Online</span><span>Offline/Criticos</span>
                       </div>
                     </div>
                   </div>
@@ -1516,21 +1882,21 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             {activeSection === 'actividad' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card shadow-sm border-0">
-                    <div className="card-header bg-white"><h3 className="card-title font-weight-bold"><i className="fas fa-history mr-2 text-secondary"></i>Registro de Actividad</h3></div>
+                  <div className="card">
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-history me-2"></i>Registro de Actividad</h3></div>
                     <div className="card-body p-0">
                       <table className="table table-hover m-0">
-                        <thead className="bg-light"><tr><th>Fecha</th><th>Evento</th><th>Detalle</th></tr></thead>
+                        <thead><tr><th>Fecha</th><th>Evento</th><th>Detalle</th></tr></thead>
                         <tbody>
                           {[
                             { date: new Date().toLocaleString('es-AR'), event: 'Acceso', detail: `Login exitoso: ${props.session.user.email}` },
-                            { date: new Date().toLocaleString('es-AR'), event: 'Sesión', detail: `Rol: ${props.session.user.role} | Tenant: ${props.session.user.tenantId}` },
+                            { date: new Date().toLocaleString('es-AR'), event: 'Sesion', detail: `Rol: ${props.session.user.role} | Tenant: ${props.session.user.tenantId}` },
                             { date: new Date().toLocaleString('es-AR'), event: 'Dispositivos', detail: `${stats.total} dispositivos cargados para ${tenantId}` },
                             { date: new Date().toLocaleString('es-AR'), event: 'Alertas', detail: `${stats.alerts} alertas abiertas` },
                           ].map((row, i) => (
                             <tr key={i}>
                               <td className="small text-muted">{row.date}</td>
-                              <td><span className="badge badge-info">{row.event}</span></td>
+                              <td><span className="badge text-bg-info">{row.event}</span></td>
                               <td className="small">{row.detail}</td>
                             </tr>
                           ))}
@@ -1543,102 +1909,262 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void }
             )}
 
           </div>
-        </section>
+        </div>
       </div>
 
-      {showAddClient && (
-        <div className="modal-backdrop-custom" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if ((e.target as HTMLElement) === e.currentTarget) setShowAddClient(false); }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', margin: '1rem' }}>
-            <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title"><i className="fas fa-building mr-2"></i>Agregar Nuevo Cliente</h5>
-                <button type="button" className="close text-white" onClick={() => setShowAddClient(false)}>
-                  <span>&times;</span>
-                </button>
+      <div className={`modal fade ${showAddClient ? 'show' : ''}`} style={{ display: showAddClient ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-building mr-2"></i>Agregar Nuevo Cliente</h4>
+              <button type="button" className="close text-white" onClick={() => setShowAddClient(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Nombre de la Empresa *</label>
+                <input className="form-control" value={newClient.companyName}
+                  onChange={e => setNewClient(p => ({ ...p, companyName: e.target.value }))}
+                  placeholder="Estancia Don Juan" />
               </div>
-              <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
-                <div className="form-group">
-                  <label className="small font-weight-bold">Nombre de la Empresa *</label>
-                  <input className="form-control" value={newClient.companyName}
-                    onChange={e => setNewClient(p => ({ ...p, companyName: e.target.value }))}
-                    placeholder="Estancia Don Juan" />
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Nombre del Contacto</label>
+                  <input className="form-control" value={newClient.contactName}
+                    onChange={e => setNewClient(p => ({ ...p, contactName: e.target.value }))}
+                    placeholder="Juan Perez" />
                 </div>
-                <div className="row">
-                  <div className="col-md-6">
-                    <div className="form-group">
-                      <label className="small font-weight-bold">Nombre del Contacto</label>
-                      <input className="form-control" value={newClient.contactName}
-                        onChange={e => setNewClient(p => ({ ...p, contactName: e.target.value }))}
-                        placeholder="Juan Perez" />
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="form-group">
-                      <label className="small font-weight-bold">Teléfono</label>
-                      <input className="form-control" value={newClient.phone}
-                        onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))}
-                        placeholder="+54 9 11 1234-5678" />
-                    </div>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="small font-weight-bold">Email de Contacto *</label>
-                  <input className="form-control" type="email" value={newClient.email}
-                    onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))}
-                    placeholder="contacto@estancia.com" />
-                </div>
-                <div className="form-group">
-                  <label className="small font-weight-bold">Dirección</label>
-                  <input className="form-control" value={newClient.address}
-                    onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))}
-                    placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
-                </div>
-                <div className="form-group">
-                  <label className="small font-weight-bold">Plan</label>
-                  <select className="form-control" value={newClient.planId}
-                    onChange={e => setNewClient(p => ({ ...p, planId: e.target.value }))}>
-                    <option value="">Seleccionar plan...</option>
-                    {plans.map(p => <option key={p._id} value={p._id}>{p.name} - ${p.monthlyPriceArs.toLocaleString('es-AR')}/mes</option>)}
-                  </select>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Telefono</label>
+                  <input className="form-control" value={newClient.phone}
+                    onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="+54 9 11 1234-5678" />
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
-                <button type="button" className="btn btn-success"
-                  disabled={!newClient.companyName || !newClient.email || creatingClient}
-                  onClick={async () => {
-                    setCreatingClient(true);
-                    try {
-                      const res = await postJson('/tenants', {
-                        companyName: newClient.companyName,
-                        contactName: newClient.contactName,
-                        email: newClient.email,
-                        phone: newClient.phone,
-                        address: newClient.address,
-                        planId: newClient.planId || undefined
-                      }, props.session.token);
-                      const data = await res.json() as { tenantId: string };
-                      setShowAddClient(false);
-                      setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
-                      setTenantId(data.tenantId);
-                      setTenantInput(data.tenantId);
-                      void loadClients();
-                    } catch {
-                      alert('Error al crear el cliente');
-                    } finally {
-                      setCreatingClient(false);
-                    }
-                  }}>
-                  {creatingClient ? 'Creando...' : <><i className="fas fa-check mr-1"></i>Crear Cliente</>}
-                </button>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Email de Contacto *</label>
+                <input className="form-control" type="email" value={newClient.email}
+                  onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))}
+                  placeholder="contacto@estancia.com" />
               </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Direccion</label>
+                <input className="form-control" value={newClient.address}
+                  onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))}
+                  placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Plan</label>
+                <select className="form-control" value={newClient.planId}
+                  onChange={e => setNewClient(p => ({ ...p, planId: e.target.value }))}>
+                  <option value="">Seleccionar plan...</option>
+                  {plans.map(p => <option key={p._id} value={p._id}>{p.name} - ${p.monthlyPriceArs.toLocaleString('es-AR')}/mes</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-default" onClick={() => setShowAddClient(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary"
+                disabled={!newClient.companyName || !newClient.email || creatingClient}
+                onClick={async () => {
+                  setCreatingClient(true);
+                  try {
+                    const res = await postJson('/tenants', {
+                      companyName: newClient.companyName,
+                      contactName: newClient.contactName,
+                      email: newClient.email,
+                      phone: newClient.phone,
+                      address: newClient.address,
+                      planId: newClient.planId || undefined
+                    }, props.session.token);
+                    const data = await res.json() as { tenantId: string };
+                    setShowAddClient(false);
+                    setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
+                    setTenantId(data.tenantId);
+                    setTenantInput(data.tenantId);
+                    void loadClients();
+                  } catch {
+                    alert('Error al crear el cliente');
+                  } finally {
+                    setCreatingClient(false);
+                  }
+                }}>
+                {creatingClient ? 'Creando...' : <><i className="fas fa-check mr-1"></i>Crear Cliente</>}
+              </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
+      {showAddClient && <div className="modal-backdrop fade show" onClick={() => setShowAddClient(false)}></div>}
 
-      <footer className="main-footer" style={{ marginLeft: sidebarCollapsed ? '0' : '250px', transition: 'margin-left 0.2s' }}>
-        <div className="float-right d-none d-sm-inline-block">
+      <div className={`modal fade ${showEditClient ? 'show' : ''}`} style={{ display: showEditClient ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-edit mr-2"></i>Editar Cliente</h4>
+              <button type="button" className="close text-white" onClick={() => setShowEditClient(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Nombre de la Empresa *</label>
+                <input className="form-control" value={editClient.companyName}
+                  onChange={e => setEditClient(p => ({ ...p, companyName: e.target.value }))} />
+              </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Nombre del Contacto</label>
+                  <input className="form-control" value={editClient.contactName}
+                    onChange={e => setEditClient(p => ({ ...p, contactName: e.target.value }))} />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Telefono</label>
+                  <input className="form-control" value={editClient.phone}
+                    onChange={e => setEditClient(p => ({ ...p, phone: e.target.value }))} />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Email de Contacto *</label>
+                <input className="form-control" type="email" value={editClient.email}
+                  onChange={e => setEditClient(p => ({ ...p, email: e.target.value }))} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Direccion</label>
+                <input className="form-control" value={editClient.address}
+                  onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Plan</label>
+                <select className="form-control" value={editClient.planId}
+                  onChange={e => setEditClient(p => ({ ...p, planId: e.target.value }))}>
+                  <option value="">Seleccionar plan...</option>
+                  {plans.map(p => <option key={p._id} value={p._id}>{p.name} - ${p.monthlyPriceArs.toLocaleString('es-AR')}/mes</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-default" onClick={() => setShowEditClient(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>
+                {savingClient ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showEditClient && <div className="modal-backdrop fade show" onClick={() => setShowEditClient(false)}></div>}
+
+      <div className={`modal fade ${showDeviceModal ? 'show' : ''}`} style={{ display: showDeviceModal ? 'block' : 'none' }}>
+        <div className="modal-dialog modal-lg">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-microchip mr-2"></i>Detalle del Sensor</h4>
+              <button type="button" className="close text-white" onClick={() => setShowDeviceModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {selectedDevice && (
+                <>
+                  <div className="row mb-4">
+                    <div className="col-md-6">
+                      <h5 className="text-primary"><i className="fas fa-info-circle mr-1"></i>Informacion General</h5>
+                      <table className="table table-sm table-borderless">
+                        <tr><td className="text-muted fw-bold">Device ID:</td><td>{selectedDevice.deviceId}</td></tr>
+                        <tr><td className="text-muted fw-bold">Nombre:</td><td className="fw-bold">{selectedDevice.name}</td></tr>
+                        <tr><td className="text-muted fw-bold">Nivel:</td><td><span className="badge text-bg-success">{selectedDevice.levelPct}%</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Reserva:</td><td>{selectedDevice.reserveLiters} litros</td></tr>
+                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge ${selectedDevice.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${selectedDevice.status === 'online' ? 'text-bg-success' : selectedDevice.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{selectedDevice.status}</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Ultima Comunicacion:</td><td className="small">{selectedDevice.lastHeartbeatAt ? new Date(selectedDevice.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td></tr>
+                      </table>
+                    </div>
+                    <div className="col-md-6">
+                      <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
+                      <table className="table table-sm table-borderless">
+                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{selectedDevice.location.lat}</td></tr>
+                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{selectedDevice.location.lng}</td></tr>
+                        <tr><td className="text-muted fw-bold">Direccion:</td><td>{selectedDevice.location.address || '—'}</td></tr>
+                      </table>
+                      <div className="alert alert-warning py-2 small mt-3">
+                        <i className="fas fa-clock mr-1"></i>
+                        Creado: {selectedDevice.createdAt ? new Date(selectedDevice.createdAt).toLocaleString('es-AR') : '—'}
+                      </div>
+                    </div>
+                  </div>
+                  <hr />
+                  <h5 className="text-primary"><i className="fas fa-edit mr-1"></i>Modificar Sensor</h5>
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Nombre</label>
+                      <input className="form-control" value={editDevice.name} onChange={e => setEditDevice(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Direccion</label>
+                      <input className="form-control" value={editDevice.address} onChange={e => setEditDevice(p => ({ ...p, address: e.target.value }))} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Latitud</label>
+                      <input className="form-control" value={editDevice.lat} onChange={e => setEditDevice(p => ({ ...p, lat: e.target.value }))} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Longitud</label>
+                      <input className="form-control" value={editDevice.lng} onChange={e => setEditDevice(p => ({ ...p, lng: e.target.value }))} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-default" onClick={() => setShowDeviceModal(false)}>Cerrar</button>
+              <button type="button" className="btn btn-primary" onClick={() => void saveDevice()} disabled={savingDevice}>
+                {savingDevice ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showDeviceModal && <div className="modal-backdrop fade show" onClick={() => setShowDeviceModal(false)}></div>}
+
+      <div className={`modal fade ${showAddSensorModal ? 'show' : ''}`} style={{ display: showAddSensorModal ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-plus-circle mr-2"></i>Agregar Nuevo Sensor</h4>
+              <button type="button" className="close text-white" onClick={() => setShowAddSensorModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Device ID *</label>
+                <input className="form-control" value={newSensor.deviceId} onChange={e => setNewSensor(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Nombre *</label>
+                <input className="form-control" value={newSensor.name} onChange={e => setNewSensor(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Direccion</label>
+                <input className="form-control" value={newSensor.address} onChange={e => setNewSensor(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" />
+              </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Latitud</label>
+                  <input className="form-control" value={newSensor.lat} onChange={e => setNewSensor(p => ({ ...p, lat: e.target.value }))} />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Longitud</label>
+                  <input className="form-control" value={newSensor.lng} onChange={e => setNewSensor(p => ({ ...p, lng: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-default" onClick={() => setShowAddSensorModal(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={() => void createSensor()} disabled={creatingSensor || !newSensor.deviceId || !newSensor.name}>
+                {creatingSensor ? 'Creando...' : <><i className="fas fa-plus mr-1"></i>Crear Sensor</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showAddSensorModal && <div className="modal-backdrop fade show" onClick={() => setShowAddSensorModal(false)}></div>}
+
+      <footer className="main-footer">
+        <div className="float-end d-none d-sm-inline-block">
           <strong>AgroSentinel Enterprise</strong> &copy; 2026
         </div>
         <strong>Plataforma de monitoreo IoT para aguadas rurales</strong>
@@ -1692,7 +2218,11 @@ export function App() {
         />
       );
     }
-    return <CompanyAdminPanel session={session} onLogout={logout} />;
+    return <CompanyAdminPanel session={session} onLogout={logout} onPasswordChanged={() => {
+      const updated = { ...session, user: { ...session.user, mustChangePassword: false } };
+      setSession(updated);
+      saveSession(updated);
+    }} />;
   }
 
   if (isClientPanel) {
