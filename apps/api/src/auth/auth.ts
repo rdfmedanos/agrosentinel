@@ -48,14 +48,6 @@ export function requireCompanyAdmin(req: Request, res: Response, next: NextFunct
   next();
 }
 
-export function requireClientUser(req: Request, res: Response, next: NextFunction) {
-  if (!req.auth || req.auth.role === 'company_admin') {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
-  next();
-}
-
 export function resolveTenantFromRequest(req: Request): string {
   const queryTenant = typeof req.query.tenantId === 'string' ? req.query.tenantId : '';
   if (req.auth?.role === 'company_admin') {

@@ -87,7 +87,6 @@ type AuthSession = {
 
 const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? window.location.origin;
-const DEFAULT_TENANT_ID = 'demo-tenant';
 
 const highlights = [
   {
@@ -763,7 +762,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [configOpen, setConfigOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [tenantId, setTenantId] = useState<string>('');
-  const [tenantInput, setTenantInput] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -933,13 +931,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         if (client) {
           setSelectedClient(client);
           setTenantId(client.tenantId);
-          setTenantInput(client.tenantId);
           void loadCompanyData(client.tenantId);
           return;
         }
       }
       setTenantId(clients[0].tenantId);
-      setTenantInput(clients[0].tenantId);
       void loadCompanyData(clients[0].tenantId);
     }
     if (!restoreClient) {
@@ -1943,7 +1939,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     setShowAddClient(false);
                     setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
                     setTenantId(data.tenantId);
-                    setTenantInput(data.tenantId);
                     void loadClients();
                   } catch {
                     alert('Error al crear el cliente');

@@ -53,10 +53,11 @@ tenantsRouter.get('/', async (req, res) => {
 tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
   const data = createTenantSchema.parse(req.body);
 
-  const tenantId = generateTenantId(data.companyName);
+  let tenantId = generateTenantId(data.companyName);
   let attempts = 0;
 
   while (await TenantConfigModel.findOne({ tenantId }) && attempts < 5) {
+    tenantId = generateTenantId(data.companyName);
     attempts++;
   }
 
