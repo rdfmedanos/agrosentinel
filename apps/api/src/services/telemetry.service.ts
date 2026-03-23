@@ -12,22 +12,36 @@ export const telemetrySchema = z.object({
 });
 
 export async function upsertHeartbeat(deviceId: string) {
-  const device = await DeviceModel.findOneAndUpdate(
+  const device = await DeviceModel.findOne({ deviceId });
+  if (!device) return null;
+
+  if (device.pending) {
+    await DeviceModel.updateOne(
+      { deviceId },
+      { lastHeartbeatAt: new Date(), lastSeenAt: new Date(), status: 'online' }
+    );
+    return null;
+  }
+
+  const updated = await DeviceModel.findOneAndUpdate(
     { deviceId },
     { lastHeartbeatAt: new Date(), status: 'online' },
     { new: true }
   );
-  if (!device) return null;
 
-  await resolveAlert(device.tenantId, device.deviceId, 'offline');
-  emitTenant(device.tenantId, 'devices:updated', device);
-  return device;
+  if (device.tenantId && updated) {
+    await resolveAlert(device.tenantId, device.deviceId, 'offline');
+    emitTenant(device.tenantId, 'devices:updated', updated);
+  }
+  return updated;
 }
 
 export async function ingestTelemetry(deviceId: string, payload: unknown) {
-  const data = telemetrySchema.parse(payload);
   const device = await DeviceModel.findOne({ deviceId });
   if (!device) throw new Error(`Device ${deviceId} not registered`);
+  if (device.pending) return;
+
+  const data = telemetrySchema.parse(payload);
 
   const ts = data.ts ? new Date(data.ts) : new Date();
   await TelemetryModel.create({
@@ -46,7 +60,9 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
   device.status = data.levelPct <= 20 ? 'critical' : 'online';
   await device.save();
 
-  await evaluateDeviceCriticalLevel(device.deviceId);
-  emitTenant(device.tenantId, 'telemetry:new', { deviceId, ...data });
-  emitTenant(device.tenantId, 'devices:updated', device);
+  if (device.tenantId) {
+    await evaluateDeviceCriticalLevel(device.deviceId);
+    emitTenant(device.tenantId, 'telemetry:new', { deviceId, ...data });
+    emitTenant(device.tenantId, 'devices:updated', device);
+  }
 }

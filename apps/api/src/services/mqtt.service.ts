@@ -1,6 +1,7 @@
 import mqtt from 'mqtt';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
+import { DeviceModel } from '../models/Device.js';
 import { ingestTelemetry, upsertHeartbeat } from './telemetry.service.js';
 
 let mqttClient: mqtt.MqttClient;
@@ -32,12 +33,30 @@ export function initMqtt() {
       }
 
       if (suffix === 'telemetry' || suffix === 'status') {
+        await ensurePendingDevice(deviceId);
         await ingestTelemetry(deviceId, payload);
       }
     } catch (error) {
       logger.error({ error }, 'MQTT message process error');
     }
   });
+}
+
+async function ensurePendingDevice(deviceId: string) {
+  const existing = await DeviceModel.findOne({ deviceId });
+  if (!existing) {
+    await DeviceModel.create({
+      deviceId,
+      pending: true,
+      status: 'offline',
+      lastSeenAt: new Date()
+    });
+    logger.info({ deviceId }, 'Created pending device from MQTT');
+  } else if (existing.pending) {
+    existing.lastSeenAt = new Date();
+    existing.status = 'online';
+    await existing.save();
+  }
 }
 
 export function publishDeviceCommand(deviceId: string, command: { cmd: 'pump_on' | 'pump_off'; requestId: string }) {

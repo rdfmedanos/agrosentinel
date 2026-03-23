@@ -781,7 +781,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   );
 }
 
-type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor';
+type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -815,6 +815,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
+  const [pendingDevices, setPendingDevices] = useState<{ device_id: string; status: string; last_seen: number; created_at?: number }[]>([]);
+  const [usersList, setUsersList] = useState<{ id: string; name: string; email: string; role: string; tenantId: string }[]>([]);
+  const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
+  const [pendingFilter, setPendingFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
@@ -965,10 +969,33 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [loadClients]);
 
   useEffect(() => {
+    if (props.session.user.role !== 'company_admin') return;
+    const token = props.session.token;
+    let interval: ReturnType<typeof setInterval>;
+    
+    const loadPendingDevices = async () => {
+      try {
+        const [pending, users] = await Promise.all([
+          getJson<{ device_id: string; status: string; last_seen: number; created_at?: number }[]>('/devices/pending', token),
+          getJson<{ id: string; name: string; email: string; role: string; tenantId: string }[]>('/devices/users', token)
+        ]);
+        setPendingDevices(pending);
+        setUsersList(users);
+      } catch (err) {
+        console.error('Error loading pending devices:', err);
+      }
+    };
+
+    loadPendingDevices();
+    interval = setInterval(loadPendingDevices, 5000);
+    return () => clearInterval(interval);
+  }, [props.session]);
+
+  useEffect(() => {
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
-      setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(nav.section));
+      setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(nav.section));
       setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor'].includes(nav.section));
     }
   }, []);
@@ -1172,7 +1199,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       notificaciones: 'Notificaciones',
       reportes: 'Reportes',
       actividad: 'Actividad',
-      servidor: 'Servidor'
+      servidor: 'Servidor',
+      'pending-devices': 'Dispositivos Pendientes'
     };
     return map[activeSection];
   };
@@ -1274,6 +1302,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('notificaciones'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'pending-devices' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('pending-devices'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Dispositivos Pendientes</p>
+                        {pendingDevices.length > 0 && <span className="badge bg-danger ms-2">{pendingDevices.length}</span>}
                       </a>
                     </li>
                   </ul>
@@ -2030,6 +2065,83 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'pending-devices' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0">
+                        <i className="fas fa-clock me-2"></i>Dispositivos Pendientes de Aprobacion ({pendingDevices.length})
+                      </h3>
+                      <div>
+                        <div className="btn-group" role="group">
+                          <button type="button" className={`btn btn-sm ${pendingFilter === 'all' ? 'btn-light' : 'btn-outline-light'}`} onClick={() => setPendingFilter('all')}>Todos</button>
+                          <button type="button" className={`btn btn-sm ${pendingFilter === 'online' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setPendingFilter('online')}>Online</button>
+                          <button type="button" className={`btn btn-sm ${pendingFilter === 'offline' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setPendingFilter('offline')}>Offline</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-body p-0">
+                      {pendingDevices.length === 0 ? (
+                        <div className="text-center text-muted p-4">
+                          <i className="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                          <p className="mb-0">No hay dispositivos pendientes</p>
+                          <small>Los nuevos dispositivos apareceran aqui cuando se conecten al MQTT</small>
+                        </div>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="table table-hover m-0">
+                            <thead><tr><th>Device ID</th><th>Estado</th><th>Ultima Conexion</th><th>Asignar a Cliente</th><th>Accion</th></tr></thead>
+                            <tbody>
+                              {pendingDevices.filter(d => pendingFilter === 'all' || d.status === pendingFilter).map(d => (
+                                <tr key={d.device_id}>
+                                  <td className="fw-bold">{d.device_id}</td>
+                                  <td>
+                                    <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                      <i className={`fas fa-circle me-1 ${d.status === 'online' ? 'fa-spin' : ''}`}></i>
+                                      {d.status}
+                                    </span>
+                                  </td>
+                                  <td className="small text-muted">
+                                    {d.last_seen ? new Date(d.last_seen).toLocaleString('es-AR') : 'N/A'}
+                                  </td>
+                                  <td style={{ minWidth: '200px' }}>
+                                    <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? (usersList.find(u => u.id === selectedUserId)?.id ?? '') : ''} 
+                                      onChange={e => { setAssigningDevice(d.device_id); setSelectedUserId(e.target.value); }}>
+                                      <option value="">Seleccionar cliente...</option>
+                                      {usersList.map(u => (
+                                        <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <button className="btn btn-success btn-sm fw-bold" 
+                                      disabled={!selectedUserId || assigningDevice !== d.device_id}
+                                      onClick={async () => {
+                                        try {
+                                          await postJson('/devices/assign', { device_id: d.device_id, user_id: selectedUserId }, props.session.token);
+                                          setPendingDevices(p => p.filter(x => x.device_id !== d.device_id));
+                                          setAssigningDevice(null);
+                                          setSelectedUserId('');
+                                        } catch (err) {
+                                          alert('Error al asignar dispositivo');
+                                        }
+                                      }}>
+                                      <i className="fas fa-check me-1"></i>Aprobar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
