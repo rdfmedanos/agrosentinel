@@ -9,12 +9,26 @@ let mqttClient: mqtt.MqttClient;
 export function initMqtt() {
   mqttClient = mqtt.connect(env.mqttUrl, {
     username: env.mqttUsername,
-    password: env.mqttPassword
+    password: env.mqttPassword,
+    reconnectPeriod: 5000,
+    connectTimeout: 10000
   });
 
   mqttClient.on('connect', () => {
     logger.info('MQTT connected');
     mqttClient.subscribe('devices/+/#', { qos: 1 });
+  });
+
+  mqttClient.on('reconnect', () => {
+    logger.warn('MQTT reconnecting...');
+  });
+
+  mqttClient.on('offline', () => {
+    logger.warn('MQTT connection offline');
+  });
+
+  mqttClient.on('error', (err) => {
+    logger.error({ error: err }, 'MQTT connection error');
   });
 
   mqttClient.on('message', async (topic, payloadBuffer) => {
@@ -57,10 +71,12 @@ async function ensurePendingDevice(deviceId: string) {
       lastSeenAt: new Date()
     });
     logger.info({ deviceId }, 'Created pending device from MQTT');
-  } else if (existing.pending) {
-    existing.lastSeenAt = new Date();
-    existing.status = 'online';
-    await existing.save();
+  } else {
+    const updateData: Record<string, unknown> = { lastSeenAt: new Date() };
+    if (existing.pending) {
+      updateData.status = 'online';
+    }
+    await DeviceModel.updateOne({ deviceId }, updateData);
   }
 }
 
