@@ -5,6 +5,7 @@ import { resolveTenantFromRequest, requireCompanyAdmin } from '../auth/auth.js';
 import { DeviceModel } from '../models/Device.js';
 import { UserModel } from '../models/User.js';
 import { publishDeviceCommand } from '../services/mqtt.service.js';
+import { emitTenant } from '../realtime/socket.js';
 
 const createSchema = z.object({
   tenantId: z.string().min(1),
@@ -154,6 +155,12 @@ devicesRouter.delete('/:id', requireCompanyAdmin, async (req, res) => {
     return;
   }
 
+  const tenantId = device.tenantId;
   await DeviceModel.deleteOne({ _id: req.params.id });
+  
+  if (tenantId) {
+    emitTenant(tenantId, 'devices:updated', null);
+  }
+  
   res.json({ status: 'deleted', device_id: device.deviceId });
 });
