@@ -86,8 +86,9 @@ export function publishDeviceCommand(deviceId: string, command: { cmd: 'pump_on'
   if (!mqttClient) throw new Error('MQTT not initialized');
   
   if (command.cmd === 'config' && payload) {
-    mqttClient.publish(`devices/${deviceId}/command`, JSON.stringify({ ...command, ...payload }), { qos: 1 });
+    mqttClient.publish(`devices/${deviceId}/config`, JSON.stringify(payload), { qos: 1 });
   } else {
-    mqttClient.publish(`devices/${deviceId}/command`, JSON.stringify(command), { qos: 1 });
+    const msg = command.cmd === 'pump_on' ? 'ON' : command.cmd === 'pump_off' ? 'OFF' : JSON.stringify(command);
+    mqttClient.publish(`devices/${deviceId}/command`, msg, { qos: 1 });
   }
 }

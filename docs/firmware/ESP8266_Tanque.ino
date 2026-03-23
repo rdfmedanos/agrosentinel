@@ -227,6 +227,25 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String t = String(topic);
   Serial.println("MQTT: " + t);
 
+  if (t.endsWith("/command")) {
+    StaticJsonDocument<256> doc;
+    deserializeJson(doc, msg);
+    
+    if (doc.containsKey("cmd")) {
+      String cmd = doc["cmd"].as<String>();
+      if (cmd == "pump_on" || cmd == "ON") {
+        ultimo_estado_bomba = true;
+        config_modo_auto = false;
+        Serial.println("CMD: Bomba ON");
+      } else if (cmd == "pump_off" || cmd == "OFF") {
+        ultimo_estado_bomba = false;
+        config_modo_auto = false;
+        Serial.println("CMD: Bomba OFF");
+      }
+    }
+    return;
+  }
+
   if (t.endsWith("/config")) {
     StaticJsonDocument<512> doc;
     deserializeJson(doc, msg);
