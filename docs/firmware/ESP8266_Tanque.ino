@@ -24,6 +24,10 @@ PubSubClient client(espClient);
 String device_id = "ESP8266_" + String(ESP.getChipId(), HEX);
 String base_topic;
 
+// Estados de conexión
+bool wifi_conectado = false;
+bool mqtt_conectado = false;
+
 // Config dinámica
 int nivel_min = 30;
 int nivel_max = 90;
@@ -35,10 +39,16 @@ bool ultimo_estado_bomba = false;
 unsigned long lastSend = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long ultimo_cambio_bomba = 0;
+unsigned long lastWifiCheck = 0;
+unsigned long lastMqttAttempt = 0;
 
-// CONFIG TANQUE (ajustar según tu tanque)
-int altura_tanque = 150;  // cm desde el sensor hasta el fondo
-int distancia_sensor = 20; // cm desde el sensor hasta el nivel máximo (agua)
+// CONFIG TANQUE
+int altura_tanque = 150;
+int distancia_sensor = 20;
+
+// Contador de reinicios
+int rebootCount = 0;
+unsigned long bootTime = 0;
 
 // ---------------- EEPROM ----------------
 void guardarConfig() {
@@ -61,12 +71,43 @@ void cargarConfig() {
   EEPROM.end();
 }
 
+// ---------------- WiFi ----------------
+void verificarWifi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wifi_conectado) {
+      Serial.println("WiFi desconectado, intentando reconnectar...");
+      wifi_conectado = false;
+    }
+    
+    WiFi.disconnect();
+    delay(100);
+    WiFi.begin();
+    
+    int intentos = 0;
+    while (WiFi.status() != WL_CONNECTED && intentos < 20) {
+      delay(500);
+      intentos++;
+      Serial.print(".");
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWiFi reconnectado!");
+      Serial.println("IP: " + WiFi.localIP().toString());
+      wifi_conectado = true;
+      mqtt_conectado = false;  // Forzar reconexión MQTT
+    }
+  } else {
+    if (!wifi_conectado) {
+      Serial.println("WiFi conectado!");
+      Serial.println("IP: " + WiFi.localIP().toString());
+      wifi_conectado = true;
+    }
+  }
+}
+
 // ---------------- SENSOR JSN-SR04T ----------------
-// Lecturas para filtro de mediana
 #define NUM_LECTURAS 7
 int lecturas[NUM_LECTURAS];
-int indice_lectura = 0;
-bool primeraLectura = true;
 
 int leerDistanciaJSN() {
   digitalWrite(TRIG_PIN, LOW);
@@ -77,28 +118,20 @@ int leerDistanciaJSN() {
 
   long duracion = pulseIn(ECHO_PIN, HIGH, 30000);
   
-  if (duracion == 0) {
-    return -1;  // Sin respuesta del sensor
-  }
-  
+  if (duracion == 0) return -1;
   return duracion * 0.034 / 2;
 }
 
 int filtroMediana() {
-  // Recolectar lecturas
   for (int i = 0; i < NUM_LECTURAS; i++) {
     int dist = leerDistanciaJSN();
-    
     if (dist < 0 || dist > 500) {
-      // Lectura inválida, usar la última válida
       dist = (i > 0) ? lecturas[i-1] : altura_tanque;
     }
-    
     lecturas[i] = dist;
-    delay(80);  // Delay entre lecturas (JSN necesita más tiempo)
+    delay(80);
   }
 
-  // Ordenar y tomar la mediana
   int sorted[NUM_LECTURAS];
   memcpy(sorted, lecturas, sizeof(lecturas));
   
@@ -117,13 +150,10 @@ int filtroMediana() {
 
 int leerNivelTanque() {
   int distancia = filtroMediana();
-  
-  // Verificar que la distancia sea razonable
   if (distancia < distancia_sensor || distancia > altura_tanque) {
     distancia = constrain(distancia, distancia_sensor, altura_tanque);
   }
   
-  // Mapear distancia a porcentaje
   int rango = altura_tanque - distancia_sensor;
   int nivel = map(distancia, altura_tanque, distancia_sensor, 0, 100);
   
@@ -134,11 +164,10 @@ int leerNivelReserva() {
   return digitalRead(SENSOR_RESERVA) ? 100 : 0;
 }
 
-// ---------------- Control Bomba con Anti-rebote ----------------
+// ---------------- Control Bomba ----------------
 void controlarBomba(int nivel, int reserva) {
   unsigned long ahora = millis();
   
-  // Solo cambiar estado si pasó suficiente tiempo desde el último cambio
   if (ahora - ultimo_cambio_bomba < 5000) {
     digitalWrite(RELE_PIN, ultimo_estado_bomba ? HIGH : LOW);
     return;
@@ -147,7 +176,6 @@ void controlarBomba(int nivel, int reserva) {
   bool nuevo_estado = ultimo_estado_bomba;
   
   if (modo_auto) {
-    // Lógica con histéresis
     if (nivel < nivel_min && reserva > 10 && !ultimo_estado_bomba) {
       nuevo_estado = true;
     } else if (nivel >= nivel_max && ultimo_estado_bomba) {
@@ -158,46 +186,28 @@ void controlarBomba(int nivel, int reserva) {
   if (nuevo_estado != ultimo_estado_bomba) {
     ultimo_estado_bomba = nuevo_estado;
     ultimo_cambio_bomba = ahora;
+    Serial.print("Bomba: ");
+    Serial.println(nuevo_estado ? "ON" : "OFF");
   }
   
   digitalWrite(RELE_PIN, ultimo_estado_bomba ? HIGH : LOW);
 }
 
-// ---------------- MQTT CALLBACK ----------------
-void callback(char* topic, byte* payload, unsigned int length) {
-  String msg;
-  for (int i = 0; i < length; i++) msg += (char)payload[i];
-
-  String t = String(topic);
-
-  if (t.endsWith("/config")) {
-    StaticJsonDocument<256> doc;
-    deserializeJson(doc, msg);
-
-    if (doc.containsKey("nivel_min")) nivel_min = doc["nivel_min"];
-    if (doc.containsKey("nivel_max")) nivel_max = doc["nivel_max"];
-    if (doc.containsKey("modo")) modo_auto = (String)doc["modo"] == "auto";
-    if (doc.containsKey("altura_tanque")) altura_tanque = doc["altura_tanque"];
-
-    guardarConfig();
-  }
-
-  if (t.endsWith("/command")) {
-    if (msg == "ON") {
-      ultimo_estado_bomba = true;
-      modo_auto = false;
-    }
-    if (msg == "OFF") {
-      ultimo_estado_bomba = false;
-      modo_auto = false;
-    }
-  }
-}
-
 // ---------------- MQTT ----------------
-void reconnect() {
-  while (!client.connected()) {
+void reconnectMQTT() {
+  unsigned long ahora = millis();
+  
+  // No intentar más de una vez cada 5 segundos
+  if (ahora - lastMqttAttempt < 5000) return;
+  lastMqttAttempt = ahora;
+  
+  if (!client.connected()) {
+    Serial.println("Intentando conectar a MQTT...");
+    
     if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
+      Serial.println("MQTT conectado!");
+      mqtt_conectado = true;
+      
       client.subscribe((base_topic + "/config").c_str());
       client.subscribe((base_topic + "/command").c_str());
 
@@ -210,8 +220,46 @@ void reconnect() {
       char buffer[200];
       serializeJson(doc, buffer);
       client.publish("devices/register", buffer);
+      Serial.println("Registro enviado!");
     } else {
-      delay(5000);
+      Serial.print("MQTT falló, código: ");
+      Serial.println(client.state());
+      mqtt_conectado = false;
+    }
+  }
+}
+
+// ---------------- MQTT CALLBACK ----------------
+void callback(char* topic, byte* payload, unsigned int length) {
+  String msg;
+  for (int i = 0; i < length; i++) msg += (char)payload[i];
+
+  String t = String(topic);
+  Serial.println("Mensaje MQTT en: " + t);
+
+  if (t.endsWith("/config")) {
+    StaticJsonDocument<256> doc;
+    deserializeJson(doc, msg);
+
+    if (doc.containsKey("nivel_min")) nivel_min = doc["nivel_min"];
+    if (doc.containsKey("nivel_max")) nivel_max = doc["nivel_max"];
+    if (doc.containsKey("modo")) modo_auto = (String)doc["modo"] == "auto";
+    if (doc.containsKey("altura_tanque")) altura_tanque = doc["altura_tanque"];
+
+    guardarConfig();
+    Serial.println("Configuración actualizada!");
+  }
+
+  if (t.endsWith("/command")) {
+    if (msg == "ON") {
+      ultimo_estado_bomba = true;
+      modo_auto = false;
+      Serial.println("Comando: BOMBA ON");
+    }
+    if (msg == "OFF") {
+      ultimo_estado_bomba = false;
+      modo_auto = false;
+      Serial.println("Comando: BOMBA OFF");
     }
   }
 }
@@ -219,7 +267,11 @@ void reconnect() {
 // ---------------- SETUP ----------------
 void setup() {
   Serial.begin(115200);
-  Serial.println("Iniciando Sensor de Nivel JSN-SR04T...");
+  Serial.println("\n========================================");
+  Serial.println("Iniciando AgroSentinel JSN-SR04T...");
+  Serial.println("========================================");
+
+  bootTime = millis();
 
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
@@ -231,33 +283,59 @@ void setup() {
 
   cargarConfig();
 
-  // WiFi portal
+  Serial.println("Device ID: " + device_id);
+  Serial.println("Config - Min: " + String(nivel_min) + ", Max: " + String(nivel_max));
+
+  // WiFi Manager con auto-reconnect
   WiFiManager wm;
   wm.setTimeout(180);
+  wm.setAutoReconnect(true);
+  
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
+    Serial.println("WiFi fallback falló, reiniciando...");
+    delay(3000);
     ESP.restart();
   }
+
+  wifi_conectado = true;
+  Serial.println("WiFi conectado!");
+  Serial.println("IP: " + WiFi.localIP().toString());
 
   base_topic = "devices/" + device_id;
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+  client.setKeepAlive(30);
+  client.setSocketTimeout(10);
 
-  Serial.println("Device ID: " + device_id);
+  Serial.println("Setup completado!");
 }
 
 // ---------------- LOOP ----------------
 void loop() {
-  if (!client.connected()) reconnect();
-  client.loop();
+  // Verificar WiFi cada 10 segundos
+  if (millis() - lastWifiCheck > 10000) {
+    lastWifiCheck = millis();
+    verificarWifi();
+  }
 
+  // Solo procesar MQTT si hay WiFi
+  if (wifi_conectado) {
+    if (!client.connected()) {
+      reconnectMQTT();
+    }
+    client.loop();
+  }
+
+  // Leer sensores
   int nivel = leerNivelTanque();
   int reserva = leerNivelReserva();
 
+  // Controlar bomba
   controlarBomba(nivel, reserva);
 
   // Telemetría cada 15 segundos
-  if (millis() - lastSend > 15000) {
+  if (millis() - lastSend > 15000 && mqtt_conectado) {
     lastSend = millis();
 
     StaticJsonDocument<256> doc;
@@ -267,16 +345,26 @@ void loop() {
     doc["bomba"] = ultimo_estado_bomba;
     doc["rssi"] = WiFi.RSSI();
     doc["altura_tanque"] = altura_tanque;
+    doc["wifi"] = wifi_conectado;
+    doc["mqtt"] = mqtt_conectado;
 
     char buffer[256];
     serializeJson(doc, buffer);
     client.publish((base_topic + "/telemetry").c_str(), buffer);
+    
+    Serial.println("Telemetría enviada - Nivel: " + String(nivel) + "%");
   }
 
   // Heartbeat cada 30 segundos
-  if (millis() - lastHeartbeat > 30000) {
+  if (millis() - lastHeartbeat > 30000 && mqtt_conectado) {
     lastHeartbeat = millis();
     client.publish((base_topic + "/heartbeat").c_str(), "1");
+  }
+
+  // Auto-reinicio si lleva más de 24 horas funcionando (para stability)
+  if (bootTime > 0 && millis() - bootTime > 86400000) {
+    Serial.println("Reinicio programado por stability...");
+    ESP.restart();
   }
 
   delay(100);
