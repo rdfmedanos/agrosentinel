@@ -73,7 +73,7 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
       pumpOn,
       ts
     });
-    device.status = levelPct <= 20 ? 'critical' : 'online';
+    device.status = levelPct <= (device.configAlertaBaja ?? 30) ? 'critical' : 'online';
   }
   
   await device.save();

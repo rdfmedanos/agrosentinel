@@ -37,7 +37,7 @@ export async function evaluateDeviceCriticalLevel(deviceId: string) {
   const device = await DeviceModel.findOne({ deviceId });
   if (!device || !device.tenantId) return;
 
-  if (device.levelPct <= env.criticalLevelPct) {
+  if (device.levelPct <= (device.configAlertaBaja ?? env.criticalLevelPct)) {
     await openAlert({
       tenantId: device.tenantId,
       deviceId: device.deviceId,

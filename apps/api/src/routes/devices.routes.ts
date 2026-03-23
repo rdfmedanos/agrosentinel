@@ -102,7 +102,7 @@ devicesRouter.post('/:id/config', async (req, res) => {
 
   publishDeviceCommand(device.deviceId, { cmd: 'config', requestId: '' }, configPayload);
   
-  DeviceModel.findByIdAndUpdate(req.params.id, {
+  await DeviceModel.findByIdAndUpdate(req.params.id, {
     configNivelMin: configPayload.nivel_min,
     configNivelMax: configPayload.nivel_max,
     configAlertaBaja: configPayload.alerta_baja,
