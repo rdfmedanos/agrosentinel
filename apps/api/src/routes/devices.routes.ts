@@ -17,7 +17,8 @@ const createSchema = z.object({
 
 const assignSchema = z.object({
   device_id: z.string().min(1),
-  user_id: z.string().min(1)
+  user_id: z.string().min(1).optional(),
+  tenant_id: z.string().min(1).optional()
 });
 
 export const devicesRouter = Router();
@@ -96,9 +97,19 @@ devicesRouter.get('/pending', requireCompanyAdmin, async (req, res) => {
 devicesRouter.post('/assign', requireCompanyAdmin, async (req, res) => {
   const data = assignSchema.parse(req.body);
   
-  const user = await UserModel.findById(data.user_id);
-  if (!user) {
-    res.status(404).json({ error: 'Usuario no encontrado' });
+  let tenantId = data.tenant_id;
+  
+  if (!tenantId && data.user_id) {
+    const user = await UserModel.findById(data.user_id);
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    tenantId = user.tenantId;
+  }
+  
+  if (!tenantId) {
+    res.status(400).json({ error: 'Debe proporcionar user_id o tenant_id' });
     return;
   }
 
@@ -108,13 +119,13 @@ devicesRouter.post('/assign', requireCompanyAdmin, async (req, res) => {
     return;
   }
 
-  device.userId = data.user_id;
-  device.tenantId = user.tenantId;
+  device.userId = data.user_id || null;
+  device.tenantId = tenantId;
   device.pending = false;
   device.status = device.status === 'offline' ? 'offline' : 'online';
   await device.save();
 
-  res.json({ status: 'assigned', device_id: device.deviceId, user_id: data.user_id });
+  res.json({ status: 'assigned', device_id: device.deviceId, tenant_id: tenantId });
 });
 
 devicesRouter.get('/users', requireCompanyAdmin, async (req, res) => {

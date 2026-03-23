@@ -2137,11 +2137,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     {d.last_seen ? new Date(d.last_seen).toLocaleString('es-AR') : 'N/A'}
                                   </td>
                                   <td style={{ minWidth: '200px' }}>
-                                    <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? (usersList.find(u => u.id === selectedUserId)?.id ?? '') : ''} 
+                                    <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? selectedUserId : ''} 
                                       onChange={e => { setAssigningDevice(d.device_id); setSelectedUserId(e.target.value); }}>
                                       <option value="">Seleccionar cliente...</option>
-                                      {usersList.map(u => (
-                                        <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                                      {clients.map(c => (
+                                        <option key={c.tenantId} value={c.tenantId}>{c.companyName}</option>
                                       ))}
                                     </select>
                                   </td>
@@ -2150,7 +2150,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       disabled={!selectedUserId || assigningDevice !== d.device_id}
                                       onClick={async () => {
                                         try {
-                                          await postJson('/devices/assign', { device_id: d.device_id, user_id: selectedUserId }, props.session.token);
+                                          await postJson('/devices/assign', { device_id: d.device_id, tenant_id: selectedUserId }, props.session.token);
                                           setPendingDevices(p => p.filter(x => x.device_id !== d.device_id));
                                           setAssigningDevice(null);
                                           setSelectedUserId('');
