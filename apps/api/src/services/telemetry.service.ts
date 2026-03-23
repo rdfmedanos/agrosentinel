@@ -5,9 +5,14 @@ import { emitTenant } from '../realtime/socket.js';
 import { evaluateDeviceCriticalLevel, resolveAlert } from './alert.service.js';
 
 export const telemetrySchema = z.object({
-  levelPct: z.number().min(0).max(100),
-  reserveLiters: z.number().min(0),
-  pumpOn: z.boolean(),
+  device_id: z.string().optional(),
+  nivel: z.number().min(0).max(100).optional(),
+  reserva: z.number().min(0).optional(),
+  bomba: z.boolean().optional(),
+  rssi: z.number().optional(),
+  levelPct: z.number().min(0).max(100).optional(),
+  reserveLiters: z.number().min(0).optional(),
+  pumpOn: z.boolean().optional(),
   ts: z.string().datetime().optional()
 });
 
@@ -44,20 +49,24 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
   const data = telemetrySchema.parse(payload);
 
   const ts = data.ts ? new Date(data.ts) : new Date();
+  const levelPct = data.nivel ?? data.levelPct ?? 0;
+  const reserveLiters = data.reserva ?? data.reserveLiters ?? 0;
+  const pumpOn = data.bomba ?? data.pumpOn ?? false;
+  
   await TelemetryModel.create({
     tenantId: device.tenantId,
     deviceId,
-    levelPct: data.levelPct,
-    reserveLiters: data.reserveLiters,
-    pumpOn: data.pumpOn,
+    levelPct,
+    reserveLiters,
+    pumpOn,
     ts
   });
 
-  device.levelPct = data.levelPct;
-  device.reserveLiters = data.reserveLiters;
-  device.pumpOn = data.pumpOn;
+  device.levelPct = levelPct;
+  device.reserveLiters = reserveLiters;
+  device.pumpOn = pumpOn;
   device.lastHeartbeatAt = new Date();
-  device.status = data.levelPct <= 20 ? 'critical' : 'online';
+  device.status = levelPct <= 20 ? 'critical' : 'online';
   await device.save();
 
   if (device.tenantId) {

@@ -27,6 +27,11 @@ export function initMqtt() {
 
       if (!deviceId || !suffix) return;
 
+      if (suffix === 'register') {
+        await ensurePendingDevice(deviceId);
+        return;
+      }
+
       if (suffix === 'heartbeat') {
         await upsertHeartbeat(deviceId);
         return;
