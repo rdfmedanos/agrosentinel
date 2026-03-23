@@ -7,6 +7,7 @@ type Device = {
   _id: string;
   deviceId: string;
   name: string;
+  tenantId?: string;
   levelPct: number;
   reserveLiters: number;
   pumpOn: boolean;
@@ -14,6 +15,7 @@ type Device = {
   location: { lat: number; lng: number; address: string };
   lastHeartbeatAt?: string;
   createdAt?: string;
+  clientName?: string;
 };
 
 type Alert = {
@@ -764,6 +766,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [tenantId, setTenantId] = useState<string>('');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [allDevices, setAllDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
@@ -881,6 +884,20 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [props.session.token]);
 
+  const loadAllDevices = useCallback(async () => {
+    const token = props.session.token;
+    try {
+      const allDevices = await getJson<Device[]>('/devices?all=true', token);
+      const devicesWithClient = allDevices.map((d: Device) => {
+        const client = clients.find(c => c.tenantId === d.tenantId);
+        return { ...d, clientName: client?.companyName || 'Unknown' };
+      });
+      setAllDevices(devicesWithClient);
+    } catch {
+      console.error('Error loading all devices');
+    }
+  }, [props.session.token, clients]);
+
   const loadCompanyData = useCallback(async (targetTenant: string) => {
     if (!targetTenant) return;
     const token = props.session.token;
@@ -943,7 +960,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [clients, tenantId]);
 
-  const setSection = (section: AdminSection) => {
+  const setSection = async (section: AdminSection) => {
     setActiveSection(section);
     setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(section));
     setConfigOpen(['facturacion', 'arca', 'reportes'].includes(section));
@@ -951,6 +968,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       setSelectedClient(null);
       setRestoreClient(false);
       saveNavState({ section: 'clientes' });
+    } else if (section === 'dispositivos') {
+      await loadAllDevices();
+      saveNavState({ section: 'dispositivos' });
     } else {
       saveNavState({ section, clientId: selectedClient?._id });
     }
@@ -1593,16 +1613,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     </div>
                   </div>
                   <div className="card mt-3">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({devices.length})</h3></div>
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3></div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Direccion</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Cliente</th><th>Direccion</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
-                            {devices.map(d => (
-                              <tr key={d._id}>
+                            {allDevices.map(d => (
+                              <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
                                 <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
+                                <td className="small">{d.clientName || 'Unknown'}</td>
                                 <td className="small">{d.location.address}</td>
                                 <td>
                                   <div className="d-flex align-items-center">
