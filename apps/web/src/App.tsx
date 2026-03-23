@@ -1140,7 +1140,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       lat: String(device.location.lat),
       lng: String(device.location.lng)
     });
-    setEditDeviceUserId(device.userId || '');
+    setEditDeviceUserId(device.tenantId || '');
     setShowDeviceModal(true);
   };
 
@@ -1154,8 +1154,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         lat: Number(editDevice.lat),
         lng: Number(editDevice.lng)
       };
-      if (editDeviceUserId !== (selectedDevice.userId || '')) {
+      if (editDeviceUserId !== (selectedDevice.tenantId || '')) {
         updateData.userId = editDeviceUserId || null;
+        updateData.tenantId = editDeviceUserId || null;
       }
       await patchJson(`/devices/${selectedDevice._id}`, updateData, props.session.token);
       setShowDeviceModal(false);
@@ -2344,8 +2345,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <label className="form-label small fw-bold">Cliente</label>
                       <select className="form-control" value={editDeviceUserId} onChange={e => setEditDeviceUserId(e.target.value)}>
                         <option value="">Sin asignar</option>
-                        {usersList.map(u => (
-                          <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                        {clients.map(c => (
+                          <option key={c._id} value={c.tenantId}>{c.companyName}</option>
                         ))}
                       </select>
                     </div>

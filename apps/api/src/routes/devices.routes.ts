@@ -59,7 +59,7 @@ devicesRouter.post('/:deviceId/command', async (req, res) => {
 });
 
 devicesRouter.patch('/:id', async (req, res) => {
-  const { lat, lng, name, address } = req.body;
+  const { lat, lng, name, address, userId, tenantId } = req.body;
   const updateData: Record<string, unknown> = {};
   if (lat !== undefined && lng !== undefined) {
     updateData['location.lat'] = lat;
@@ -67,6 +67,8 @@ devicesRouter.patch('/:id', async (req, res) => {
   }
   if (name !== undefined) updateData.name = name;
   if (address !== undefined) updateData['location.address'] = address;
+  if (userId !== undefined) updateData.userId = userId;
+  if (tenantId !== undefined) updateData.tenantId = tenantId;
 
   const device = await DeviceModel.findByIdAndUpdate(req.params.id, updateData, { new: true });
   if (!device) {
