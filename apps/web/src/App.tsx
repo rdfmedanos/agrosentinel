@@ -9,6 +9,7 @@ type Device = {
   deviceId: string;
   name: string;
   tenantId?: string;
+  userId?: string;
   levelPct: number;
   reserveLiters: number;
   pumpOn: boolean;
@@ -852,6 +853,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [editDevice, setEditDevice] = useState({ name: '', address: '', lat: '', lng: '' });
+  const [editDeviceUserId, setEditDeviceUserId] = useState<string>('');
   const [savingDevice, setSavingDevice] = useState(false);
   const [showAddSensorModal, setShowAddSensorModal] = useState(false);
   const [newSensor, setNewSensor] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
@@ -1138,6 +1140,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       lat: String(device.location.lat),
       lng: String(device.location.lng)
     });
+    setEditDeviceUserId(device.userId || '');
     setShowDeviceModal(true);
   };
 
@@ -1145,12 +1148,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     if (!selectedDevice) return;
     setSavingDevice(true);
     try {
-      await patchJson(`/devices/${selectedDevice._id}`, {
+      const updateData: Record<string, unknown> = {
         name: editDevice.name,
         address: editDevice.address,
         lat: Number(editDevice.lat),
         lng: Number(editDevice.lng)
-      }, props.session.token);
+      };
+      if (editDeviceUserId !== (selectedDevice.userId || '')) {
+        updateData.userId = editDeviceUserId || null;
+      }
+      await patchJson(`/devices/${selectedDevice._id}`, updateData, props.session.token);
       setShowDeviceModal(false);
       setSelectedDevice(null);
       await loadCompanyData(tenantId);
@@ -2332,6 +2339,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Nombre</label>
                       <input className="form-control" value={editDevice.name} onChange={e => setEditDevice(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Cliente</label>
+                      <select className="form-control" value={editDeviceUserId} onChange={e => setEditDeviceUserId(e.target.value)}>
+                        <option value="">Sin asignar</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Direccion</label>
