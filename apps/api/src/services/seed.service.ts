@@ -51,24 +51,13 @@ export async function seedInitialData() {
     await DeviceModel.insertMany([
       {
         tenantId: 'demo-tenant',
-        deviceId: 'ESP32-NORTE-001',
-        name: 'Tanque Norte',
-        location: { lat: -34.61, lng: -58.39, address: 'Lote Norte' },
-        levelPct: 74,
-        reserveLiters: 7400,
+        deviceId: 'ESP32-DEMO-001',
+        name: 'Dispositivo Demo',
+        location: { lat: -34.61, lng: -58.39, address: 'Dirección demo' },
+        levelPct: 50,
+        reserveLiters: 5000,
         pumpOn: false,
         status: 'online',
-        lastHeartbeatAt: new Date()
-      },
-      {
-        tenantId: 'demo-tenant',
-        deviceId: 'ESP32-SUR-002',
-        name: 'Tanque Sur',
-        location: { lat: -34.66, lng: -58.47, address: 'Lote Sur' },
-        levelPct: 18,
-        reserveLiters: 1800,
-        pumpOn: true,
-        status: 'critical',
         lastHeartbeatAt: new Date()
       }
     ]);
