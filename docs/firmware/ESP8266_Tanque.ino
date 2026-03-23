@@ -4,11 +4,13 @@
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 
-// ---------------- MQTT Defaults ----------------
-char mqtt_server[40] = "192.168.1.66";
-char mqtt_port[6] = "1883";
-char mqtt_user[40] = "admin@agrosentinel.com";
-char mqtt_pass[40] = "Empresa123!";
+// ---------------- MQTT ----------------
+const char* mqtt_server = "192.168.1.66";
+const int mqtt_port = 1883;
+const char* mqtt_user = "admin@agrosentinel.com";
+const char* mqtt_pass = "Empresa123!";
+
+#define LED_ESTADO LED_BUILTIN
 
 // ---------------- Pines ----------------
 #define TRIG_PIN D2
@@ -57,10 +59,6 @@ struct DeviceConfig {
   bool habilitar_bomba;
   int altura_tanque;
   int distancia_sensor;
-  char mqtt_server[40];
-  char mqtt_user[40];
-  char mqtt_pass[40];
-  char mqtt_port[6];
 };
 
 void guardarConfig() {
@@ -72,10 +70,6 @@ void guardarConfig() {
   cfg.habilitar_bomba = config_habilitar_bomba;
   cfg.altura_tanque = altura_tanque;
   cfg.distancia_sensor = distancia_sensor;
-  strncpy(cfg.mqtt_server, mqtt_server, 40);
-  strncpy(cfg.mqtt_user, mqtt_user, 40);
-  strncpy(cfg.mqtt_pass, mqtt_pass, 40);
-  strncpy(cfg.mqtt_port, mqtt_port, 6);
   
   EEPROM.begin(512);
   EEPROM.put(10, cfg);
@@ -95,11 +89,6 @@ void cargarConfig() {
   if (cfg.altura_tanque > 0) altura_tanque = cfg.altura_tanque;
   if (cfg.distancia_sensor > 0) distancia_sensor = cfg.distancia_sensor;
   
-  if (strlen(cfg.mqtt_server) > 0) strncpy(mqtt_server, cfg.mqtt_server, 40);
-  if (strlen(cfg.mqtt_user) > 0) strncpy(mqtt_user, cfg.mqtt_user, 40);
-  if (strlen(cfg.mqtt_pass) > 0) strncpy(mqtt_pass, cfg.mqtt_pass, 40);
-  if (strlen(cfg.mqtt_port) > 0) strncpy(mqtt_port, cfg.mqtt_port, 6);
-
   config_modo_auto = cfg.modo_auto;
   config_habilitar_bomba = cfg.habilitar_bomba;
 }
@@ -115,9 +104,18 @@ int leerDistanciaJSN() {
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  long duracion = pulseIn(ECHO_PIN, HIGH, 25000);
-  if (duracion == 0) return -1;
+  // Aumentamos el timeout a 30ms (~5 metros)
+  long duracion = pulseIn(ECHO_PIN, HIGH, 30000);
+  
+  if (duracion == 0) {
+    Serial.println("DEBUG: Sensor timeout (ECHO no recibido)");
+    return -1;
+  }
+  
   int dist = duracion * 0.034 / 2;
+  // Debug de duración para ver si el sensor responde algo
+  Serial.println("DEBUG: Duracion=" + String(duracion) + "us -> " + String(dist) + "cm");
+  
   return dist;
 }
 
@@ -129,18 +127,15 @@ int filtroMediana() {
     int dist = leerDistanciaJSN();
     delay(100);
     
-    // El JSN-SR04T tiene un rango mínimo de ~21cm. 
-    // Si la distancia es < 21cm, el sensor suele reportar valores erráticos o el máximo.
-    if (dist >= 10 && dist < 450) {
+    // Rango válido típico del JSN-SR04T: 21cm a 450cm
+    if (dist >= 10 && dist < 500) {
       lecturas[i] = dist;
       suma += dist;
       validas++;
-    } else {
-      Serial.println("Lectura fuera de rango: " + String(dist));
     }
   }
 
-  if (validas == 0) return -1; // Indicar error
+  if (validas == 0) return -1;
   
   return suma / validas;
 }
@@ -149,12 +144,9 @@ int leerNivelTanque() {
   int distancia = filtroMediana();
   
   if (distancia == -1) {
-    // Si no hay lecturas válidas, probablemente el tanque está MUY lleno (zona muerta)
-    // o el sensor está desconectado. 
-    // Para evitar falsos 0%, asumiremos que si fallan todas las lecturas y el sensor 
-    // respondió algo (duracion != 0), es por cercanía extrema.
-    Serial.println("Error de lectura: asumiendo nivel alto por zona muerta");
-    return 100; 
+    // Si hay timeout absoluto en todas las lecturas, es un error de Hardware
+    Serial.println("ALERTA: Sensor no responde (revisar cables/alimentación)");
+    return -1; // Código de error de Hardware
   }
 
   Serial.println("Distancia: " + String(distancia) + " cm");
@@ -257,6 +249,7 @@ void reconnectMQTT() {
   Serial.println(mqtt_server);
   
   if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
+    digitalWrite(LED_ESTADO, LOW); // LED ON (active low in many ESP8266)
     Serial.println("MQTT conectado!");
     mqtt_conectado = true;
     
@@ -268,8 +261,8 @@ void reconnectMQTT() {
     doc["type"] = "nivel_tanque";
     char buffer[200];
     serializeJson(doc, buffer);
-    client.publish("devices/register", buffer);
-    Serial.println("Registro enviado");
+    client.publish((base_topic + "/register").c_str(), buffer);
+    Serial.println("Registro enviado a " + base_topic + "/register");
   } else {
     Serial.print("MQTT falló, rc=");
     Serial.println(client.state());
@@ -288,9 +281,11 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
   pinMode(SENSOR_RESERVA, INPUT);
   pinMode(RELE_PIN, OUTPUT);
+  pinMode(LED_ESTADO, OUTPUT);
 
   digitalWrite(RELE_PIN, LOW);
   digitalWrite(TRIG_PIN, LOW);
+  digitalWrite(LED_ESTADO, HIGH); // LED OFF
 
   device_id = "ESP8266_" + String(ESP.getChipId(), HEX);
   base_topic = "devices/" + device_id;
@@ -300,17 +295,6 @@ void setup() {
   Serial.println("Device: " + device_id);
   
   WiFiManager wm;
-  
-  WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 40);
-  WiFiManagerParameter custom_mqtt_port("port", "MQTT Port", mqtt_port, 6);
-  WiFiManagerParameter custom_mqtt_user("user", "MQTT User", mqtt_user, 40);
-  WiFiManagerParameter custom_mqtt_pass("pass", "MQTT Pass", mqtt_pass, 40);
-  
-  wm.addParameter(&custom_mqtt_server);
-  wm.addParameter(&custom_mqtt_port);
-  wm.addParameter(&custom_mqtt_user);
-  wm.addParameter(&custom_mqtt_pass);
-
   wm.setTimeout(180);
   
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
@@ -319,17 +303,10 @@ void setup() {
     ESP.restart();
   }
 
-  strncpy(mqtt_server, custom_mqtt_server.getValue(), 40);
-  strncpy(mqtt_port, custom_mqtt_port.getValue(), 6);
-  strncpy(mqtt_user, custom_mqtt_user.getValue(), 40);
-  strncpy(mqtt_pass, custom_mqtt_pass.getValue(), 40);
-  
-  guardarConfig();
-
   wifi_conectado = true;
   Serial.println("WiFi OK: " + WiFi.localIP().toString());
 
-  client.setServer(mqtt_server, atoi(mqtt_port));
+  client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   client.setKeepAlive(30);
 }
@@ -344,23 +321,31 @@ void loop() {
   int nivel = leerNivelTanque();
   int reserva = leerNivelReserva();
 
-  controlarBomba(nivel, reserva);
+  // Si hay error de hardware, no intentamos controlar la bomba con datos basura
+  if (nivel != -1) {
+    controlarBomba(nivel, reserva);
+  }
 
   if (millis() - lastSend > 15000 && client.connected()) {
     lastSend = millis();
 
     StaticJsonDocument<512> doc;
     doc["device_id"] = device_id;
-    doc["nivel"] = nivel;
+    if (nivel != -1) doc["nivel"] = nivel;
     doc["reserva"] = reserva;
     doc["bomba"] = ultimo_estado_bomba;
     doc["rssi"] = WiFi.RSSI();
+    if (nivel == -1) doc["error"] = "sensor_hardware_fail";
 
     char buffer[512];
     serializeJson(doc, buffer);
     client.publish((base_topic + "/telemetry").c_str(), buffer);
     
-    Serial.println("Nivel: " + String(nivel) + "% Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
+    if (nivel == -1) {
+      Serial.println("Estado: ERROR DE SENSOR | Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
+    } else {
+      Serial.println("Nivel: " + String(nivel) + "% | Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
+    }
   }
 
   if (millis() - lastHeartbeat > 30000 && client.connected()) {

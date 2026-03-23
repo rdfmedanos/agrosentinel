@@ -53,5 +53,5 @@ export function resolveTenantFromRequest(req: Request): string {
   if (req.auth?.role === 'company_admin') {
     return queryTenant || req.auth?.tenantId || 'demo-tenant';
   }
-  return req.auth?.tenantId ?? queryTenant ?? 'demo-tenant';
+  return req.auth?.tenantId || queryTenant || 'demo-tenant';
 }
