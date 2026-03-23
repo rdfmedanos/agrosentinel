@@ -2407,14 +2407,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 </>
               )}
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-danger mr-auto" onClick={() => void deleteDevice()} disabled={savingDevice}>
-                <i className="fas fa-trash mr-1"></i>Eliminar
+            <div className="modal-footer d-flex justify-content-between">
+              <button type="button" className="btn btn-danger" style={{ minWidth: '100px' }} onClick={() => void deleteDevice()} disabled={savingDevice}>
+                <i className="fas fa-trash-alt mr-1"></i>Eliminar
               </button>
-              <button type="button" className="btn btn-default" onClick={() => setShowDeviceModal(false)}>Cerrar</button>
-              <button type="button" className="btn btn-primary" onClick={() => void saveDevice()} disabled={savingDevice}>
-                {savingDevice ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
-              </button>
+              <div>
+                <button type="button" className="btn btn-default mr-2" onClick={() => setShowDeviceModal(false)}>Cerrar</button>
+                <button type="button" className="btn btn-primary" onClick={() => void saveDevice()} disabled={savingDevice}>
+                  {savingDevice ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>
