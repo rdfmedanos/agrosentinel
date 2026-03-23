@@ -2527,39 +2527,47 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       {showAllDevicesModal && (
         <>
           <div className="modal-backdrop fade show" style={{ opacity: 0.5 }}></div>
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050, display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050, display: 'flex', flexDirection: 'column', backgroundColor: '#f4f6f9' }}>
             <div className="bg-primary px-3 py-2 d-flex align-items-center">
               <h5 className="mb-0 text-white"><i className="fas fa-map-marked-alt mr-2"></i>Mapa de Todos los Dispositivos</h5>
               <button className="btn btn-outline-light btn-sm ml-auto" onClick={() => setShowAllDevicesModal(false)}>
                 <i className="fas fa-times"></i> Cerrar
               </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              {allDevices.length > 0 && (() => {
-                const lats = allDevices.map(d => d.location.lat);
-                const lngs = allDevices.map(d => d.location.lng);
+            <div style={{ flex: 1, minHeight: '500px', position: 'relative' }}>
+              {(() => {
+                const validDevices = allDevices.filter(d => d.location && d.location.lat && d.location.lng && d.location.lat !== 0 && d.location.lng !== 0);
+                if (validDevices.length === 0) {
+                  return (
+                    <div className="d-flex align-items-center justify-content-center h-100">
+                      <div className="text-center text-muted">
+                        <i className="fas fa-map-marker-alt fa-3x mb-3"></i>
+                        <p>No hay dispositivos con ubicación válida</p>
+                      </div>
+                    </div>
+                  );
+                }
+                const lats = validDevices.map(d => d.location.lat);
+                const lngs = validDevices.map(d => d.location.lng);
                 const center: [number, number] = [
-                  (Math.min(...lats) + Math.max(...lats)) / 2,
-                  (Math.min(...lngs) + Math.max(...lngs)) / 2
+                  lats.length > 0 ? (Math.min(...lats) + Math.max(...lats)) / 2 : -34.6,
+                  lngs.length > 0 ? (Math.min(...lngs) + Math.max(...lngs)) / 2 : -58.4
                 ];
                 return (
-              <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {allDevices.map(d => {
-                  const color = markerColor(d.status, d.levelPct, false);
-                  return (
-                  <Marker key={d._id} position={[d.location.lat, d.location.lng]} eventHandlers={{
-                    click: () => { openDeviceModal(d); }
-                  }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
-                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p><p className="mb-0 small text-muted">Click para editar</p></div></Popup>
-                  </Marker>
-                );})}
-              </MapContainer>
+                  <MapContainer key={Date.now()} center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                    {validDevices.map(d => {
+                      const color = markerColor(d.status, d.levelPct, false);
+                      return (
+                      <Marker key={d._id} position={[d.location.lat, d.location.lng]} eventHandlers={{
+                        click: () => { setShowAllDevicesModal(false); openDeviceModal(d); }
+                      }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
+                        <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p></div></Popup>
+                      </Marker>
+                    );})}
+                  </MapContainer>
                 );
               })()}
-              {allDevices.length === 0 && (
-                <div className="text-center text-muted py-5">No hay dispositivos para mostrar en el mapa</div>
-              )}
             </div>
           </div>
         </>
