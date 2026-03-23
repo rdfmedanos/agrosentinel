@@ -19,6 +19,10 @@ const deviceSchema = new Schema(
     pumpOn: { type: Boolean, default: false },
     lastHeartbeatAt: { type: Date },
     lastSeenAt: { type: Date },
+    configNivelMin: { type: Number, default: 50 },
+    configNivelMax: { type: Number, default: 95 },
+    configAlertaBaja: { type: Number, default: 30 },
+    configModoAuto: { type: Boolean, default: true },
     status: {
       type: String,
       enum: ['online', 'warning', 'critical', 'offline'],

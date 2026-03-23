@@ -93,13 +93,21 @@ devicesRouter.post('/:id/config', async (req, res) => {
     return;
   }
 
-  const configPayload: Record<string, unknown> = {};
-  if (nivel_min !== undefined) configPayload.nivel_min = nivel_min;
-  if (nivel_max !== undefined) configPayload.nivel_max = nivel_max;
-  if (alerta_baja !== undefined) configPayload.alerta_baja = alerta_baja;
-  if (modo !== undefined) configPayload.modo = modo;
+  const configPayload: Record<string, unknown> = {
+    nivel_min: nivel_min ?? device.configNivelMin,
+    nivel_max: nivel_max ?? device.configNivelMax,
+    alerta_baja: alerta_baja ?? device.configAlertaBaja,
+    modo: modo ?? (device.configModoAuto ? 'auto' : 'manual')
+  };
 
   publishDeviceCommand(device.deviceId, { cmd: 'config', requestId: '' }, configPayload);
+  
+  DeviceModel.findByIdAndUpdate(req.params.id, {
+    configNivelMin: configPayload.nivel_min,
+    configNivelMax: configPayload.nivel_max,
+    configAlertaBaja: configPayload.alerta_baja,
+    configModoAuto: configPayload.modo === 'auto'
+  });
   
   res.json({ status: 'config_sent', device_id: device.deviceId });
 });

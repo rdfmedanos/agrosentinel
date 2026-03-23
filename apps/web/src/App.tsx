@@ -18,6 +18,10 @@ type Device = {
   lastHeartbeatAt?: string;
   createdAt?: string;
   clientName?: string;
+  configNivelMin?: number;
+  configNivelMax?: number;
+  configAlertaBaja?: number;
+  configModoAuto?: boolean;
 };
 
 type Alert = {
@@ -1020,7 +1024,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     socket.on('devices:updated', () => void loadCompanyData(tenantId));
     socket.on('telemetry:new', () => void loadCompanyData(tenantId));
     socket.on('alerts:updated', () => void loadCompanyData(tenantId));
-    return () => { socket.disconnect(); };
+    
+    const interval = setInterval(() => void loadCompanyData(tenantId), 10000);
+    
+    return () => { 
+      clearInterval(interval);
+      socket.disconnect(); 
+    };
   }, [tenantId, props.session.token]);
 
   useEffect(() => {
