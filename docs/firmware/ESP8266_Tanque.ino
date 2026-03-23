@@ -20,17 +20,16 @@ const char* mqtt_pass = "Empresa123!";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-String device_id = "ESP8266_" + String(ESP.getChipId(), HEX);
+String device_id;
 String base_topic;
 
 bool wifi_conectado = false;
 bool mqtt_conectado = false;
 
-// ---------------- CONFIGURACIÓN (default) ----------------
-// Valores por defecto - se pueden cambiar desde MQTT
-int config_nivel_min = 50;    // Nivel para encender bomba (default 50%)
-int config_nivel_max = 95;   // Nivel para apagar bomba (default 95%)
-int config_alerta_baja = 30;  // Nivel para alerta si bomba no enciende (default 30%)
+// ---------------- CONFIGURACIÓN ----------------
+int config_nivel_min = 50;
+int config_nivel_max = 95;
+int config_alerta_baja = 30;
 bool config_modo_auto = true;
 bool config_habilitar_bomba = true;
 
@@ -47,8 +46,6 @@ unsigned long lastWifiCheck = 0;
 unsigned long lastMqttAttempt = 0;
 unsigned long bootTime = 0;
 
-// Contador de bombeo para alertas
-unsigned long ultimo_bombeo_exitoso = 0;
 bool alerta_baja_emitida = false;
 
 // ---------------- EEPROM ----------------
@@ -94,35 +91,7 @@ void cargarConfig() {
   config_habilitar_bomba = cfg.habilitar_bomba;
 }
 
-// ---------------- WiFi ----------------
-void verificarWifi() {
-  if (WiFi.status() != WL_CONNECTED) {
-    if (wifi_conectado) {
-      Serial.println("WiFi desconectado, intentando reconnectar...");
-      wifi_conectado = false;
-    }
-    WiFi.disconnect();
-    delay(100);
-    WiFi.begin();
-    int intentos = 0;
-    while (WiFi.status() != WL_CONNECTED && intentos < 20) {
-      delay(500);
-      intentos++;
-    }
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nWiFi reconnectado!");
-      wifi_conectado = true;
-      mqtt_conectado = false;
-    }
-  } else {
-    if (!wifi_conectado) {
-      Serial.println("WiFi conectado!");
-      wifi_conectado = true;
-    }
-  }
-}
-
-// ---------------- SENSOR JSN-SR04T ----------------
+// ---------------- SENSOR ----------------
 #define NUM_LECTURAS 7
 int lecturas[NUM_LECTURAS];
 
@@ -169,7 +138,6 @@ int leerNivelTanque() {
   if (distancia < distancia_sensor || distancia > altura_tanque) {
     distancia = constrain(distancia, distancia_sensor, altura_tanque);
   }
-  
   int nivel = map(distancia, altura_tanque, distancia_sensor, 0, 100);
   return constrain(nivel, 0, 100);
 }
@@ -182,8 +150,7 @@ int leerNivelReserva() {
 void controlarBomba(int nivel, int reserva) {
   unsigned long ahora = millis();
   
-  // Anti-rebote de 5 segundos
-  if (ahora - ultimo_cambio_bomba < 5000) {
+  if (ahora - ultimo_cambio_bomba < 3000) {
     digitalWrite(RELE_PIN, ultimo_estado_bomba ? HIGH : LOW);
     return;
   }
@@ -191,29 +158,22 @@ void controlarBomba(int nivel, int reserva) {
   bool nuevo_estado = ultimo_estado_bomba;
   
   if (config_modo_auto && config_habilitar_bomba) {
-    // Encender bomba cuando nivel < config_nivel_min Y hay reserva
     if (nivel < config_nivel_min && reserva > 10 && !ultimo_estado_bomba) {
       nuevo_estado = true;
-      ultimo_bombeo_exitoso = ahora;
-      alerta_baja_emitida = false;
-      Serial.println("Bomba encendida por nivel bajo");
-    }
-    // Apagar bomba cuando nivel >= config_nivel_max
-    else if (nivel >= config_nivel_max && ultimo_estado_bomba) {
+    } else if (nivel >= config_nivel_max && ultimo_estado_bomba) {
       nuevo_estado = false;
-      Serial.println("Bomba apagada por nivel alto");
     }
   }
   
-  // Verificar alerta: nivel muy bajo y bomba no encendida
   if (nivel < config_alerta_baja && ultimo_estado_bomba == false && !alerta_baja_emitida) {
-    Serial.println("ALERTA: Nivel critico y bomba no iniciada!");
+    Serial.println("ALERTA: Nivel critico!");
     alerta_baja_emitida = true;
   }
   
   if (nuevo_estado != ultimo_estado_bomba) {
     ultimo_estado_bomba = nuevo_estado;
     ultimo_cambio_bomba = ahora;
+    Serial.println(nuevo_estado ? "BOMBA ON" : "BOMBA OFF");
   }
   
   digitalWrite(RELE_PIN, ultimo_estado_bomba ? HIGH : LOW);
@@ -228,20 +188,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println("MQTT: " + t);
 
   if (t.endsWith("/command")) {
-    StaticJsonDocument<256> doc;
-    deserializeJson(doc, msg);
-    
-    if (doc.containsKey("cmd")) {
-      String cmd = doc["cmd"].as<String>();
-      if (cmd == "pump_on" || cmd == "ON") {
-        ultimo_estado_bomba = true;
-        config_modo_auto = false;
-        Serial.println("CMD: Bomba ON");
-      } else if (cmd == "pump_off" || cmd == "OFF") {
-        ultimo_estado_bomba = false;
-        config_modo_auto = false;
-        Serial.println("CMD: Bomba OFF");
-      }
+    if (msg == "ON" || msg.indexOf("\"cmd\":\"pump_on\"") >= 0) {
+      ultimo_estado_bomba = true;
+      config_modo_auto = false;
+      Serial.println("CMD: BOMBA ON");
+    } else if (msg == "OFF" || msg.indexOf("\"cmd\":\"pump_off\"") >= 0) {
+      ultimo_estado_bomba = false;
+      config_modo_auto = false;
+      Serial.println("CMD: BOMBA OFF");
     }
     return;
   }
@@ -259,46 +213,48 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (doc.containsKey("distancia_sensor")) distancia_sensor = doc["distancia_sensor"];
 
     guardarConfig();
-    Serial.println("Config guardada en EEPROM");
+    Serial.println("Config guardada");
   }
 }
 
 // ---------------- MQTT ----------------
 void reconnectMQTT() {
+  if (client.connected()) {
+    mqtt_conectado = true;
+    return;
+  }
+  
   unsigned long ahora = millis();
-  if (ahora - lastMqttAttempt < 5000) return;
+  if (ahora - lastMqttAttempt < 3000) return;
   lastMqttAttempt = ahora;
   
-  if (!client.connected()) {
-    Serial.println("Conectando MQTT...");
+  Serial.println("Intentando MQTT...");
+  
+  if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
+    Serial.println("MQTT conectado!");
+    mqtt_conectado = true;
     
-    if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
-      Serial.println("MQTT conectado!");
-      mqtt_conectado = true;
-      
-      client.subscribe((base_topic + "/config").c_str());
-      client.subscribe((base_topic + "/command").c_str());
+    client.subscribe((base_topic + "/config").c_str());
+    client.subscribe((base_topic + "/command").c_str());
 
-      StaticJsonDocument<200> doc;
-      doc["device_id"] = device_id;
-      doc["type"] = "nivel_tanque";
-      doc["altura_tanque"] = altura_tanque;
-
-      char buffer[200];
-      serializeJson(doc, buffer);
-      client.publish("devices/register", buffer);
-    } else {
-      mqtt_conectado = false;
-    }
+    StaticJsonDocument<200> doc;
+    doc["device_id"] = device_id;
+    doc["type"] = "nivel_tanque";
+    char buffer[200];
+    serializeJson(doc, buffer);
+    client.publish("devices/register", buffer);
+    Serial.println("Registro enviado");
+  } else {
+    Serial.print("MQTT falló: ");
+    Serial.println(client.state());
+    mqtt_conectado = false;
   }
 }
 
 // ---------------- SETUP ----------------
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n========================================");
-  Serial.println("AgroSentinel v2.0 - Control de Bomba");
-  Serial.println("========================================");
+  Serial.println("\n=== AgroSentinel v2.0 ===");
 
   bootTime = millis();
 
@@ -310,47 +266,44 @@ void setup() {
   digitalWrite(RELE_PIN, LOW);
   digitalWrite(TRIG_PIN, LOW);
 
+  device_id = "ESP8266_" + String(ESP.getChipId(), HEX);
+  base_topic = "devices/" + device_id;
+
   cargarConfig();
 
-  Serial.println("Device ID: " + device_id);
-  Serial.println("Config - Min: " + String(config_nivel_min) + "%, Max: " + String(config_nivel_max) + "%, Alerta: " + String(config_alerta_baja) + "%");
+  Serial.println("Device: " + device_id);
+  Serial.println("Min: " + String(config_nivel_min) + "% Max: " + String(config_nivel_max) + "%");
 
   WiFiManager wm;
   wm.setTimeout(180);
+  
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
+    Serial.println("WiFi falló, reiniciando...");
+    delay(3000);
     ESP.restart();
   }
 
   wifi_conectado = true;
-  Serial.println("WiFi OK - IP: " + WiFi.localIP().toString());
-
-  base_topic = "devices/" + device_id;
+  Serial.println("WiFi OK: " + WiFi.localIP().toString());
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   client.setKeepAlive(30);
-  client.setSocketTimeout(10);
 }
 
 // ---------------- LOOP ----------------
 void loop() {
-  if (millis() - lastWifiCheck > 10000) {
-    lastWifiCheck = millis();
-    verificarWifi();
+  if (!client.connected()) {
+    reconnectMQTT();
   }
-
-  if (wifi_conectado) {
-    if (!client.connected()) reconnectMQTT();
-    client.loop();
-  }
+  client.loop();
 
   int nivel = leerNivelTanque();
   int reserva = leerNivelReserva();
 
   controlarBomba(nivel, reserva);
 
-  // Telemetría
-  if (millis() - lastSend > 15000 && mqtt_conectado) {
+  if (millis() - lastSend > 15000 && client.connected()) {
     lastSend = millis();
 
     StaticJsonDocument<512> doc;
@@ -359,29 +312,19 @@ void loop() {
     doc["reserva"] = reserva;
     doc["bomba"] = ultimo_estado_bomba;
     doc["rssi"] = WiFi.RSSI();
-    doc["altura_tanque"] = altura_tanque;
-    doc["wifi"] = wifi_conectado;
-    doc["mqtt"] = mqtt_conectado;
-    doc["config_nivel_min"] = config_nivel_min;
-    doc["config_nivel_max"] = config_nivel_max;
-    doc["config_alerta_baja"] = config_alerta_baja;
-    doc["config_modo_auto"] = config_modo_auto;
-    doc["config_habilitar_bomba"] = config_habilitar_bomba;
 
     char buffer[512];
     serializeJson(doc, buffer);
     client.publish((base_topic + "/telemetry").c_str(), buffer);
     
-    Serial.println("Nivel: " + String(nivel) + "% - Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
+    Serial.println("Nivel: " + String(nivel) + "% Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
   }
 
-  // Heartbeat
-  if (millis() - lastHeartbeat > 30000 && mqtt_conectado) {
+  if (millis() - lastHeartbeat > 30000 && client.connected()) {
     lastHeartbeat = millis();
     client.publish((base_topic + "/heartbeat").c_str(), "1");
   }
 
-  // Auto-reinicio cada 24h
   if (millis() - bootTime > 86400000) {
     ESP.restart();
   }
