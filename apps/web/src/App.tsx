@@ -1055,7 +1055,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
-    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(section));
+    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(section));
     setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
