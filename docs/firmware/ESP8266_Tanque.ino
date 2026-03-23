@@ -4,11 +4,11 @@
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 
-// ---------------- MQTT ----------------
-const char* mqtt_server = "192.168.100.20";
-const int mqtt_port = 1883;
-const char* mqtt_user = "admin@agrosentinel.com";
-const char* mqtt_pass = "Empresa123!";
+// ---------------- MQTT Defaults ----------------
+char mqtt_server[40] = "192.168.1.66";
+char mqtt_port[6] = "1883";
+char mqtt_user[40] = "admin@agrosentinel.com";
+char mqtt_pass[40] = "Empresa123!";
 
 // ---------------- Pines ----------------
 #define TRIG_PIN D2
@@ -57,6 +57,10 @@ struct DeviceConfig {
   bool habilitar_bomba;
   int altura_tanque;
   int distancia_sensor;
+  char mqtt_server[40];
+  char mqtt_user[40];
+  char mqtt_pass[40];
+  char mqtt_port[6];
 };
 
 void guardarConfig() {
@@ -68,6 +72,10 @@ void guardarConfig() {
   cfg.habilitar_bomba = config_habilitar_bomba;
   cfg.altura_tanque = altura_tanque;
   cfg.distancia_sensor = distancia_sensor;
+  strncpy(cfg.mqtt_server, mqtt_server, 40);
+  strncpy(cfg.mqtt_user, mqtt_user, 40);
+  strncpy(cfg.mqtt_pass, mqtt_pass, 40);
+  strncpy(cfg.mqtt_port, mqtt_port, 6);
   
   EEPROM.begin(512);
   EEPROM.put(10, cfg);
@@ -87,6 +95,11 @@ void cargarConfig() {
   if (cfg.altura_tanque > 0) altura_tanque = cfg.altura_tanque;
   if (cfg.distancia_sensor > 0) distancia_sensor = cfg.distancia_sensor;
   
+  if (strlen(cfg.mqtt_server) > 0) strncpy(mqtt_server, cfg.mqtt_server, 40);
+  if (strlen(cfg.mqtt_user) > 0) strncpy(mqtt_user, cfg.mqtt_user, 40);
+  if (strlen(cfg.mqtt_pass) > 0) strncpy(mqtt_pass, cfg.mqtt_pass, 40);
+  if (strlen(cfg.mqtt_port) > 0) strncpy(mqtt_port, cfg.mqtt_port, 6);
+
   config_modo_auto = cfg.modo_auto;
   config_habilitar_bomba = cfg.habilitar_bomba;
 }
@@ -105,7 +118,6 @@ int leerDistanciaJSN() {
   long duracion = pulseIn(ECHO_PIN, HIGH, 25000);
   if (duracion == 0) return -1;
   int dist = duracion * 0.034 / 2;
-  Serial.println("Echo: " + String(duracion) + "us -> " + String(dist) + "cm");
   return dist;
 }
 
@@ -117,28 +129,40 @@ int filtroMediana() {
     int dist = leerDistanciaJSN();
     delay(100);
     
-    if (dist > 20 && dist < 400) {
+    // El JSN-SR04T tiene un rango mínimo de ~21cm. 
+    // Si la distancia es < 21cm, el sensor suele reportar valores erráticos o el máximo.
+    if (dist >= 10 && dist < 450) {
       lecturas[i] = dist;
       suma += dist;
       validas++;
     } else {
-      Serial.println("Lectura invalida: " + String(dist));
-      lecturas[i] = (i > 0) ? lecturas[i-1] : 100;
+      Serial.println("Lectura fuera de rango: " + String(dist));
     }
   }
 
-  if (validas == 0) return altura_tanque;
+  if (validas == 0) return -1; // Indicar error
   
   return suma / validas;
 }
 
 int leerNivelTanque() {
   int distancia = filtroMediana();
+  
+  if (distancia == -1) {
+    // Si no hay lecturas válidas, probablemente el tanque está MUY lleno (zona muerta)
+    // o el sensor está desconectado. 
+    // Para evitar falsos 0%, asumiremos que si fallan todas las lecturas y el sensor 
+    // respondió algo (duracion != 0), es por cercanía extrema.
+    Serial.println("Error de lectura: asumiendo nivel alto por zona muerta");
+    return 100; 
+  }
+
   Serial.println("Distancia: " + String(distancia) + " cm");
   
-  if (distancia < distancia_sensor || distancia > altura_tanque) {
-    distancia = constrain(distancia, distancia_sensor, altura_tanque);
-  }
+  // Ajuste de mapeo
+  if (distancia < distancia_sensor) distancia = distancia_sensor;
+  if (distancia > altura_tanque) distancia = altura_tanque;
+  
   int nivel = map(distancia, altura_tanque, distancia_sensor, 0, 100);
   return constrain(nivel, 0, 100);
 }
@@ -226,10 +250,11 @@ void reconnectMQTT() {
   }
   
   unsigned long ahora = millis();
-  if (ahora - lastMqttAttempt < 3000) return;
+  if (ahora - lastMqttAttempt < 5000) return;
   lastMqttAttempt = ahora;
   
-  Serial.println("Intentando MQTT...");
+  Serial.print("Intentando MQTT: ");
+  Serial.println(mqtt_server);
   
   if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
     Serial.println("MQTT conectado!");
@@ -246,7 +271,7 @@ void reconnectMQTT() {
     client.publish("devices/register", buffer);
     Serial.println("Registro enviado");
   } else {
-    Serial.print("MQTT falló: ");
+    Serial.print("MQTT falló, rc=");
     Serial.println(client.state());
     mqtt_conectado = false;
   }
@@ -255,7 +280,7 @@ void reconnectMQTT() {
 // ---------------- SETUP ----------------
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n=== AgroSentinel v2.0 ===");
+  Serial.println("\n=== AgroSentinel v2.1 ===");
 
   bootTime = millis();
 
@@ -273,9 +298,19 @@ void setup() {
   cargarConfig();
 
   Serial.println("Device: " + device_id);
-  Serial.println("Min: " + String(config_nivel_min) + "% Max: " + String(config_nivel_max) + "%");
-
+  
   WiFiManager wm;
+  
+  WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 40);
+  WiFiManagerParameter custom_mqtt_port("port", "MQTT Port", mqtt_port, 6);
+  WiFiManagerParameter custom_mqtt_user("user", "MQTT User", mqtt_user, 40);
+  WiFiManagerParameter custom_mqtt_pass("pass", "MQTT Pass", mqtt_pass, 40);
+  
+  wm.addParameter(&custom_mqtt_server);
+  wm.addParameter(&custom_mqtt_port);
+  wm.addParameter(&custom_mqtt_user);
+  wm.addParameter(&custom_mqtt_pass);
+
   wm.setTimeout(180);
   
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
@@ -284,10 +319,17 @@ void setup() {
     ESP.restart();
   }
 
+  strncpy(mqtt_server, custom_mqtt_server.getValue(), 40);
+  strncpy(mqtt_port, custom_mqtt_port.getValue(), 6);
+  strncpy(mqtt_user, custom_mqtt_user.getValue(), 40);
+  strncpy(mqtt_pass, custom_mqtt_pass.getValue(), 40);
+  
+  guardarConfig();
+
   wifi_conectado = true;
   Serial.println("WiFi OK: " + WiFi.localIP().toString());
 
-  client.setServer(mqtt_server, mqtt_port);
+  client.setServer(mqtt_server, atoi(mqtt_port));
   client.setCallback(callback);
   client.setKeepAlive(30);
 }
