@@ -171,6 +171,15 @@ async function patchJson(path: string, body: unknown, token?: string) {
   return res;
 }
 
+async function deleteJson(path: string, token?: string) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'DELETE',
+    headers: authHeaders(token)
+  });
+  if (!res.ok) throw new Error('API request failed');
+  return res;
+}
+
 function loadStoredSession(): AuthSession | null {
   const raw = localStorage.getItem('agrosentinel_session');
   if (!raw) return null;
@@ -1171,6 +1180,21 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         updateData.tenantId = editDeviceUserId || null;
       }
       await patchJson(`/devices/${selectedDevice._id}`, updateData, props.session.token);
+      setShowDeviceModal(false);
+      setSelectedDevice(null);
+      await loadCompanyData(tenantId);
+    } finally {
+      setSavingDevice(false);
+    }
+  };
+
+  const deleteDevice = async () => {
+    if (!selectedDevice) return;
+    if (!confirm(`¿Está seguro de eliminar el dispositivo "${selectedDevice.name}"? Esta acción no se puede deshacer.`)) return;
+    
+    setSavingDevice(true);
+    try {
+      await deleteJson(`/devices/${selectedDevice._id}`, props.session.token);
       setShowDeviceModal(false);
       setSelectedDevice(null);
       await loadCompanyData(tenantId);
@@ -2318,8 +2342,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       <div className={`modal fade ${showDeviceModal ? 'show' : ''}`} style={{ display: showDeviceModal ? 'block' : 'none' }}>
         <div className="modal-dialog modal-xl" style={{ maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
-            <div className="modal-header bg-primary">
-              <h4 className="modal-title"><i className="fas fa-microchip mr-2"></i>Detalle del Sensor</h4>
+            <div className="modal-header bg-primary d-flex justify-content-between align-items-center">
+              <h4 className="modal-title"><i className="fas fa-microchip mr-2"></i>Detalle del Dispositivo</h4>
               <button type="button" className="close text-white" onClick={() => setShowDeviceModal(false)}>&times;</button>
             </div>
             <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
@@ -2384,6 +2408,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               )}
             </div>
             <div className="modal-footer">
+              <button type="button" className="btn btn-danger mr-auto" onClick={() => void deleteDevice()} disabled={savingDevice}>
+                <i className="fas fa-trash mr-1"></i>Eliminar
+              </button>
               <button type="button" className="btn btn-default" onClick={() => setShowDeviceModal(false)}>Cerrar</button>
               <button type="button" className="btn btn-primary" onClick={() => void saveDevice()} disabled={savingDevice}>
                 {savingDevice ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}

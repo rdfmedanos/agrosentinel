@@ -146,3 +146,14 @@ devicesRouter.get('/users', requireCompanyAdmin, async (req, res) => {
     }))
   );
 });
+
+devicesRouter.delete('/:id', requireCompanyAdmin, async (req, res) => {
+  const device = await DeviceModel.findById(req.params.id);
+  if (!device) {
+    res.status(404).json({ error: 'Dispositivo no encontrado' });
+    return;
+  }
+
+  await DeviceModel.deleteOne({ _id: req.params.id });
+  res.json({ status: 'deleted', device_id: device.deviceId });
+});
