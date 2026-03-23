@@ -92,49 +92,50 @@ void cargarConfig() {
 }
 
 // ---------------- SENSOR ----------------
-#define NUM_LECTURAS 7
+#define NUM_LECTURAS 3
 int lecturas[NUM_LECTURAS];
 
 int leerDistanciaJSN() {
   digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(20);
+  delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  long duracion = pulseIn(ECHO_PIN, HIGH, 30000);
+  long duracion = pulseIn(ECHO_PIN, HIGH, 25000);
   if (duracion == 0) return -1;
-  return duracion * 0.034 / 2;
+  int dist = duracion * 0.034 / 2;
+  Serial.println("Echo: " + String(duracion) + "us -> " + String(dist) + "cm");
+  return dist;
 }
 
 int filtroMediana() {
+  int suma = 0;
+  int validas = 0;
+  
   for (int i = 0; i < NUM_LECTURAS; i++) {
     int dist = leerDistanciaJSN();
-    if (dist < 0 || dist > 500) {
-      dist = (i > 0) ? lecturas[i-1] : altura_tanque;
+    delay(100);
+    
+    if (dist > 20 && dist < 400) {
+      lecturas[i] = dist;
+      suma += dist;
+      validas++;
+    } else {
+      Serial.println("Lectura invalida: " + String(dist));
+      lecturas[i] = (i > 0) ? lecturas[i-1] : 100;
     }
-    lecturas[i] = dist;
-    delay(80);
   }
 
-  int sorted[NUM_LECTURAS];
-  memcpy(sorted, lecturas, sizeof(lecturas));
+  if (validas == 0) return altura_tanque;
   
-  for (int i = 0; i < NUM_LECTURAS - 1; i++) {
-    for (int j = i + 1; j < NUM_LECTURAS; j++) {
-      if (sorted[i] > sorted[j]) {
-        int temp = sorted[i];
-        sorted[i] = sorted[j];
-        sorted[j] = temp;
-      }
-    }
-  }
-  
-  return sorted[NUM_LECTURAS / 2];
+  return suma / validas;
 }
 
 int leerNivelTanque() {
   int distancia = filtroMediana();
+  Serial.println("Distancia: " + String(distancia) + " cm");
+  
   if (distancia < distancia_sensor || distancia > altura_tanque) {
     distancia = constrain(distancia, distancia_sensor, altura_tanque);
   }
