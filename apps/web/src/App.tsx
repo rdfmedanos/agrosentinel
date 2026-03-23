@@ -1016,6 +1016,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, []);
 
   useEffect(() => {
+    if (!showMqttConfig) return;
+    void (async () => {
+      try {
+        const config = await getJson<{ host: string; port: number; username: string; password: string }>('/mqtt-config', props.session.token);
+        setMqttConfig({ ...config, port: String(config.port), qos: '1' });
+      } catch (err) {
+        console.error('Error loading MQTT config:', err);
+      }
+    })();
+  }, [showMqttConfig, props.session.token]);
+
+  useEffect(() => {
     if (!tenantId) return;
     const socket = io(SOCKET_URL, {
       auth: { token: props.session.token }
@@ -2615,7 +2627,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-default" onClick={() => setShowMqttConfig(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={() => setShowMqttConfig(false)}>
+              <button type="button" className="btn btn-primary" onClick={async () => {
+                try {
+                  await putJson('/mqtt-config', mqttConfig, props.session.token);
+                  setShowMqttConfig(false);
+                  alert('Configuración guardada');
+                } catch (err) {
+                  alert('Error al guardar configuración');
+                }
+              }}>
                 <i className="fas fa-save mr-1"></i>Guardar
               </button>
             </div>

@@ -4,6 +4,7 @@ import { alertsRouter } from './alerts.routes.js';
 import { authRouter } from './auth.routes.js';
 import { billingRouter } from './billing.routes.js';
 import { devicesRouter } from './devices.routes.js';
+import { mqttConfigRouter } from './mqttConfig.routes.js';
 import { tenantsRouter } from './tenants.routes.js';
 import { workOrdersRouter } from './workOrders.routes.js';
 
@@ -17,6 +18,7 @@ apiRouter.use('/auth', authRouter);
 
 apiRouter.use(requireAuth);
 
+apiRouter.use('/mqtt-config', mqttConfigRouter);
 apiRouter.use('/tenants', tenantsRouter);
 apiRouter.use('/devices', devicesRouter);
 apiRouter.use('/alerts', alertsRouter);
