@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import { DeviceModel } from '../models/Device.js';
 import { PlanModel } from '../models/Plan.js';
 import { UserModel } from '../models/User.js';
 
@@ -14,7 +13,7 @@ export async function seedInitialData() {
   }
 
   const ownerPasswordHash = await bcrypt.hash('Cliente123!', 10);
-  const owner = await UserModel.findOneAndUpdate(
+  await UserModel.findOneAndUpdate(
     { email: 'owner@agrosentinel.com' },
     {
       $setOnInsert: {
@@ -31,7 +30,7 @@ export async function seedInitialData() {
   );
 
   const companyAdminPasswordHash = await bcrypt.hash('Empresa123!', 10);
-  const companyAdmin = await UserModel.findOneAndUpdate(
+  await UserModel.findOneAndUpdate(
     { email: 'admin@agrosentinel.com' },
     {
       $setOnInsert: {
@@ -45,21 +44,4 @@ export async function seedInitialData() {
     },
     { upsert: true, new: true }
   );
-
-  const devices = await DeviceModel.countDocuments({ tenantId: 'demo-tenant' });
-  if (devices === 0) {
-    await DeviceModel.insertMany([
-      {
-        tenantId: 'demo-tenant',
-        deviceId: 'ESP32-DEMO-001',
-        name: 'Dispositivo Demo',
-        location: { lat: -34.61, lng: -58.39, address: 'Dirección demo' },
-        levelPct: 50,
-        reserveLiters: 5000,
-        pumpOn: false,
-        status: 'online',
-        lastHeartbeatAt: new Date()
-      }
-    ]);
-  }
 }
