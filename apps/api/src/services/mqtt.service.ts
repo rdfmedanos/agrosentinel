@@ -57,6 +57,7 @@ export async function initMqtt() {
   mqttClient.on('message', async (topic, payloadBuffer) => {
     try {
       const payloadText = payloadBuffer.toString();
+      logger.info({ topic, payloadText }, 'MQTT payload received');
       const payload = payloadText ? JSON.parse(payloadText) : {};
       const parts = topic.split('/');
       const deviceId = parts[1];

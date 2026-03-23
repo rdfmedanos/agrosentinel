@@ -86,8 +86,8 @@ void cargarConfig() {
   if (cfg.nivel_min > 0 && cfg.nivel_min <= 100) config_nivel_min = cfg.nivel_min;
   if (cfg.nivel_max > 0 && cfg.nivel_max <= 100) config_nivel_max = cfg.nivel_max;
   if (cfg.alerta_baja > 0 && cfg.alerta_baja <= 100) config_alerta_baja = cfg.alerta_baja;
-  if (cfg.altura_tanque > 0) altura_tanque = cfg.altura_tanque;
-  if (cfg.distancia_sensor > 0) distancia_sensor = cfg.distancia_sensor;
+  if (cfg.altura_tanque > 0 && cfg.altura_tanque < 2000) altura_tanque = cfg.altura_tanque;
+  if (cfg.distancia_sensor >= 0 && cfg.distancia_sensor < 500) distancia_sensor = cfg.distancia_sensor;
   
   config_modo_auto = cfg.modo_auto;
   config_habilitar_bomba = cfg.habilitar_bomba;
@@ -124,37 +124,50 @@ int filtroMediana() {
   
   for (int i = 0; i < NUM_LECTURAS; i++) {
     int dist = leerDistanciaJSN();
-    delay(40); // Lecturas mas frecuentes para 5 muestras
+    delay(100); // Aumentar delay para dejar que los ecos se disipen
     
-    // Aceptamos 0 como "muy cerca" (blind spot)
     if (dist >= 0 && dist < 500) {
       temp_lecturas[validas] = dist;
       validas++;
       if (dist == 0) ceros++;
+      Serial.print(String(dist) + " ");
+    } else {
+      Serial.print("X ");
     }
   }
+  Serial.println();
 
   if (validas == 0) return -1;
   
-  // Si la mayoria de las lecturas son 0, el sensor esta en zona muerta o desconectado
-  if (ceros >= (validas / 2 + 1)) {
+  // Si tenemos lecturas mayores a 0, preferimos ignorar los 0s (ruido/errores)
+  // a menos que sea la UNICA lectura que tenemos (zona muerta real).
+  int validas_dist = 0;
+  int temp_dist[NUM_LECTURAS];
+  for (int i = 0; i < validas; i++) {
+    if (temp_lecturas[i] > 0) {
+      temp_dist[validas_dist] = temp_lecturas[i];
+      validas_dist++;
+    }
+  }
+
+  // Si no hay lecturas > 0 pero sí hubo lecturas válidas (fueron 0)
+  if (validas_dist == 0 && validas > 0) {
     Serial.println("DEBUG: Sensor en zona muerta (o desconectado)");
     return 0;
   }
   
-  // Ordenar lecturas (Bubble Sort) para encontrar la mediana
-  for (int i = 0; i < validas - 1; i++) {
-    for (int j = 0; j < validas - i - 1; j++) {
-      if (temp_lecturas[j] > temp_lecturas[j + 1]) {
-        int temp = temp_lecturas[j];
-        temp_lecturas[j] = temp_lecturas[j + 1];
-        temp_lecturas[j + 1] = temp;
+  // Ordenar solo las lecturas > 0
+  for (int i = 0; i < validas_dist - 1; i++) {
+    for (int j = 0; j < validas_dist - i - 1; j++) {
+      if (temp_dist[j] > temp_dist[j + 1]) {
+        int temp = temp_dist[j];
+        temp_dist[j] = temp_dist[j + 1];
+        temp_dist[j + 1] = temp;
       }
     }
   }
   
-  // Retornamos el valor central (Mediana) que ignora los picos (outliers)
-  int mediana = temp_lecturas[validas / 2];
+  int mediana = temp_dist[validas_dist / 2];
   return mediana;
 }
 
@@ -174,7 +187,9 @@ int leerNivelTanque() {
   if (distancia > altura_tanque) distancia = altura_tanque;
   
   int nivel = map(distancia, altura_tanque, distancia_sensor, 0, 100);
-  return constrain(nivel, 0, 100);
+  nivel = constrain(nivel, 0, 100);
+  Serial.println("Nivel calculado: " + String(nivel) + "%");
+  return nivel;
 }
 
 int leerNivelReserva() {
@@ -353,6 +368,8 @@ void loop() {
     doc["reserva"] = reserva;
     doc["bomba"] = ultimo_estado_bomba;
     doc["rssi"] = WiFi.RSSI();
+    doc["h"] = altura_tanque;
+    doc["s"] = distancia_sensor;
     if (nivel == -1) doc["error"] = "sensor_hardware_fail";
 
     char buffer[512];

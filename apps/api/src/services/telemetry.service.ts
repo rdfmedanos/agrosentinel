@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DeviceModel } from '../models/Device.js';
 import { TelemetryModel } from '../models/Telemetry.js';
+import { logger } from '../config/logger.js';
 import { emitTenant } from '../realtime/socket.js';
 import { evaluateDeviceCriticalLevel, resolveAlert } from './alert.service.js';
 
@@ -13,7 +14,9 @@ export const telemetrySchema = z.object({
   levelPct: z.number().min(0).max(100).optional(),
   reserveLiters: z.number().min(0).optional(),
   pumpOn: z.boolean().optional(),
-  ts: z.string().datetime().optional()
+  ts: z.string().datetime().optional(),
+  h: z.number().optional(),
+  s: z.number().optional()
 });
 
 export async function upsertHeartbeat(deviceId: string) {
@@ -46,6 +49,9 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
   if (!device) throw new Error(`Device ${deviceId} not registered`);
 
   const data = telemetrySchema.parse(payload);
+  if (data.h !== undefined || data.s !== undefined) {
+    logger.info({ deviceId, h: data.h, s: data.s }, 'Received calibration from device');
+  }
 
   const ts = data.ts ? new Date(data.ts) : new Date();
   const levelPct = data.nivel ?? data.levelPct ?? 0;
