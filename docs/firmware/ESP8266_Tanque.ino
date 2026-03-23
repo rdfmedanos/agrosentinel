@@ -5,7 +5,7 @@
 #include <EEPROM.h>
 
 // ---------------- MQTT ----------------
-const char* mqtt_server = "192.168.1.66";
+const char* mqtt_server = "192.168.100.20";
 const int mqtt_port = 1883;
 const char* mqtt_user = "admin@agrosentinel.com";
 const char* mqtt_pass = "Empresa123!";
@@ -28,7 +28,7 @@ String base_topic;
 bool wifi_conectado = false;
 bool mqtt_conectado = false;
 
-// ---------------- CONFIGURACIÓN ----------------
+// ---------------- CONFIGURACION ----------------
 int config_nivel_min = 50;
 int config_nivel_max = 95;
 int config_alerta_baja = 30;
@@ -94,7 +94,7 @@ void cargarConfig() {
 }
 
 // ---------------- SENSOR ----------------
-#define NUM_LECTURAS 3
+#define NUM_LECTURAS 5
 int lecturas[NUM_LECTURAS];
 
 int leerDistanciaJSN() {
@@ -108,51 +108,69 @@ int leerDistanciaJSN() {
   long duracion = pulseIn(ECHO_PIN, HIGH, 30000);
   
   if (duracion == 0) {
-    Serial.println("DEBUG: Sensor timeout (ECHO no recibido)");
-    return -1;
+    // Un timeout de 0 suele ser "zona muerta" (agua muy cerca) o desconexion.
+    // Lo tratamos como 0cm para que la logica de "Lleno" lo capture.
+    return 0;
   }
   
   int dist = duracion * 0.034 / 2;
-  // Debug de duración para ver si el sensor responde algo
-  Serial.println("DEBUG: Duracion=" + String(duracion) + "us -> " + String(dist) + "cm");
-  
   return dist;
 }
 
 int filtroMediana() {
-  int suma = 0;
   int validas = 0;
+  int ceros = 0;
+  int temp_lecturas[NUM_LECTURAS];
   
   for (int i = 0; i < NUM_LECTURAS; i++) {
     int dist = leerDistanciaJSN();
-    delay(100);
+    delay(40); // Lecturas mas frecuentes para 5 muestras
     
-    // Rango válido típico del JSN-SR04T: 21cm a 450cm
-    if (dist >= 10 && dist < 500) {
-      lecturas[i] = dist;
-      suma += dist;
+    // Aceptamos 0 como "muy cerca" (blind spot)
+    if (dist >= 0 && dist < 500) {
+      temp_lecturas[validas] = dist;
       validas++;
+      if (dist == 0) ceros++;
     }
   }
 
   if (validas == 0) return -1;
   
-  return suma / validas;
+  // Si la mayoria de las lecturas son 0, el sensor esta en zona muerta o desconectado
+  if (ceros >= (validas / 2 + 1)) {
+    Serial.println("DEBUG: Sensor en zona muerta (o desconectado)");
+    return 0;
+  }
+  
+  // Ordenar lecturas (Bubble Sort) para encontrar la mediana
+  for (int i = 0; i < validas - 1; i++) {
+    for (int j = 0; j < validas - i - 1; j++) {
+      if (temp_lecturas[j] > temp_lecturas[j + 1]) {
+        int temp = temp_lecturas[j];
+        temp_lecturas[j] = temp_lecturas[j + 1];
+        temp_lecturas[j + 1] = temp;
+      }
+    }
+  }
+  
+  // Retornamos el valor central (Mediana) que ignora los picos (outliers)
+  int mediana = temp_lecturas[validas / 2];
+  return mediana;
 }
 
 int leerNivelTanque() {
   int distancia = filtroMediana();
   
   if (distancia == -1) {
-    // Si hay timeout absoluto en todas las lecturas, es un error de Hardware
-    Serial.println("ALERTA: Sensor no responde (revisar cables/alimentación)");
-    return -1; // Código de error de Hardware
+    Serial.println("ALERTA: Sensor no responde (revisar cables/alimentacion)");
+    return -1; 
   }
 
   Serial.println("Distancia: " + String(distancia) + " cm");
   
-  // Ajuste de mapeo
-  if (distancia < distancia_sensor) distancia = distancia_sensor;
+  // Si la distancia es menor a la distancia_sensor (ej: 20cm), esta lleno (100%)
+  // Esto incluye el caso de distancia = 0 (zona muerta)
+  if (distancia <= distancia_sensor) return 100;
   if (distancia > altura_tanque) distancia = altura_tanque;
   
   int nivel = map(distancia, altura_tanque, distancia_sensor, 0, 100);
@@ -264,7 +282,7 @@ void reconnectMQTT() {
     client.publish((base_topic + "/register").c_str(), buffer);
     Serial.println("Registro enviado a " + base_topic + "/register");
   } else {
-    Serial.print("MQTT falló, rc=");
+    Serial.print("MQTT fallo, rc=");
     Serial.println(client.state());
     mqtt_conectado = false;
   }
@@ -298,7 +316,7 @@ void setup() {
   wm.setTimeout(180);
   
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
-    Serial.println("WiFi falló, reiniciando...");
+    Serial.println("WiFi fallo, reiniciando...");
     delay(3000);
     ESP.restart();
   }
