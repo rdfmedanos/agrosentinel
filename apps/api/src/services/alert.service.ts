@@ -35,7 +35,7 @@ export async function resolveAlert(tenantId: string, deviceId: string, type: 'of
 
 export async function evaluateDeviceCriticalLevel(deviceId: string) {
   const device = await DeviceModel.findOne({ deviceId });
-  if (!device) return;
+  if (!device || !device.tenantId) return;
 
   if (device.levelPct <= env.criticalLevelPct) {
     await openAlert({
@@ -55,10 +55,12 @@ export async function checkOfflineDevices() {
   const threshold = new Date(Date.now() - env.deviceOfflineSeconds * 1000);
   const offlineDevices = await DeviceModel.find({
     $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }],
-    status: { $ne: 'offline' }
+    status: { $ne: 'offline' },
+    tenantId: { $exists: true, $ne: null }
   });
 
   for (const d of offlineDevices) {
+    if (!d.tenantId) continue;
     d.status = 'offline';
     await d.save();
 
