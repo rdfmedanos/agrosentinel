@@ -298,8 +298,6 @@ void setup() {
 
   WiFiManager wm;
   wm.setTimeout(180);
-  wm.setAutoReconnect(true);
-  
   if (!wm.autoConnect("AGROSENTINEL-SETUP")) {
     ESP.restart();
   }
