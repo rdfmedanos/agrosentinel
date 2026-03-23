@@ -511,10 +511,20 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       auth: { token: props.session.token }
     });
     socket.emit('tenant:join', props.session.user.tenantId);
-    socket.on('devices:updated', () => void loadAll());
+    socket.on('devices:updated', (payload: any) => {
+      if (payload && payload.deviceId) {
+        setDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload } : d));
+      } else {
+        void loadAll();
+      }
+    });
     socket.on('alerts:updated', () => void loadAll());
     socket.on('work-orders:updated', () => void loadAll());
-    socket.on('telemetry:new', () => void loadAll());
+    socket.on('telemetry:new', (payload: any) => {
+      if (payload && payload.deviceId) {
+        setDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload, lastSeenAt: new Date().toISOString() } : d));
+      }
+    });
     return () => {
       socket.disconnect();
     };
@@ -1033,14 +1043,26 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       auth: { token: props.session.token }
     });
     socket.emit('tenant:join', tenantId);
-    socket.on('devices:updated', () => void loadCompanyData(tenantId));
-    socket.on('telemetry:new', () => void loadCompanyData(tenantId));
+    socket.on('devices:updated', (payload: any) => {
+      if (payload && payload.deviceId) {
+        setDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload } : d));
+        setAllDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload } : d));
+        setSelectedDevice(prev => (prev && prev.deviceId === payload.deviceId) ? { ...prev, ...payload } : prev);
+      } else {
+        void loadCompanyData(tenantId);
+      }
+    });
+    socket.on('telemetry:new', (payload: any) => {
+      if (payload && payload.deviceId) {
+        const ts = new Date().toISOString();
+        setDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload, lastSeenAt: ts } : d));
+        setAllDevices(prev => prev.map(d => d.deviceId === payload.deviceId ? { ...d, ...payload, lastSeenAt: ts } : d));
+        setSelectedDevice(prev => (prev && prev.deviceId === payload.deviceId) ? { ...prev, ...payload, lastSeenAt: ts } : prev);
+      }
+    });
     socket.on('alerts:updated', () => void loadCompanyData(tenantId));
     
-    const interval = setInterval(() => void loadCompanyData(tenantId), 10000);
-    
     return () => { 
-      clearInterval(interval);
       socket.disconnect(); 
     };
   }, [tenantId, props.session.token]);
