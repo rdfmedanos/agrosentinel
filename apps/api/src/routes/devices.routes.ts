@@ -51,3 +51,21 @@ devicesRouter.post('/:deviceId/command', async (req, res) => {
   publishDeviceCommand(req.params.deviceId, { cmd: command, requestId });
   res.json({ status: 'queued', requestId });
 });
+
+devicesRouter.patch('/:id', async (req, res) => {
+  const { lat, lng, name, address } = req.body;
+  const updateData: Record<string, unknown> = {};
+  if (lat !== undefined && lng !== undefined) {
+    updateData['location.lat'] = lat;
+    updateData['location.lng'] = lng;
+  }
+  if (name !== undefined) updateData.name = name;
+  if (address !== undefined) updateData['location.address'] = address;
+
+  const device = await DeviceModel.findByIdAndUpdate(req.params.id, updateData, { new: true });
+  if (!device) {
+    res.status(404).json({ error: 'Dispositivo no encontrado' });
+    return;
+  }
+  res.json(device);
+});

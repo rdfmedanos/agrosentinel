@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import L from 'leaflet';
 
 type Device = {
   _id: string;
@@ -201,9 +202,9 @@ function loadNavState(): { section: string; clientId?: string } | null {
   }
 }
 
-function markerColor(status: Device['status']) {
-  if (status === 'critical' || status === 'offline') return '#e11d48';
-  if (status === 'warning') return '#f59e0b';
+function markerColor(status: Device['status'], levelPct?: number, hasAlert?: boolean) {
+  if (hasAlert || status === 'critical' || status === 'offline') return '#e11d48';
+  if (status === 'warning' || (levelPct !== undefined && levelPct < 20)) return '#f59e0b';
   return '#22c55e';
 }
 
@@ -263,7 +264,7 @@ function LandingPage() {
               </div>
             ))}
           </div>
-          <p>Arquitectura modular para escalar sensores, tecnicos y sedes sin perder claridad operativa.</p>
+          <p>Arquitectura modular para escalar dispositivos, tecnicos y sedes sin perder claridad operativa.</p>
         </article>
       </section>
 
@@ -778,6 +779,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingDevice, setCreatingDevice] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [showAllDevicesModal, setShowAllDevicesModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [changingPwd, setChangingPwd] = useState(false);
   const [pwdError, setPwdError] = useState('');
@@ -811,7 +813,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   });
   const [savingClient, setSavingClient] = useState(false);
   const [selectedClient, setSelectedClient] = useState<TenantClient | null>(null);
-  const [clientTab, setClientTab] = useState<'info' | 'sensores'>('info');
+  const [clientTab, setClientTab] = useState<'info' | 'dispositivos' | 'mapa'>('info');
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [editDevice, setEditDevice] = useState({ name: '', address: '', lat: '', lng: '' });
@@ -1431,8 +1433,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                             </a>
                           </li>
                           <li className="nav-item">
-                            <a className={`nav-link ${clientTab === 'sensores' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('sensores'); }}>
-                              <i className="fas fa-microchip mr-1"></i> Sensores
+                            <a className={`nav-link ${clientTab === 'dispositivos' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('dispositivos'); }}>
+                              <i className="fas fa-microchip mr-1"></i> Dispositivos
+                            </a>
+                          </li>
+                          <li className="nav-item">
+                            <a className={`nav-link ${clientTab === 'mapa' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('mapa'); }}>
+                              <i className="fas fa-map-marked-alt mr-1"></i> Mapa
                             </a>
                           </li>
                         </ul>
@@ -1461,13 +1468,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                             </div>
                           </div>
                         )}
-                        {clientTab === 'sensores' && (
+                        {clientTab === 'dispositivos' && (
                           <div className="tab-content">
                             <div className="tab-pane active show">
                               <div className="table-responsive">
                                 <div className="mb-3">
                                   <button className="btn btn-primary btn-sm" onClick={() => setShowAddSensorModal(true)}>
-                                    <i className="fas fa-plus me-1"></i>Agregar Sensor
+                                    <i className="fas fa-plus me-1"></i>Agregar Dispositivo
                                   </button>
                                 </div>
                                 <table className="table table-hover table-striped">
@@ -1479,15 +1486,14 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       <th>Bomba</th>
                                       <th>Estado</th>
                                       <th>Ultima Comunicacion</th>
-                                      <th>Acciones</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {devices.length === 0 ? (
-                                      <tr><td colSpan={7} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
+                                      <tr><td colSpan={6} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
                                     ) : (
                                       devices.map(d => (
-                                        <tr key={d._id}>
+                                        <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
                                           <td className="fw-bold">{d.name}</td>
                                           <td className="small text-muted">{d.deviceId}</td>
                                           <td>
@@ -1501,17 +1507,59 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                           <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
                                           <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
                                           <td className="small text-muted">{d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td>
-                                          <td>
-                                            <button className="btn btn-primary btn-xs" onClick={() => openDeviceModal(d)}>
-                                              <i className="fas fa-edit"></i>
-                                            </button>
-                                          </td>
                                         </tr>
                                       ))
                                     )}
                                   </tbody>
                                 </table>
                               </div>
+                            </div>
+                          </div>
+                        )}
+                        {clientTab === 'mapa' && (
+                          <div className="tab-content">
+                            <div className="tab-pane active show">
+                              {devices.length > 0 && (() => {
+                                const lats = devices.map(d => d.location.lat);
+                                const lngs = devices.map(d => d.location.lng);
+                                const center: [number, number] = [
+                                  (Math.min(...lats) + Math.max(...lats)) / 2,
+                                  (Math.min(...lngs) + Math.max(...lngs)) / 2
+                                ];
+                                return (
+                              <MapContainer center={center} zoom={10} style={{ height: '500px', width: '100%' }}>
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                {devices.map(d => {
+                                  const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
+                                  const hasAlert = deviceAlerts.length > 0;
+                                  const color = markerColor(d.status, d.levelPct, hasAlert);
+                                  return (
+                                  <Marker key={d._id} position={[d.location.lat, d.location.lng]} draggable={true} eventHandlers={{
+                                    dragend: async (e) => {
+                                      const newPos = e.target.getLatLng();
+                                      const deviceId = d._id;
+                                      const lat = newPos.lat;
+                                      const lng = newPos.lng;
+                                      try {
+                                        await patchJson(`/devices/${deviceId}`, { lat, lng }, props.session.token);
+                                        setDevices(devices.map(dev => dev._id === deviceId ? { ...dev, location: { ...dev.location, lat, lng } } : dev));
+                                      } catch (err) {
+                                        console.error('Error updating device location:', err);
+                                      }
+                                    },
+                                    click: () => {
+                                      openDeviceModal(d);
+                                    }
+                                  }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
+                                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>{hasAlert && <p className="mb-0 small text-danger"><i className="fas fa-exclamation-triangle"></i> Alerta activa</p>}<p className="mb-0 small text-muted">Click para editar, arrastra para mover</p></div></Popup>
+                                  </Marker>
+                                );})}
+                              </MapContainer>
+                                );
+                              })()}
+                              {devices.length === 0 && (
+                                <div className="text-center text-muted py-5">No hay dispositivos para mostrar en el mapa</div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1552,37 +1600,22 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 <th>Telefono</th>
                                 <th>Direccion</th>
                                 <th>Plan</th>
-                                <th>Acciones</th>
                               </tr>
                             </thead>
                             <tbody>
                               {loadingClients ? (
-                                <tr><td colSpan={7} className="text-center text-muted py-3"><i className="fas fa-spinner fa-spin me-1"></i>Cargando clientes...</td></tr>
+                                <tr><td colSpan={6} className="text-center text-muted py-3"><i className="fas fa-spinner fa-spin me-1"></i>Cargando clientes...</td></tr>
                               ) : filteredClients.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center text-muted py-3">No se encontraron clientes</td></tr>
+                                <tr><td colSpan={6} className="text-center text-muted py-3">No se encontraron clientes</td></tr>
                               ) : (
                                 filteredClients.map(c => (
-                                  <tr key={c._id}>
+                                  <tr key={c._id} onClick={async () => { setSelectedClient(c); setTenantId(c.tenantId); setRestoreClient(true); await loadCompanyData(c.tenantId); saveNavState({ section: 'clientes', clientId: c._id }); }} style={{ cursor: 'pointer' }}>
                                     <td className="fw-bold">{c.companyName}</td>
                                     <td>{c.contactName || '—'}</td>
                                     <td>{c.email || '—'}</td>
                                     <td>{c.phone || '—'}</td>
                                     <td className="small">{c.address || '—'}</td>
                                     <td>{c.planName || '—'}</td>
-                                    <td>
-                                      <button
-                                        className="btn btn-primary btn-xs"
-                                        onClick={async () => {
-                                          setSelectedClient(c);
-                                          setTenantId(c.tenantId);
-                                          setRestoreClient(true);
-                                          await loadCompanyData(c.tenantId);
-                                          saveNavState({ section: 'clientes', clientId: c._id });
-                                        }}
-                                      >
-                                        <i className="fas fa-eye mr-1"></i>Ver Detalle
-                                      </button>
-                                    </td>
                                   </tr>
                                 ))
                               )}
@@ -1613,7 +1646,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     </div>
                   </div>
                   <div className="card mt-3">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3>
+                      <button className="btn btn-light btn-sm ml-auto" onClick={() => setShowAllDevicesModal(true)}>
+                        <i className="fas fa-expand me-1"></i>Ver Todos
+                      </button>
+                    </div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
@@ -2141,6 +2179,47 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         </div>
       </div>
       {showAddSensorModal && <div className="modal-backdrop fade show" onClick={() => setShowAddSensorModal(false)}></div>}
+
+      {showAllDevicesModal && (
+        <>
+          <div className="modal-backdrop fade show" style={{ opacity: 0.5 }}></div>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050, display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
+            <div className="bg-primary px-3 py-2 d-flex align-items-center">
+              <h5 className="mb-0 text-white"><i className="fas fa-map-marked-alt mr-2"></i>Mapa de Todos los Dispositivos</h5>
+              <button className="btn btn-outline-light btn-sm ml-auto" onClick={() => setShowAllDevicesModal(false)}>
+                <i className="fas fa-times"></i> Cerrar
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {allDevices.length > 0 && (() => {
+                const lats = allDevices.map(d => d.location.lat);
+                const lngs = allDevices.map(d => d.location.lng);
+                const center: [number, number] = [
+                  (Math.min(...lats) + Math.max(...lats)) / 2,
+                  (Math.min(...lngs) + Math.max(...lngs)) / 2
+                ];
+                return (
+              <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {allDevices.map(d => {
+                  const color = markerColor(d.status, d.levelPct, false);
+                  return (
+                  <Marker key={d._id} position={[d.location.lat, d.location.lng]} eventHandlers={{
+                    click: () => { openDeviceModal(d); }
+                  }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
+                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p><p className="mb-0 small text-muted">Click para editar</p></div></Popup>
+                  </Marker>
+                );})}
+              </MapContainer>
+                );
+              })()}
+              {allDevices.length === 0 && (
+                <div className="text-center text-muted py-5">No hay dispositivos para mostrar en el mapa</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       <footer className="main-footer">
         <div className="float-end d-none d-sm-inline-block">
