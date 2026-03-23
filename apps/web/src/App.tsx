@@ -2299,7 +2299,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       {showEditClient && <div className="modal-backdrop fade show" onClick={() => setShowEditClient(false)}></div>}
 
       <div className={`modal fade ${showDeviceModal ? 'show' : ''}`} style={{ display: showDeviceModal ? 'block' : 'none' }}>
-        <div className="modal-dialog modal-lg modal-dialog-centered" style={{ maxHeight: '90vh' }}>
+        <div className="modal-dialog modal-xl" style={{ maxHeight: '90vh' }}>
           <div className="modal-content">
             <div className="modal-header bg-primary">
               <h4 className="modal-title"><i className="fas fa-microchip mr-2"></i>Detalle del Sensor</h4>
