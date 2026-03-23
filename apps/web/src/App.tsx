@@ -706,7 +706,10 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                                 </div>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'Encendida' : 'Apagada'}</span>
+                                <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                  {d.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
+                                </span>
                               </td>
                               <td className="align-middle">
                                 <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span>
@@ -1689,7 +1692,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                               <span className="small fw-bold">{d.levelPct}%</span>
                                             </div>
                                           </td>
-                                          <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                          <td><span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                    {d.pumpOn ? 'ON' : 'OFF'}
+                                  </span></td>
                                           <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
                                           <td className="small text-muted">{d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td>
                                         </tr>
@@ -2425,7 +2431,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                         <tr><td className="text-muted fw-bold">Nombre:</td><td className="fw-bold">{selectedDevice.name}</td></tr>
                         <tr><td className="text-muted fw-bold">Nivel:</td><td><span className="badge text-bg-success">{selectedDevice.levelPct}%</span></td></tr>
                         <tr><td className="text-muted fw-bold">Reserva:</td><td>{selectedDevice.reserveLiters} litros</td></tr>
-                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge ${selectedDevice.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge text-bg-${selectedDevice.pumpOn ? 'success' : 'danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                  {selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
+                                </span></td></tr>
                         <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${selectedDevice.status === 'online' ? 'text-bg-success' : selectedDevice.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{selectedDevice.status}</span></td></tr>
                         <tr><td className="text-muted fw-bold">Ultima Comunicacion:</td><td className="small">{selectedDevice.lastHeartbeatAt ? new Date(selectedDevice.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td></tr>
                       </table>
