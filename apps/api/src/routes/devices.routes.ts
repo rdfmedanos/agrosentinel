@@ -61,7 +61,7 @@ devicesRouter.post('/:deviceId/command', async (req, res) => {
 });
 
 devicesRouter.patch('/:id', async (req, res) => {
-  const { lat, lng, name, address, userId, tenantId } = req.body;
+  const { lat, lng, name, address, userId, tenantId, configNivelMin, configNivelMax, configAlertaBaja, configModoAuto } = req.body;
   const updateData: Record<string, unknown> = {};
   if (lat !== undefined && lng !== undefined) {
     updateData['location.lat'] = lat;
@@ -71,6 +71,10 @@ devicesRouter.patch('/:id', async (req, res) => {
   if (address !== undefined) updateData['location.address'] = address;
   if (userId !== undefined) updateData.userId = userId;
   if (tenantId !== undefined) updateData.tenantId = tenantId;
+  if (configNivelMin !== undefined) updateData.configNivelMin = configNivelMin;
+  if (configNivelMax !== undefined) updateData.configNivelMax = configNivelMax;
+  if (configAlertaBaja !== undefined) updateData.configAlertaBaja = configAlertaBaja;
+  if (configModoAuto !== undefined) updateData.configModoAuto = configModoAuto;
 
   const device = await DeviceModel.findByIdAndUpdate(req.params.id, updateData, { new: true });
   if (!device) {
@@ -78,6 +82,26 @@ devicesRouter.patch('/:id', async (req, res) => {
     return;
   }
   res.json(device);
+});
+
+devicesRouter.post('/:id/config', async (req, res) => {
+  const { nivel_min, nivel_max, alerta_baja, modo } = req.body;
+  
+  const device = await DeviceModel.findById(req.params.id);
+  if (!device) {
+    res.status(404).json({ error: 'Dispositivo no encontrado' });
+    return;
+  }
+
+  const configPayload: Record<string, unknown> = {};
+  if (nivel_min !== undefined) configPayload.nivel_min = nivel_min;
+  if (nivel_max !== undefined) configPayload.nivel_max = nivel_max;
+  if (alerta_baja !== undefined) configPayload.alerta_baja = alerta_baja;
+  if (modo !== undefined) configPayload.modo = modo;
+
+  publishDeviceCommand(device.deviceId, { cmd: 'config', requestId: '' }, configPayload);
+  
+  res.json({ status: 'config_sent', device_id: device.deviceId });
 });
 
 devicesRouter.get('/pending', requireCompanyAdmin, async (req, res) => {

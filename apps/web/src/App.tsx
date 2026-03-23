@@ -861,7 +861,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [clientTab, setClientTab] = useState<'info' | 'dispositivos' | 'mapa'>('info');
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [editDevice, setEditDevice] = useState({ name: '', address: '', lat: '', lng: '' });
+  const [editDevice, setEditDevice] = useState<{ name: string; address: string; lat: string; lng: string; configNivelMin?: number; configNivelMax?: number; configAlertaBaja?: number; configModoAuto?: boolean }>({ name: '', address: '', lat: '', lng: '' });
   const [editDeviceUserId, setEditDeviceUserId] = useState<string>('');
   const [savingDevice, setSavingDevice] = useState(false);
   const [showAddSensorModal, setShowAddSensorModal] = useState(false);
@@ -1159,7 +1159,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       name: device.name,
       address: device.location.address,
       lat: String(device.location.lat),
-      lng: String(device.location.lng)
+      lng: String(device.location.lng),
+      configNivelMin: (device as unknown as { configNivelMin?: number }).configNivelMin,
+      configNivelMax: (device as unknown as { configNivelMax?: number }).configNivelMax,
+      configAlertaBaja: (device as unknown as { configAlertaBaja?: number }).configAlertaBaja,
+      configModoAuto: (device as unknown as { configModoAuto?: boolean }).configModoAuto
     });
     setEditDeviceUserId(device.tenantId || '');
     setShowDeviceModal(true);
@@ -1173,13 +1177,27 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         name: editDevice.name,
         address: editDevice.address,
         lat: Number(editDevice.lat),
-        lng: Number(editDevice.lng)
+        lng: Number(editDevice.lng),
+        configNivelMin: editDevice.configNivelMin,
+        configNivelMax: editDevice.configNivelMax,
+        configAlertaBaja: editDevice.configAlertaBaja,
+        configModoAuto: editDevice.configModoAuto
       };
       if (editDeviceUserId !== (selectedDevice.tenantId || '')) {
         updateData.userId = editDeviceUserId || null;
         updateData.tenantId = editDeviceUserId || null;
       }
       await patchJson(`/devices/${selectedDevice._id}`, updateData, props.session.token);
+      
+      if (editDevice.configNivelMin || editDevice.configNivelMax || editDevice.configAlertaBaja || editDevice.configModoAuto !== undefined) {
+        await postJson(`/devices/${selectedDevice._id}/config`, {
+          nivel_min: editDevice.configNivelMin,
+          nivel_max: editDevice.configNivelMax,
+          alerta_baja: editDevice.configAlertaBaja,
+          modo: editDevice.configModoAuto ? 'auto' : 'manual'
+        }, props.session.token);
+      }
+      
       setShowDeviceModal(false);
       setSelectedDevice(null);
       await loadCompanyData(tenantId);
@@ -2408,6 +2426,31 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Longitud</label>
                       <input className="form-control" value={editDevice.lng} onChange={e => setEditDevice(p => ({ ...p, lng: e.target.value }))} />
+                    </div>
+                  </div>
+                  <hr />
+                  <h5 className="text-primary"><i className="fas fa-cog mr-1"></i>Configuracion de Bomba</h5>
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Nivel para encender bomba (%)</label>
+                      <input type="number" className="form-control" value={editDevice.configNivelMin ?? 50} onChange={e => setEditDevice(p => ({ ...p, configNivelMin: Number(e.target.value) }))} min={0} max={100} />
+                      <small className="text-muted">Default: 50%</small>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Nivel para apagar bomba (%)</label>
+                      <input type="number" className="form-control" value={editDevice.configNivelMax ?? 95} onChange={e => setEditDevice(p => ({ ...p, configNivelMax: Number(e.target.value) }))} min={0} max={100} />
+                      <small className="text-muted">Default: 95%</small>
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Nivel de alerta critica (%)</label>
+                      <input type="number" className="form-control" value={editDevice.configAlertaBaja ?? 30} onChange={e => setEditDevice(p => ({ ...p, configAlertaBaja: Number(e.target.value) }))} min={0} max={100} />
+                      <small className="text-muted">Alerta si bomba no enciende por debajo de este nivel</small>
+                    </div>
+                    <div className="col-md-6 mb-3 d-flex align-items-end">
+                      <div className="custom-control custom-switch">
+                        <input type="checkbox" className="custom-control-input" id="modoAuto" checked={editDevice.configModoAuto ?? true} onChange={e => setEditDevice(p => ({ ...p, configModoAuto: e.target.checked }))} />
+                        <label className="custom-control-label fw-bold" htmlFor="modoAuto">Modo Automatico</label>
+                      </div>
                     </div>
                   </div>
                 </>

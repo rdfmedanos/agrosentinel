@@ -80,7 +80,12 @@ async function ensurePendingDevice(deviceId: string) {
   }
 }
 
-export function publishDeviceCommand(deviceId: string, command: { cmd: 'pump_on' | 'pump_off'; requestId: string }) {
+export function publishDeviceCommand(deviceId: string, command: { cmd: 'pump_on' | 'pump_off' | 'config'; requestId: string }, payload?: Record<string, unknown>) {
   if (!mqttClient) throw new Error('MQTT not initialized');
-  mqttClient.publish(`devices/${deviceId}/command`, JSON.stringify(command), { qos: 1 });
+  
+  if (command.cmd === 'config' && payload) {
+    mqttClient.publish(`devices/${deviceId}/command`, JSON.stringify({ ...command, ...payload }), { qos: 1 });
+  } else {
+    mqttClient.publish(`devices/${deviceId}/command`, JSON.stringify(command), { qos: 1 });
+  }
 }
