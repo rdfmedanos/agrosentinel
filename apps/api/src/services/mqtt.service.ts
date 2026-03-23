@@ -2,20 +2,43 @@ import mqtt from 'mqtt';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { DeviceModel } from '../models/Device.js';
+import { MqttConfigModel } from '../models/MqttConfig.js';
 import { ingestTelemetry, upsertHeartbeat } from './telemetry.service.js';
 
 let mqttClient: mqtt.MqttClient;
 
-export function initMqtt() {
-  mqttClient = mqtt.connect(env.mqttUrl, {
+async function getMqttConfig() {
+  const dbConfig = await MqttConfigModel.findOne({ tenantId: 'global' });
+  if (dbConfig) {
+    return {
+      url: `mqtt://${dbConfig.host}:${dbConfig.port}`,
+      username: dbConfig.username,
+      password: dbConfig.password
+    };
+  }
+  return {
+    url: env.mqttUrl,
     username: env.mqttUsername,
-    password: env.mqttPassword,
+    password: env.mqttPassword
+  };
+}
+
+export async function initMqtt() {
+  const config = await getMqttConfig();
+  
+  if (mqttClient) {
+    mqttClient.end();
+  }
+
+  mqttClient = mqtt.connect(config.url, {
+    username: config.username,
+    password: config.password,
     reconnectPeriod: 5000,
     connectTimeout: 10000
   });
 
   mqttClient.on('connect', () => {
-    logger.info('MQTT connected');
+    logger.info({ url: config.url }, 'MQTT connected');
     mqttClient.subscribe('devices/+/#', { qos: 1 });
   });
 
@@ -61,6 +84,11 @@ export function initMqtt() {
       logger.error({ error }, 'MQTT message process error');
     }
   });
+}
+
+export async function reloadMqtt() {
+  logger.info('Reloading MQTT configuration...');
+  await initMqtt();
 }
 
 async function ensurePendingDevice(deviceId: string) {

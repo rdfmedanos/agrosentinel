@@ -51,7 +51,7 @@ export function requireCompanyAdmin(req: Request, res: Response, next: NextFunct
 export function resolveTenantFromRequest(req: Request): string {
   const queryTenant = typeof req.query.tenantId === 'string' ? req.query.tenantId : '';
   if (req.auth?.role === 'company_admin') {
-    return queryTenant || 'demo-tenant';
+    return queryTenant || req.auth?.tenantId || 'demo-tenant';
   }
   return req.auth?.tenantId ?? queryTenant ?? 'demo-tenant';
 }

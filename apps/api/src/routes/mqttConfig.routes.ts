@@ -1,15 +1,11 @@
 import { Router } from 'express';
-import { resolveTenantFromRequest } from '../auth/auth.js';
 import { MqttConfigModel } from '../models/MqttConfig.js';
+import { reloadMqtt } from '../services/mqtt.service.js';
 
 export const mqttConfigRouter = Router();
 
-mqttConfigRouter.get('/', async (req, res) => {
-  const tenantId = resolveTenantFromRequest(req);
-  if (!tenantId) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
+mqttConfigRouter.get('/', async (_req, res) => {
+  const tenantId = 'global';
 
   const config = await MqttConfigModel.findOne({ tenantId });
   if (!config) {
@@ -20,12 +16,7 @@ mqttConfigRouter.get('/', async (req, res) => {
 });
 
 mqttConfigRouter.put('/', async (req, res) => {
-  const tenantId = resolveTenantFromRequest(req);
-  if (!tenantId) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-
+  const tenantId = 'global';
   const { host, port, username, password } = req.body;
   
   await MqttConfigModel.findOneAndUpdate(
@@ -33,6 +24,8 @@ mqttConfigRouter.put('/', async (req, res) => {
     { host, port, username, password },
     { upsert: true, new: true }
   );
+  
+  void reloadMqtt();
   
   res.json({ status: 'saved' });
 });

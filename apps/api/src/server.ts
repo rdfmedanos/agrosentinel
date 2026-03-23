@@ -14,7 +14,7 @@ async function start() {
 
   const server = createServer(app);
   initSocket(server);
-  initMqtt();
+  await initMqtt();
   startSchedulers();
 
   server.listen(env.port, () => {
