@@ -2344,8 +2344,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <label className="form-label small fw-bold">Cliente</label>
                       <select className="form-control" value={editDeviceUserId} onChange={e => setEditDeviceUserId(e.target.value)}>
                         <option value="">Sin asignar</option>
-                        {users.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
+                        {usersList.map(u => (
+                          <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
                         ))}
                       </select>
                     </div>
