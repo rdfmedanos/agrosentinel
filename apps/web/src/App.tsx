@@ -339,6 +339,7 @@ function LoginPanel(props: {
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -376,7 +377,14 @@ function LoginPanel(props: {
             </div>
             <div className="mb-3">
               <label className="form-label small fw-semibold">Contrasena</label>
-              <input type="password" className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="********" />
+              <div className="input-group">
+                <input type={showPassword ? 'text' : 'password'} className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="********" />
+                <div className="input-group-append">
+                  <button className="btn btn-outline-secondary" type="button" onClick={() => setShowPassword(!showPassword)}>
+                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                  </button>
+                </div>
+              </div>
             </div>
             {error && <div className="alert alert-danger py-2 small">{error}</div>}
             <div className="row">
@@ -396,6 +404,8 @@ function LoginPanel(props: {
 function PasswordSection(props: { token: string; mustChangePassword: boolean }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [message, setMessage] = useState('');
 
   const save = async () => {
@@ -416,11 +426,25 @@ function PasswordSection(props: { token: string; mustChangePassword: boolean }) 
       {props.mustChangePassword && <div className="alert alert-warning py-2 small">Debes cambiar la contrasena inicial.</div>}
       <div className="mb-3">
         <label className="form-label small fw-semibold">Contrasena actual</label>
-        <input type="password" className="form-control form-control-sm" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+        <div className="input-group">
+          <input type={showCurrentPassword ? 'text' : 'password'} className="form-control form-control-sm" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+          <div className="input-group-append">
+            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+              <i className={`fas ${showCurrentPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+            </button>
+          </div>
+        </div>
       </div>
       <div className="mb-3">
         <label className="form-label small fw-semibold">Nueva contrasena</label>
-        <input type="password" className="form-control form-control-sm" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+        <div className="input-group">
+          <input type={showNewPassword ? 'text' : 'password'} className="form-control form-control-sm" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <div className="input-group-append">
+            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>
+              <i className={`fas ${showNewPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+            </button>
+          </div>
+        </div>
       </div>
       <button className="btn btn-primary btn-sm" onClick={() => void save()} disabled={!currentPassword || !newPassword}>
         Cambiar contrasena
@@ -757,7 +781,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   );
 }
 
-type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad';
+type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -779,10 +803,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingDevice, setCreatingDevice] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt'>('servidor');
+  const [showMqttConfig, setShowMqttConfig] = useState(false);
+  const [mqttConfig, setMqttConfig] = useState({ host: 'localhost', port: '1883', username: '', password: '', qos: '1' });
+  const [showMqttPassword, setShowMqttPassword] = useState(false);
   const [showAllDevicesModal, setShowAllDevicesModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
   const [pwdError, setPwdError] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
   const [newUser, setNewUser] = useState({
     name: '',
@@ -938,7 +969,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     if (nav) {
       setActiveSection(nav.section as AdminSection);
       setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(nav.section));
-      setConfigOpen(['facturacion', 'arca', 'reportes'].includes(nav.section));
+      setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor'].includes(nav.section));
     }
   }, []);
 
@@ -965,7 +996,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
     setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(section));
-    setConfigOpen(['facturacion', 'arca', 'reportes'].includes(section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
       setRestoreClient(false);
@@ -1140,7 +1171,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       arca: 'Configuracion ARCA',
       notificaciones: 'Notificaciones',
       reportes: 'Reportes',
-      actividad: 'Actividad'
+      actividad: 'Actividad',
+      servidor: 'Servidor'
     };
     return map[activeSection];
   };
@@ -1249,7 +1281,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </li>
 
               <li className={`nav-item has-treeview ${configOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); setOperacionOpen(false); }}>
                   <i className="nav-icon fas fa-cog"></i>
                   <p>Configuracion <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
@@ -1272,6 +1304,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <a href="#" className={`nav-link ${activeSection === 'reportes' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('reportes'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Reportes</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'servidor' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('servidor'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Servidor</p>
                       </a>
                     </li>
                   </ul>
@@ -1926,6 +1964,78 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </div>
             )}
 
+            {activeSection === 'servidor' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-server me-2"></i>Configuracion del Servidor</h3>
+                    </div>
+                    <div className="card-body p-0">
+                      <div className="card card-primary card-outline card-tabs">
+                        <div className="card-header p-0 border-bottom-0">
+                          <ul className="nav nav-tabs" role="tablist">
+                            <li className="nav-item">
+                              <a className={`nav-link ${serverTab === 'servidor' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('servidor'); }}>
+                                <i className="fas fa-server mr-1"></i> Servidor
+                              </a>
+                            </li>
+                            <li className="nav-item">
+                              <a className={`nav-link ${serverTab === 'mqtt' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('mqtt'); }}>
+                                <i className="fas fa-wifi mr-1"></i> MQTT
+                              </a>
+                            </li>
+                          </ul>
+                        </div>
+                        <div className="card-body">
+                          {serverTab === 'servidor' && (
+                            <div>
+                              <div className="alert alert-info mb-3">
+                                <i className="fas fa-info-circle mr-2"></i>
+                                La configuración del servidor se gestiona a través de variables de entorno. Contacte al administrador del sistema para realizar cambios.
+                              </div>
+                              <table className="table table-sm table-bordered">
+                                <thead className="thead-dark"><tr><th>Parametro</th><th>Valor Actual</th></tr></thead>
+                                <tbody>
+                                  <tr><td>API URL</td><td className="text-muted">http://localhost:4000</td></tr>
+                                  <tr><td>Web URL</td><td className="text-muted">http://localhost:5173</td></tr>
+                                  <tr><td>Base de Datos</td><td className="text-muted">MongoDB</td></tr>
+                                  <tr><td>Broker MQTT</td><td className="text-muted">localhost:1883</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                          {serverTab === 'mqtt' && (
+                            <div>
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <div className="alert alert-info mb-0">
+                                  <i className="fas fa-info-circle mr-2"></i>
+                                  La configuración MQTT se gestiona a través de variables de entorno.
+                                </div>
+                                <button className="btn btn-primary btn-sm" onClick={() => setShowMqttConfig(true)}>
+                                  <i className="fas fa-cog mr-1"></i>Configurar Credenciales
+                                </button>
+                              </div>
+                              <table className="table table-sm table-bordered">
+                                <thead className="thead-dark"><tr><th>Parametro</th><th>Valor Actual</th></tr></thead>
+                                <tbody>
+                                  <tr><td>Broker</td><td className="text-muted">{mqttConfig.host}</td></tr>
+                                  <tr><td>Puerto</td><td className="text-muted">{mqttConfig.port}</td></tr>
+                                  <tr><td>Usuario</td><td className="text-muted">{mqttConfig.username || '—'}</td></tr>
+                                  <tr><td>QoS</td><td className="text-muted">{mqttConfig.qos}</td></tr>
+                                  <tr><td>Retención</td><td className="text-muted">true</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
@@ -2220,6 +2330,57 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
           </div>
         </>
       )}
+
+      <div className={`modal fade ${showMqttConfig ? 'show' : ''}`} style={{ display: showMqttConfig ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-wifi mr-2"></i>Configuración MQTT</h4>
+              <button type="button" className="close text-white" onClick={() => setShowMqttConfig(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Broker Host</label>
+                <input className="form-control" value={mqttConfig.host} onChange={e => setMqttConfig(p => ({ ...p, host: e.target.value }))} placeholder="localhost" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Puerto</label>
+                <input className="form-control" value={mqttConfig.port} onChange={e => setMqttConfig(p => ({ ...p, port: e.target.value }))} placeholder="1883" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Usuario</label>
+                <input className="form-control" value={mqttConfig.username} onChange={e => setMqttConfig(p => ({ ...p, username: e.target.value }))} placeholder="Usuario MQTT" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Contraseña</label>
+                <div className="input-group">
+                  <input className="form-control" type={showMqttPassword ? 'text' : 'password'} value={mqttConfig.password} onChange={e => setMqttConfig(p => ({ ...p, password: e.target.value }))} placeholder="Contraseña MQTT" />
+                  <div className="input-group-append">
+                    <button className="btn btn-outline-secondary" type="button" onClick={() => setShowMqttPassword(!showMqttPassword)}>
+                      <i className={`fas ${showMqttPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">QoS</label>
+                <select className="form-control" value={mqttConfig.qos} onChange={e => setMqttConfig(p => ({ ...p, qos: e.target.value }))}>
+                  <option value="0">0 - Mejor esfuerzo</option>
+                  <option value="1">1 - Al menos una vez</option>
+                  <option value="2">2 - Exactamente una vez</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-default" onClick={() => setShowMqttConfig(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={() => setShowMqttConfig(false)}>
+                <i className="fas fa-save mr-1"></i>Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showMqttConfig && <div className="modal-backdrop fade show" onClick={() => setShowMqttConfig(false)}></div>}
 
       <footer className="main-footer">
         <div className="float-end d-none d-sm-inline-block">
