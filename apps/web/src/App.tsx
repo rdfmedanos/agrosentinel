@@ -1432,25 +1432,25 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               <>
                 <div className="row">
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-info">
+                    <div className="small-box bg-info" style={{ cursor: 'pointer' }} onClick={() => { setSection('clientes'); }}>
                       <div className="inner"><h3>{stats.tenants}</h3><p>Clientes Activos</p></div>
                       <div className="icon"><i className="fas fa-building"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-primary">
+                    <div className="small-box bg-primary" style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); }}>
                       <div className="inner"><h3>{stats.total}</h3><p>Dispositivos Totales</p></div>
                       <div className="icon"><i className="fas fa-microchip"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-primary">
+                    <div className="small-box bg-primary" style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); }}>
                       <div className="inner"><h3>{stats.online}</h3><p>Online</p></div>
                       <div className="icon"><i className="fas fa-signal"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-3 col-6">
-                    <div className="small-box bg-danger">
+                    <div className="small-box bg-danger" style={{ cursor: 'pointer' }} onClick={() => { setSection('notificaciones'); }}>
                       <div className="inner"><h3>{stats.offline}</h3><p>Offline / Criticos</p></div>
                       <div className="icon"><i className="fas fa-exclamation-triangle"></i></div>
                     </div>
@@ -1458,19 +1458,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 </div>
                 <div className="row">
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-warning">
+                    <div className="small-box bg-warning" style={{ cursor: 'pointer' }} onClick={() => { setSection('notificaciones'); }}>
                       <div className="inner"><h3>{stats.alerts}</h3><p>Alertas Abiertas</p></div>
                       <div className="icon"><i className="fas fa-bell"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-secondary">
+                    <div className="small-box bg-secondary" style={{ cursor: 'pointer' }} onClick={() => { setSection('usuarios'); }}>
                       <div className="inner"><h3>{stats.users}</h3><p>Usuarios Totales</p></div>
                       <div className="icon"><i className="fas fa-users"></i></div>
                     </div>
                   </div>
                   <div className="col-lg-4 col-6">
-                    <div className="small-box bg-indigo">
+                    <div className="small-box bg-indigo" style={{ cursor: 'pointer' }} onClick={() => { setSection('facturacion'); }}>
                       <div className="inner"><h3>{invoices.length}</h3><p>Facturas Registradas</p></div>
                       <div className="icon"><i className="fas fa-file-invoice-dollar"></i></div>
                     </div>
@@ -1479,13 +1479,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 <div className="row">
                   <div className="col-md-8">
                     <div className="card">
-                      <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Estado de Dispositivos</h3></div>
+                      <div className="card-header d-flex justify-content-between align-items-center">
+                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Estado de Dispositivos</h3>
+                        <button className="btn btn-sm btn-light" onClick={() => setSection('dispositivos')}>Ver Todos</button>
+                      </div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
                           <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Estado</th><th>Direccion</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
-                              <tr key={d._id}>
+                              <tr key={d._id} style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); openDeviceModal(d); }}>
                                 <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
@@ -1500,7 +1503,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                   </div>
                   <div className="col-md-4">
                     <div className="card">
-                      <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Alertas Recientes</h3></div>
+                      <div className="card-header d-flex justify-content-between align-items-center">
+                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Alertas Recientes</h3>
+                        <button className="btn btn-sm btn-light" onClick={() => setSection('notificaciones')}>Ver Todas</button>
+                      </div>
                       <div className="card-body p-0" style={{ maxHeight: '300px', overflowY: 'auto' }}>
                         {alerts.filter(a => a.status === 'open').length === 0 ? (
                           <p className="text-center text-muted p-3 small">Sin alertas abiertas</p>
