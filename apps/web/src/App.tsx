@@ -1003,6 +1003,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, []);
 
   useEffect(() => {
+    if (!tenantId) return;
+    const socket = io(SOCKET_URL, {
+      auth: { token: props.session.token }
+    });
+    socket.emit('tenant:join', tenantId);
+    socket.on('devices:updated', () => void loadCompanyData(tenantId));
+    socket.on('telemetry:new', () => void loadCompanyData(tenantId));
+    socket.on('alerts:updated', () => void loadCompanyData(tenantId));
+    return () => { socket.disconnect(); };
+  }, [tenantId, props.session.token]);
+
+  useEffect(() => {
     if (clients.length > 0 && !tenantId && restoreClient) {
       const nav = loadNavState();
       if (nav?.clientId) {
