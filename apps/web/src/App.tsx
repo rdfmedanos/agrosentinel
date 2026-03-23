@@ -1598,17 +1598,25 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           </div>
                         )}
                         {clientTab === 'mapa' && (
-                          <div className="tab-content">
-                            <div className="tab-pane active show">
-                              {devices.length > 0 && (() => {
-                                const lats = devices.map(d => d.location.lat);
-                                const lngs = devices.map(d => d.location.lng);
+                          <div className="tab-content" style={{ height: '500px' }}>
+                            <div className="tab-pane active show h-100">
+                              {(() => {
+                                const deviceList = devices.filter(d => d.location.lat && d.location.lng);
+                                if (deviceList.length === 0) {
+                                  return (
+                                    <div className="d-flex align-items-center justify-content-center h-100 text-muted">
+                                      No hay dispositivos con ubicación para mostrar en el mapa
+                                    </div>
+                                  );
+                                }
+                                const lats = deviceList.map(d => d.location.lat);
+                                const lngs = deviceList.map(d => d.location.lng);
                                 const center: [number, number] = [
                                   (Math.min(...lats) + Math.max(...lats)) / 2,
                                   (Math.min(...lngs) + Math.max(...lngs)) / 2
                                 ];
                                 return (
-                              <MapContainer center={center} zoom={10} style={{ height: '500px', width: '100%' }}>
+                              <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                 {devices.map(d => {
                                   const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
@@ -1638,9 +1646,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                               </MapContainer>
                                 );
                               })()}
-                              {devices.length === 0 && (
-                                <div className="text-center text-muted py-5">No hay dispositivos para mostrar en el mapa</div>
-                              )}
                             </div>
                           </div>
                         )}
