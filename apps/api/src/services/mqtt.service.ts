@@ -39,6 +39,8 @@ export function initMqtt() {
       const deviceId = parts[1];
       const suffix = parts.slice(2).join('/');
 
+      logger.info({ topic, deviceId, suffix, hasPayload: !!payloadText }, 'MQTT message received');
+
       if (!deviceId || !suffix) return;
 
       if (suffix === 'register') {
