@@ -2464,22 +2464,34 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       </table>
                     </div>
                     <div className="col-md-6">
-                      <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
-                      {selectedDevice.location.lat && selectedDevice.location.lng && !isNaN(Number(selectedDevice.location.lat)) && !isNaN(Number(selectedDevice.location.lng)) ? (
-                        <div className="mb-3" style={{ height: '250px', borderRadius: '8px', overflow: 'hidden' }}>
-                          <MapContainer center={[Number(selectedDevice.location.lat), Number(selectedDevice.location.lng)]} zoom={15} style={{ height: '100%', width: '100%' }}>
-                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                            <Marker position={[Number(selectedDevice.location.lat), Number(selectedDevice.location.lng)]}>
-                              <Popup>{selectedDevice.name || selectedDevice.deviceId}<br />{selectedDevice.location.address}</Popup>
-                            </Marker>
-                          </MapContainer>
-                        </div>
-                      ) : (
-                        <div className="alert alert-warning">Sin coordenadas de ubicacion</div>
-                      )}
+                      <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion (haz clic para seleccionar)</h5>
+                      <div className="mb-3" style={{ height: '280px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
+                        <MapContainer 
+                          center={!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
+                          zoom={13} 
+                          style={{ height: '100%', width: '100%' }}
+                        >
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          {!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) && (
+                            <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} />
+                          )}
+                          <MapClickHandler onMapClick={(lat, lng) => setEditDevice(p => ({ ...p, lat: lat.toString(), lng: lng.toString() }))} />
+                        </MapContainer>
+                      </div>
+                      <div className="d-flex gap-2 mb-2">
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => {
+                          if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition((pos) => {
+                              setEditDevice(p => ({ ...p, lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }));
+                            });
+                          }
+                        }}>
+                          <i className="fas fa-crosshairs mr-1"></i> Mi ubicacion
+                        </button>
+                      </div>
                       <table className="table table-sm table-borderless">
-                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{selectedDevice.location.lat || '—'}</td></tr>
-                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{selectedDevice.location.lng || '—'}</td></tr>
+                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{editDevice.lat || '—'}</td></tr>
+                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{editDevice.lng || '—'}</td></tr>
                         <tr><td className="text-muted fw-bold">Direccion:</td><td>{selectedDevice.location.address || '—'}</td></tr>
                       </table>
                       <div className="alert alert-warning py-2 small mt-3">
@@ -2508,33 +2520,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <label className="form-label small fw-bold">Direccion</label>
                       <input className="form-control" value={editDevice.address} onChange={e => setEditDevice(p => ({ ...p, address: e.target.value }))} />
                     </div>
-                    <div className="col-md-12 mb-3">
-                      <label className="form-label small fw-bold">Ubicacion en el mapa (haz clic para seleccionar)</label>
-                      <div style={{ height: '300px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
-                        <MapContainer 
-                          center={!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
-                          zoom={13} 
-                          style={{ height: '100%', width: '100%' }}
-                        >
-                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                          {!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) && (
-                            <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} eventHandlers={{ click: () => {} }} />
-                          )}
-                          <MapClickHandler onMapClick={(lat, lng) => setEditDevice(p => ({ ...p, lat: lat.toString(), lng: lng.toString() }))} />
-                        </MapContainer>
-                      </div>
-                      <small className="text-muted">Lat: {editDevice.lat || '—'} | Lng: {editDevice.lng || '—'}</small>
-                      <div className="mt-2">
-                        <button type="button" className="btn btn-sm btn-outline-primary mr-2" onClick={() => {
-                          if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition((pos) => {
-                              setEditDevice(p => ({ ...p, lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }));
-                            });
-                          }
-                        }}>
-                          <i className="fas fa-crosshairs mr-1"></i> Usar mi ubicacion
-                        </button>
-                      </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Latitud</label>
+                      <input className="form-control" value={editDevice.lat} onChange={e => setEditDevice(p => ({ ...p, lat: e.target.value }))} />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label small fw-bold">Longitud</label>
+                      <input className="form-control" value={editDevice.lng} onChange={e => setEditDevice(p => ({ ...p, lng: e.target.value }))} />
                     </div>
                   </div>
                   <hr />
