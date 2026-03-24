@@ -17,7 +17,28 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
     const clients = await TenantConfigModel.find({ tenantId }).lean();
     const devices = await DeviceModel.find({ tenantId, pending: false }).lean();
 
-    res.json({ clients, devices });
+    const exportClients = clients.map(c => ({
+      tenantId: c.tenantId,
+      companyName: c.companyName,
+      contactName: c.contactName,
+      email: c.email,
+      phone: c.phone,
+      address: c.address
+    }));
+
+    const exportDevices = devices.map(d => ({
+      deviceId: d.deviceId,
+      tenantId: d.tenantId,
+      name: d.name,
+      location: d.location,
+      status: d.status,
+      configNivelMin: d.configNivelMin,
+      configNivelMax: d.configNivelMax,
+      configAlertaBaja: d.configAlertaBaja,
+      configModoAuto: d.configModoAuto
+    }));
+
+    res.json({ clients: exportClients, devices: exportDevices });
   } catch (error) {
     logger.error({ error }, 'Error exporting backup');
     res.status(500).json({ error: 'Error al exportar backup' });
