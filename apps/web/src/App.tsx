@@ -858,7 +858,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingDevice, setCreatingDevice] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
-  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'backup'>('servidor');
+  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [backupError, setBackupError] = useState('');
@@ -2228,6 +2228,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 <i className="fas fa-wifi mr-1"></i> MQTT
                               </a>
                             </li>
+                            <li className="nav-item">
+                              <a className={`nav-link ${serverTab === 'config' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('config'); }}>
+                                <i className="fas fa-cogs mr-1"></i> Config
+                              </a>
+                            </li>
                           </ul>
                         </div>
                         <div className="card-body">
@@ -2269,6 +2274,31 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   <tr><td>Retención</td><td className="text-muted">true</td></tr>
                                 </tbody>
                               </table>
+                            </div>
+                          )}
+                          {serverTab === 'config' && (
+                            <div>
+                              <div className="alert alert-info mb-3">
+                                <i className="fas fa-info-circle mr-2"></i>
+                                Configuracion del sistema. Requiere reiniciar el servidor para aplicar cambios.
+                              </div>
+                              <table className="table table-sm table-bordered">
+                                <thead className="thead-dark">
+                                  <tr><th>Parametro</th><th>Valor</th><th style={{width: 40}}></th></tr>
+                                </thead>
+                                <tbody>
+                                  <tr><td>DEVICE_OFFLINE_SECONDS</td><td className="text-muted">30</td><td><span className="badge bg-info" title="Segundos sin heartbeat para marcar offline">?</span></td></tr>
+                                  <tr><td>CRITICAL_LEVEL_PCT</td><td className="text-muted">20</td><td><span className="badge bg-info" title="Porcentaje minimo para alerta critica">?</span></td></tr>
+                                  <tr><td>AUTH_JWT_EXPIRES</td><td className="text-muted">12h</td><td><span className="badge bg-info" title="Tiempo de expiracion del token">?</span></td></tr>
+                                  <tr><td>PORT</td><td className="text-muted">4000</td><td><span className="badge bg-info" title="Puerto del servidor API">?</span></td></tr>
+                                  <tr><td>ARCA_ENABLED</td><td className="text-muted">false</td><td><span className="badge bg-info" title="Habilitar facturacion ARCA/AFIP">?</span></td></tr>
+                                  <tr><td>CORS_ORIGIN</td><td className="text-muted">*</td><td><span className="badge bg-info" title="URL permitida para CORS">?</span></td></tr>
+                                </tbody>
+                              </table>
+                              <div className="alert alert-warning mt-2">
+                                <i className="fas fa-exclamation-triangle mr-2"></i>
+                                Edite el archivo <code>.env</code> en el servidor y reinicie los contenedores.
+                              </div>
                             </div>
                           )}
                         </div>
