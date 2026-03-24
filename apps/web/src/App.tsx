@@ -1097,8 +1097,14 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   useEffect(() => {
     if (serverTab === 'config') {
       getJson<{key: string; value: string; description?: string}[]>('/config', props.session.token)
-        .then(setSystemConfig)
-        .catch(console.error);
+        .then(data => {
+          console.log('Config loaded:', data);
+          setSystemConfig(data);
+        })
+        .catch(err => {
+          console.error('Error loading config:', err);
+          alert('Error al cargar configuración: ' + err.message);
+        });
     }
   }, [serverTab, props.session.token]);
 
