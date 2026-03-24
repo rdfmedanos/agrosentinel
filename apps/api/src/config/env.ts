@@ -8,7 +8,7 @@ export const env = {
   mqttUrl: process.env.MQTT_URL ?? 'mqtt://localhost:1883',
   mqttUsername: process.env.MQTT_USERNAME,
   mqttPassword: process.env.MQTT_PASSWORD,
-  deviceOfflineSeconds: Number(process.env.DEVICE_OFFLINE_SECONDS ?? 120),
+  deviceOfflineSeconds: Number(process.env.DEVICE_OFFLINE_SECONDS ?? 30),
   criticalLevelPct: Number(process.env.CRITICAL_LEVEL_PCT ?? 20),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   arcaCuit: process.env.ARCA_CUIT ?? '30712345678',
