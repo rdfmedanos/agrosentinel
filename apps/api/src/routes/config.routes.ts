@@ -16,7 +16,9 @@ const DEFAULT_CONFIG = [
 
 configRouter.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
+    console.log('Loading system config...');
     let configs = await SystemConfigModel.find().lean();
+    console.log('Found configs:', configs.length);
     
     for (const defaultCfg of DEFAULT_CONFIG) {
       if (!configs.find(c => c.key === defaultCfg.key)) {
@@ -25,10 +27,11 @@ configRouter.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
     }
     
     configs = await SystemConfigModel.find().lean();
+    console.log('Returning configs:', configs);
     res.json(configs);
   } catch (error) {
     console.error('Error loading config:', error);
-    res.status(500).json({ error: 'Error al cargar configuración' });
+    res.status(500).json({ error: 'Error al cargar configuración: ' + String(error) });
   }
 });
 
