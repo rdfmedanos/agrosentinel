@@ -1058,7 +1058,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     if (nav) {
       setActiveSection(nav.section as AdminSection);
       setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(nav.section));
-      setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor'].includes(nav.section));
+      setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(nav.section));
     }
   }, []);
 
