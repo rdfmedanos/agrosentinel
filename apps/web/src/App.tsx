@@ -58,6 +58,18 @@ function MapCenterUpdater(props: { lat: string; lng: string }) {
   return null;
 }
 
+function getStatusColor(status: string) {
+  if (status === 'online') return '#28a745';
+  if (status === 'warning') return '#ffc107';
+  return '#dc3545';
+}
+
+function getStatusBadge(status: string) {
+  if (status === 'online') return 'text-bg-success';
+  if (status === 'warning') return 'text-bg-warning';
+  return 'text-bg-danger';
+}
+
 type Device = {
   _id: string;
   deviceId: string;
@@ -720,7 +732,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                           <Popup>
                             <div className="p-1">
                               <h6 className="fw-bold mb-1">{d.name}</h6>
-                              <p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{d.status}</span></p>
+                              <p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p>
                               <p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>
                             </div>
                           </Popup>
@@ -766,7 +778,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                                 </span>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{d.status}</span>
+                                <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span>
                               </td>
                               <td className="text-end align-middle">
                                 <div className="btn-group">
@@ -1683,7 +1695,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span>
                                 </td>
-                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{d.status}</span></td>
+                                <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                                 <td className="small">{d.location.address}</td>
                               </tr>
                             ))}
@@ -1822,7 +1834,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span></td>
-                                          <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
+                                          <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                                           <td className="small text-muted">{d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td>
                                         </tr>
                                       ))
@@ -1880,7 +1892,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       openDeviceModal(d);
                                     }
                                   }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
-                                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>{hasAlert && <p className="mb-0 small text-danger"><i className="fas fa-exclamation-triangle"></i> Alerta activa</p>}<p className="mb-0 small text-muted">Click para editar, arrastra para mover</p></div></Popup>
+                                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>{hasAlert && <p className="mb-0 small text-danger"><i className="fas fa-exclamation-triangle"></i> Alerta activa</p>}<p className="mb-0 small text-muted">Click para editar, arrastra para mover</p></div></Popup>
                                   </Marker>
                                 );})}
                               </MapContainer>
@@ -1998,7 +2010,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   </div>
                                 </td>
                                 <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
-                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
+                                <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                               </tr>
                             ))}
                           </tbody>
@@ -2386,8 +2398,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 <tr key={d.device_id}>
                                   <td className="fw-bold">{d.device_id}</td>
                                   <td>
-                                    <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>
-                                      <i className={`fas fa-circle me-1 ${d.status === 'online' ? 'fa-spin' : ''}`}></i>
+                                    <span className={`badge ${getStatusBadge(d.status)}`}>
+                                      <i className={`fas fa-circle me-1`} style={{ color: getStatusColor(d.status) }}></i>
                                       {d.status}
                                     </span>
                                   </td>
@@ -2703,7 +2715,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
                                   {selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
                                 </span></td></tr>
-                        <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${selectedDevice.status === 'online' ? 'text-bg-success' : selectedDevice.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{selectedDevice.status}</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${getStatusBadge(selectedDevice.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(selectedDevice.status) }}></i>{selectedDevice.status}</span></td></tr>
                         <tr><td className="text-muted fw-bold">Ultima Comunicacion:</td><td className="small">{selectedDevice.lastHeartbeatAt ? new Date(selectedDevice.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td></tr>
                       </table>
                     </div>
@@ -2893,7 +2905,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <Marker key={d._id} position={[d.location.lat, d.location.lng]} eventHandlers={{
                         click: () => { setShowAllDevicesModal(false); openDeviceModal(d); }
                       }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
-                        <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em' }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p></div></Popup>
+                        <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p></div></Popup>
                       </Marker>
                     );})}
                   </MapContainer>
