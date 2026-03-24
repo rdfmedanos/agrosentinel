@@ -1188,7 +1188,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
     setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices'].includes(section));
-    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
       setRestoreClient(false);
