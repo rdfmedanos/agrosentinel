@@ -2287,7 +2287,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   <tr><th>Parametro</th><th>Valor</th><th style={{width: 40}}></th></tr>
                                 </thead>
                                 <tbody>
-                                  <tr><td>DEVICE_OFFLINE_SECONDS</td><td className="text-muted">10</td><td><span className="badge bg-info" title="Segundos sin heartbeat para marcar offline">?</span></td></tr>
+                                  <tr><td>DEVICE_OFFLINE_SECONDS</td><td className="text-muted">5</td><td><span className="badge bg-info" title="Segundos sin heartbeat para marcar offline">?</span></td></tr>
                                   <tr><td>CRITICAL_LEVEL_PCT</td><td className="text-muted">20</td><td><span className="badge bg-info" title="Porcentaje minimo para alerta critica">?</span></td></tr>
                                   <tr><td>AUTH_JWT_EXPIRES</td><td className="text-muted">12h</td><td><span className="badge bg-info" title="Tiempo de expiracion del token">?</span></td></tr>
                                   <tr><td>PORT</td><td className="text-muted">4000</td><td><span className="badge bg-info" title="Puerto del servidor API">?</span></td></tr>
