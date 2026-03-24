@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet';
@@ -2467,9 +2467,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
                       {selectedDevice.location.lat && selectedDevice.location.lng ? (
                         <div className="mb-3" style={{ height: '250px', borderRadius: '8px', overflow: 'hidden' }}>
-                          <MapContainer center={[selectedDevice.location.lat, selectedDevice.location.lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
+                          <MapContainer center={[Number(selectedDevice.location.lat), Number(selectedDevice.location.lng)]} zoom={15} style={{ height: '100%', width: '100%' }}>
                             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                            <Marker position={[selectedDevice.location.lat, selectedDevice.location.lng]}>
+                            <Marker position={[Number(selectedDevice.location.lat), Number(selectedDevice.location.lng)]}>
                               <Popup>{selectedDevice.name || selectedDevice.deviceId}<br />{selectedDevice.location.address}</Popup>
                             </Marker>
                           </MapContainer>
