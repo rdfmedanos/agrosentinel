@@ -1396,7 +1396,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       await deleteJson(`/devices/${selectedDevice._id}`, props.session.token);
       setShowDeviceModal(false);
       setSelectedDevice(null);
-      await loadCompanyData(tenantId);
+      await Promise.all([loadCompanyData(tenantId), loadAllDevices()]);
     } finally {
       setSavingDevice(false);
     }
