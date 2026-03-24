@@ -7,16 +7,15 @@ export const backupRouter = Router();
 
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    console.log('=== BACKUP EXPORT ===');
-    console.log('req.auth:', JSON.stringify(req.auth));
+    const tenantId = resolveTenantFromRequest(req);
     
-    const allClients = await TenantConfigModel.find().lean();
-    const allDevices = await DeviceModel.find({ pending: false }).lean();
-    
-    console.log('Clients count:', allClients.length);
-    console.log('Devices count:', allDevices.length);
+    const filterClients = tenantId && tenantId !== 'demo-tenant' ? { tenantId } : {};
+    const filterDevices = tenantId && tenantId !== 'demo-tenant' ? { tenantId, pending: false } : { pending: false };
 
-    const exportClients = allClients.map((c: any) => ({
+    const clients = await TenantConfigModel.find(filterClients).lean();
+    const devices = await DeviceModel.find(filterDevices).lean();
+
+    const exportClients = clients.map((c: any) => ({
       tenantId: c.tenantId,
       companyName: c.companyName,
       contactName: c.contactName,
@@ -25,7 +24,7 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
       address: c.address
     }));
 
-    const exportDevices = allDevices.map((d: any) => ({
+    const exportDevices = devices.map((d: any) => ({
       deviceId: d.deviceId,
       tenantId: d.tenantId,
       name: d.name,
@@ -47,17 +46,13 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
 backupRouter.post('/import', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     const tenantId = resolveTenantFromRequest(req);
-    if (!tenantId) {
-      res.status(400).json({ error: 'Tenant no encontrado' });
-      return;
-    }
 
     const { clients, devices } = req.body as { clients?: unknown[]; devices?: unknown[] };
 
     if (clients && Array.isArray(clients)) {
       for (const client of clients) {
         const c = client as { tenantId?: string; companyName?: string; contactName?: string; email?: string; phone?: string; address?: string };
-        if (c.tenantId === tenantId) {
+        if (tenantId === 'demo-tenant' || c.tenantId === tenantId) {
           await TenantConfigModel.findOneAndUpdate(
             { tenantId: c.tenantId, companyName: c.companyName },
             { $set: c },
@@ -70,7 +65,7 @@ backupRouter.post('/import', requireAuth, requireCompanyAdmin, async (req, res) 
     if (devices && Array.isArray(devices)) {
       for (const device of devices) {
         const d = device as { deviceId?: string; tenantId?: string; name?: string; location?: { lat?: number; lng?: number; address?: string } };
-        if (d.tenantId === tenantId) {
+        if (tenantId === 'demo-tenant' || d.tenantId === tenantId) {
           await DeviceModel.findOneAndUpdate(
             { deviceId: d.deviceId },
             { 
