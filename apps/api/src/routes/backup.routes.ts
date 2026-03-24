@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { requireAuth, requireCompanyAdmin } from '../auth/auth.js';
+import { requireAuth, requireCompanyAdmin, resolveTenantFromRequest } from '../auth/auth.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 import { DeviceModel } from '../models/Device.js';
-import { logger } from '../config/logger.js';
 
 export const backupRouter = Router();
 
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const tenantId = req.auth?.tenantId;
+    const tenantId = resolveTenantFromRequest(req);
     if (!tenantId) {
       res.status(400).json({ error: 'Tenant no encontrado' });
       return;
@@ -40,14 +39,14 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
 
     res.json({ clients: exportClients, devices: exportDevices });
   } catch (error) {
-    logger.error({ error }, 'Error exporting backup');
+    console.error('Error exporting backup:', error);
     res.status(500).json({ error: 'Error al exportar backup' });
   }
 });
 
 backupRouter.post('/import', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const tenantId = req.auth?.tenantId;
+    const tenantId = resolveTenantFromRequest(req);
     if (!tenantId) {
       res.status(400).json({ error: 'Tenant no encontrado' });
       return;
@@ -91,7 +90,7 @@ backupRouter.post('/import', requireAuth, requireCompanyAdmin, async (req, res) 
 
     res.json({ status: 'ok', message: 'Backup restaurado exitosamente' });
   } catch (error) {
-    logger.error({ error }, 'Error importing backup');
+    console.error('Error importing backup:', error);
     res.status(500).json({ error: 'Error al restaurar backup' });
   }
 });
