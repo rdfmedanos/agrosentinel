@@ -863,7 +863,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [backupError, setBackupError] = useState('');
   const [backupSuccess, setBackupSuccess] = useState('');
-  const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number]>([-34.62, -58.43]);
+  const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
   const [showMqttConfig, setShowMqttConfig] = useState(false);
   const [mqttConfig, setMqttConfig] = useState({ host: 'localhost', port: '1883', username: '', password: '', qos: '1' });
   const [showMqttPassword, setShowMqttPassword] = useState(false);
@@ -1816,17 +1816,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 }
                                 const lats = deviceList.map(d => d.location.lat);
                                 const lngs = deviceList.map(d => d.location.lng);
-                                if (lats.length > 0) {
-                                  const newCenter: [number, number] = [
-                                    (Math.min(...lats) + Math.max(...lats)) / 2,
-                                    (Math.min(...lngs) + Math.max(...lngs)) / 2
-                                  ];
-                                  if (devicesMapCenter[0] === -34.62 && devicesMapCenter[1] === -58.43) {
-                                    setDevicesMapCenter(newCenter);
-                                  }
+                                const defaultCenter: [number, number] = [
+                                  (Math.min(...lats) + Math.max(...lats)) / 2,
+                                  (Math.min(...lngs) + Math.max(...lngs)) / 2
+                                ];
+                                const mapCenter = devicesMapCenter || defaultCenter;
+                                if (!devicesMapCenter && lats.length > 0) {
+                                  setDevicesMapCenter(mapCenter);
                                 }
                                 return (
-                              <MapContainer center={devicesMapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
+                              <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                 {devices.map(d => {
                                   const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
