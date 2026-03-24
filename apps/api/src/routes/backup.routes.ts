@@ -7,11 +7,14 @@ export const backupRouter = Router();
 
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
+    console.log('=== BACKUP EXPORT ===');
+    console.log('req.auth:', JSON.stringify(req.auth));
+    
     const allClients = await TenantConfigModel.find().lean();
     const allDevices = await DeviceModel.find({ pending: false }).lean();
     
-    console.log('All tenants in DB:', allClients.map((c: any) => c.tenantId));
-    console.log('All devices in DB:', allDevices.map((d: any) => ({ deviceId: d.deviceId, tenantId: d.tenantId })));
+    console.log('Clients count:', allClients.length);
+    console.log('Devices count:', allDevices.length);
 
     const exportClients = allClients.map((c: any) => ({
       tenantId: c.tenantId,
