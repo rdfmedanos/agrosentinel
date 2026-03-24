@@ -161,8 +161,12 @@ devicesRouter.post('/assign', requireCompanyAdmin, async (req, res) => {
   device.pending = false;
   device.status = device.status === 'offline' ? 'offline' : 'online';
   if (data.name) device.name = data.name;
-  if (data.address) device.location = { ...device.location, address: data.address };
-  if (data.lat && data.lng) device.location = { ...device.location, lat: data.lat, lng: data.lng };
+  if (data.address) {
+    device.location = { ...device.location, address: data.address || '' } as typeof device.location;
+  }
+  if (data.lat !== undefined && data.lng !== undefined) {
+    device.location = { ...device.location, lat: data.lat ?? undefined, lng: data.lng ?? undefined } as typeof device.location;
+  }
   await device.save();
 
   res.json({ status: 'assigned', device_id: device.deviceId, tenant_id: tenantId });
