@@ -2465,7 +2465,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     </div>
                     <div className="col-md-6">
                       <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
-                      {selectedDevice.location.lat && selectedDevice.location.lng ? (
+                      {selectedDevice.location.lat && selectedDevice.location.lng && !isNaN(Number(selectedDevice.location.lat)) && !isNaN(Number(selectedDevice.location.lng)) ? (
                         <div className="mb-3" style={{ height: '250px', borderRadius: '8px', overflow: 'hidden' }}>
                           <MapContainer center={[Number(selectedDevice.location.lat), Number(selectedDevice.location.lng)]} zoom={15} style={{ height: '100%', width: '100%' }}>
                             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -2512,12 +2512,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <label className="form-label small fw-bold">Ubicacion en el mapa (haz clic para seleccionar)</label>
                       <div style={{ height: '300px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
                         <MapContainer 
-                          center={editDevice.lat && editDevice.lng ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
+                          center={!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
                           zoom={13} 
                           style={{ height: '100%', width: '100%' }}
                         >
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                          {editDevice.lat && editDevice.lng && (
+                          {!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) && (
                             <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} eventHandlers={{ click: () => {} }} />
                           )}
                           <MapClickHandler onMapClick={(lat, lng) => setEditDevice(p => ({ ...p, lat: lat.toString(), lng: lng.toString() }))} />
