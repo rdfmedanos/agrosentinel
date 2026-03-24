@@ -54,22 +54,22 @@ export async function evaluateDeviceCriticalLevel(deviceId: string) {
 export async function checkOfflineDevices() {
   const threshold = new Date(Date.now() - env.deviceOfflineSeconds * 1000);
   const offlineDevices = await DeviceModel.find({
-    $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }],
-    status: { $ne: 'offline' },
-    tenantId: { $exists: true, $ne: null }
+    $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }, { lastSeenAt: { $lt: threshold } }, { lastSeenAt: { $exists: false } }],
+    status: { $ne: 'offline' }
   });
 
   for (const d of offlineDevices) {
-    if (!d.tenantId) continue;
     d.status = 'offline';
     await d.save();
 
-    await openAlert({
-      tenantId: d.tenantId,
-      deviceId: d.deviceId,
-      type: 'offline',
-      message: `Dispositivo ${d.name} sin heartbeat` 
-    });
-    emitTenant(d.tenantId, 'devices:updated', d);
+    if (d.tenantId) {
+      await openAlert({
+        tenantId: d.tenantId,
+        deviceId: d.deviceId,
+        type: 'offline',
+        message: `Dispositivo ${d.name} sin comunicación` 
+      });
+      emitTenant(d.tenantId, 'devices:updated', d);
+    }
   }
 }
