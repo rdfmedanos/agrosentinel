@@ -3,6 +3,7 @@ import { AlertModel } from '../models/Alert.js';
 import { DeviceModel } from '../models/Device.js';
 import { emitTenant } from '../realtime/socket.js';
 import { createWorkOrderFromAlert } from './workOrder.service.js';
+import { sendTelegramMessage, formatAlertMessage } from './telegram.service.js';
 
 export async function openAlert(params: {
   tenantId: string;
@@ -18,9 +19,16 @@ export async function openAlert(params: {
   });
   if (existing) return existing;
 
+  const device = await DeviceModel.findOne({ deviceId: params.deviceId });
+  const deviceName = device?.name || params.deviceId;
+
   const alert = await AlertModel.create({ ...params, openedAt: new Date() });
   await createWorkOrderFromAlert(String(alert._id));
   emitTenant(params.tenantId, 'alerts:updated', alert);
+
+  const telegramMsg = formatAlertMessage(params.type, deviceName, params.message);
+  await sendTelegramMessage(telegramMsg);
+
   return alert;
 }
 
@@ -30,7 +38,14 @@ export async function resolveAlert(tenantId: string, deviceId: string, type: 'of
     { status: 'resolved', resolvedAt: new Date() },
     { new: true }
   );
-  if (alert) emitTenant(tenantId, 'alerts:updated', alert);
+  if (alert) {
+    emitTenant(tenantId, 'alerts:updated', alert);
+    
+    const device = await DeviceModel.findOne({ deviceId });
+    const deviceName = device?.name || deviceId;
+    const resolvedMsg = formatAlertMessage(type === 'offline' ? 'online' : 'warning', deviceName, 'Problema resuelto');
+    await sendTelegramMessage(resolvedMsg);
+  }
 }
 
 export async function evaluateDeviceCriticalLevel(deviceId: string) {

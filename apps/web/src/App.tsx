@@ -2336,6 +2336,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <tr><td>CRITICAL_LEVEL_PCT</td><td className="text-muted">20</td><td><span className="badge bg-info" title="Porcentaje minimo para alerta critica">?</span></td></tr>
                                   <tr><td>AUTH_JWT_EXPIRES</td><td className="text-muted">12h</td><td><span className="badge bg-info" title="Tiempo de expiracion del token">?</span></td></tr>
                                   <tr><td>PORT</td><td className="text-muted">4000</td><td><span className="badge bg-info" title="Puerto del servidor API">?</span></td></tr>
+                                  <tr><td>TELEGRAM_ENABLED</td><td className="text-muted">false</td><td><span className="badge bg-info" title="Habilitar notificaciones por Telegram">?</span></td></tr>
+                                  <tr><td>TELEGRAM_BOT_TOKEN</td><td className="text-muted">****</td><td><span className="badge bg-info" title="Token del bot de Telegram">?</span></td></tr>
+                                  <tr><td>TELEGRAM_CHAT_ID</td><td className="text-muted">****</td><td><span className="badge bg-info" title="Chat ID de Telegram para recibir alertas">?</span></td></tr>
                                   <tr><td>ARCA_ENABLED</td><td className="text-muted">false</td><td><span className="badge bg-info" title="Habilitar facturacion ARCA/AFIP">?</span></td></tr>
                                   <tr><td>CORS_ORIGIN</td><td className="text-muted">*</td><td><span className="badge bg-info" title="URL permitida para CORS">?</span></td></tr>
                                 </tbody>
