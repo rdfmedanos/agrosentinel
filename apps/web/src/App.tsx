@@ -906,6 +906,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [backupError, setBackupError] = useState('');
   const [backupSuccess, setBackupSuccess] = useState('');
   const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
+  const [allDevicesMapCenter, setAllDevicesMapCenter] = useState<[number, number] | null>(null);
   const [showMqttConfig, setShowMqttConfig] = useState(false);
   const [mqttConfig, setMqttConfig] = useState({ host: 'localhost', port: '1883', username: '', password: '', qos: '1' });
   const [showMqttPassword, setShowMqttPassword] = useState(false);
@@ -1974,7 +1975,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                   <div className="card mt-3">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3>
-                      <button className="btn btn-light btn-sm ml-auto" onClick={() => setShowAllDevicesModal(true)}>
+                      <button className="btn btn-light btn-sm ml-auto" onClick={() => { setAllDevicesMapCenter(null); setShowAllDevicesModal(true); }}>
                         <i className="fas fa-expand me-1"></i>Ver Todos
                       </button>
                     </div>
@@ -2879,12 +2880,16 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 }
                 const lats = validDevices.map(d => d.location.lat);
                 const lngs = validDevices.map(d => d.location.lng);
-                const center: [number, number] = [
+                const defaultCenter: [number, number] = [
                   lats.length > 0 ? (Math.min(...lats) + Math.max(...lats)) / 2 : -34.6,
                   lngs.length > 0 ? (Math.min(...lngs) + Math.max(...lngs)) / 2 : -58.4
                 ];
+                const mapCenter = allDevicesMapCenter || defaultCenter;
+                if (!allDevicesMapCenter && lats.length > 0) {
+                  setAllDevicesMapCenter(mapCenter);
+                }
                 return (
-                  <MapContainer key={Date.now()} center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+                  <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
                     {validDevices.map(d => {
                       const color = markerColor(d.status, d.levelPct, false);
