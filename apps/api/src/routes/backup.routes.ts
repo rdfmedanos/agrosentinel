@@ -8,8 +8,15 @@ export const backupRouter = Router();
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     const tenantId = resolveTenantFromRequest(req);
+    const allClients = await TenantConfigModel.find().lean();
+    const allDevices = await DeviceModel.find({ pending: false }).lean();
+    
+    console.log('resolveTenantFromRequest:', tenantId);
+    console.log('All tenants:', allClients.map(c => c.tenantId));
+    console.log('All devices tenants:', allDevices.map(d => d.tenantId));
+    
     if (!tenantId) {
-      res.status(400).json({ error: 'Tenant no encontrado' });
+      res.json({ clients: allClients, devices: allDevices, debug: 'no tenantId, returning all' });
       return;
     }
 
