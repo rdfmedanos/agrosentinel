@@ -1700,7 +1700,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   </span>
                                 </td>
                                 <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
-                                <td className="small">{d.location.address}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1802,11 +1801,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           <div className="tab-content">
                             <div className="tab-pane active show">
                               <div className="table-responsive">
-                                <div className="mb-3">
-                                  <button className="btn btn-primary btn-sm" onClick={() => setShowAddSensorModal(true)}>
-                                    <i className="fas fa-plus me-1"></i>Agregar Dispositivo
-                                  </button>
-                                </div>
                                 <table className="table table-hover table-striped">
                                   <thead>
                                     <tr>
@@ -1815,12 +1809,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       <th>Nivel</th>
                                       <th>Bomba</th>
                                       <th>Estado</th>
-                                      <th>Ultima Comunicacion</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {devices.length === 0 ? (
-                                      <tr><td colSpan={6} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
+                                      <tr><td colSpan={5} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
                                     ) : (
                                       devices.map(d => (
                                         <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
@@ -1974,19 +1967,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
             {activeSection === 'dispositivos' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card">
-                    <div className="card-header">
-                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-plus-circle me-2"></i>Agregar Dispositivo</h3>
-                    </div>
-                    <div className="card-body">
-                      <div className="row">
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Device ID</label><input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" /></div>
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" /></div>
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" /></div>
-                        <div className="col-md-2 mb-3 d-flex align-items-end"><button className="btn btn-primary w-100 fw-bold" onClick={() => void createDevice()} disabled={creatingDevice}>{creatingDevice ? '...' : 'Vincular'}</button></div>
-                      </div>
-                    </div>
-                  </div>
                   <div className="card mt-3">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3>
@@ -1997,14 +1977,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Cliente</th><th>Direccion</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Cliente</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
                             {allDevices.map(d => (
                               <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
                                 <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td className="small">{d.clientName || 'Unknown'}</td>
-                                <td className="small">{d.location.address}</td>
                                 <td>
                                   <div className="d-flex align-items-center">
                                     <div className="progress me-2" style={{ width: '60px', height: '6px' }}>
