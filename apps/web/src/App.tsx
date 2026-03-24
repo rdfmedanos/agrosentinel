@@ -2447,9 +2447,21 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     </div>
                     <div className="col-md-6">
                       <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
+                      {selectedDevice.location.lat && selectedDevice.location.lng ? (
+                        <div className="mb-3" style={{ height: '250px', borderRadius: '8px', overflow: 'hidden' }}>
+                          <MapContainer center={[selectedDevice.location.lat, selectedDevice.location.lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            <Marker position={[selectedDevice.location.lat, selectedDevice.location.lng]}>
+                              <Popup>{selectedDevice.name || selectedDevice.deviceId}<br />{selectedDevice.location.address}</Popup>
+                            </Marker>
+                          </MapContainer>
+                        </div>
+                      ) : (
+                        <div className="alert alert-warning">Sin coordenadas de ubicacion</div>
+                      )}
                       <table className="table table-sm table-borderless">
-                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{selectedDevice.location.lat}</td></tr>
-                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{selectedDevice.location.lng}</td></tr>
+                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{selectedDevice.location.lat || '—'}</td></tr>
+                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{selectedDevice.location.lng || '—'}</td></tr>
                         <tr><td className="text-muted fw-bold">Direccion:</td><td>{selectedDevice.location.address || '—'}</td></tr>
                       </table>
                       <div className="alert alert-warning py-2 small mt-3">
