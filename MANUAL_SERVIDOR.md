@@ -82,7 +82,7 @@ MONGO_URI=mongodb://mongo:27017/agrosentinel
 MQTT_URL=mqtt://mosquitto:1883
 MQTT_USERNAME=
 MQTT_PASSWORD=
-DEVICE_OFFLINE_SECONDS=120
+DEVICE_OFFLINE_SECONDS=5
 CRITICAL_LEVEL_PCT=20
 CORS_ORIGIN=https://agrosentinel.jaz.ar
 
@@ -93,6 +93,12 @@ ARCA_PTO_VTA=1
 ARCA_WSFE_URL=https://wswhomo.afip.gov.ar/wsfev1/service.asmx
 ARCA_TOKEN=
 ARCA_SIGN=
+
+# Notificaciones Telegram (opcional)
+
+TELEGRAM_ENABLED=false
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 ```
 
 Para produccion con dominio y HTTPS, usa tu dominio real en `CORS_ORIGIN` (en este caso `https://agrosentinel.jaz.ar`).
@@ -260,7 +266,48 @@ Backup de configuracion:
 - Guardar `.env`
 - Guardar `infra/mosquitto/mosquitto.conf`
 
-## 11) Checklist final
+## 11) Notificaciones por Telegram
+
+### 11.1 Obtener el Token del Bot
+
+1. Abre Telegram y busca `@BotFather`
+2. Enviale el comando `/newbot`
+3. Sigue las instrucciones y给它 un nombre (ej: `AgroSentinel Bot`)
+4. Cuando te pida el username, ingresa uno que termine en `bot` (ej: `agrosentinel_alerts_bot`)
+5. Copia el **Token** que te da (algo como `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+### 11.2 Obtener el Chat ID
+
+1. Agrega el bot a tu Telegram
+2. Enviale un mensaje al bot (cualquier texto)
+3. Visita: `https://api.telegram.org/bot<TU_TOKEN>/getUpdates`
+4. Busca el campo `"chat":{"id":123456789,...}` - ese número es tu **Chat ID**
+
+### 11.3 Configurar en .env
+
+```env
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+TELEGRAM_CHAT_ID=123456789
+```
+
+### 11.4 Notificaciones que se envían
+
+- 🔴 **Dispositivo Offline** - Cuando un dispositivo deja de enviar datos
+- 🟢 **Dispositivo Online** - Cuando un dispositivo offline se reconecta
+- ⚠️ **Nivel Crítico** - Cuando el nivel del tanque baja del umbral configurado
+- 🟡 **Advertencia** - Alertas generales
+
+### 11.5 Reiniciar servicios
+
+```bash
+docker compose down
+docker compose up -d --build
+```
+
+---
+
+## 12) Checklist final
 
 - [ ] `docker compose ps` en estado `Up`
 - [ ] `GET /api/health` responde OK
@@ -268,6 +315,7 @@ Backup de configuracion:
 - [ ] ESP32 publica en MQTT y aparece telemetria
 - [ ] Alertas y ordenes de trabajo se crean correctamente
 - [ ] Backup probado al menos una vez
+- [ ] Telegram configurado y funcionando (opcional)
 
 ---
 
