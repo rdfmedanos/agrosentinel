@@ -18,20 +18,21 @@ configRouter.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     console.log('Loading system config...');
     
-    for (const defaultCfg of DEFAULT_CONFIG) {
-      await SystemConfigModel.findOneAndUpdate(
-        { key: defaultCfg.key },
-        { $setOnInsert: defaultCfg, $set: { value: defaultCfg.value } },
-        { upsert: true, new: true }
-      );
-    }
-    
     const configs = await SystemConfigModel.find().lean();
-    console.log('Returning configs:', configs);
-    res.json(configs);
+    
+    const result = DEFAULT_CONFIG.map(defaultCfg => {
+      const existing = configs.find(c => c.key === defaultCfg.key);
+      if (existing && existing.value) {
+        return { key: existing.key, value: existing.value, description: existing.description };
+      }
+      return defaultCfg;
+    });
+    
+    console.log('Returning configs:', result);
+    res.json(result);
   } catch (error: any) {
     console.error('Error loading config:', error.message, error.stack);
-    res.status(500).json({ error: 'Error al cargar configuración: ' + error.message });
+    res.json(DEFAULT_CONFIG);
   }
 });
 

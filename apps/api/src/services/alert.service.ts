@@ -19,22 +19,19 @@ const DEFAULT_CONFIG = [
 
 export async function loadConfig() {
   try {
-    for (const defaultCfg of DEFAULT_CONFIG) {
-      await SystemConfigModel.findOneAndUpdate(
-        { key: defaultCfg.key },
-        { $setOnInsert: defaultCfg, $set: { value: defaultCfg.value } },
-        { upsert: true, new: true }
-      );
-    }
-    
     const configs = await SystemConfigModel.find().lean();
+    
     cachedConfig = {};
-    for (const c of configs) {
-      cachedConfig[c.key] = c.value || '';
+    for (const defaultCfg of DEFAULT_CONFIG) {
+      const existing = configs.find(c => c.key === defaultCfg.key);
+      cachedConfig[defaultCfg.key] = existing?.value || defaultCfg.value;
     }
     console.log('Config loaded:', cachedConfig);
   } catch (e) {
     console.error('Error loading config:', e);
+    for (const defaultCfg of DEFAULT_CONFIG) {
+      cachedConfig[defaultCfg.key] = defaultCfg.value;
+    }
   }
 }
 
