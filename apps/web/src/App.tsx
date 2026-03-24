@@ -1127,7 +1127,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
     setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(section));
-    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
       setRestoreClient(false);
@@ -1498,7 +1498,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </li>
 
               <li className={`nav-item has-treeview ${configOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); setOperacionOpen(false); }}>
                   <i className="nav-icon fas fa-cog"></i>
                   <p>Configuracion <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
