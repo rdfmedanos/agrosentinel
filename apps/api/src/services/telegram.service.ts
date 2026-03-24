@@ -1,19 +1,24 @@
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
+import { getConfig } from './alert.service.js';
 
 export async function sendTelegramMessage(message: string) {
-  if (!env.telegramEnabled || !env.telegramBotToken || !env.telegramChatId) {
+  const enabled = getConfig('TELEGRAM_ENABLED', 'false') === 'true';
+  const botToken = getConfig('TELEGRAM_BOT_TOKEN', '');
+  const chatId = getConfig('TELEGRAM_CHAT_ID', '');
+  
+  if (!enabled || !botToken || !chatId) {
     logger.debug('Telegram notifications disabled or not configured');
     return;
   }
 
   try {
-    const url = `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`;
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: env.telegramChatId,
+        chat_id: chatId,
         text: message,
         parse_mode: 'HTML'
       })

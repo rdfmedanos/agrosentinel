@@ -901,6 +901,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
+  const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [backupError, setBackupError] = useState('');
@@ -1091,6 +1093,14 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   useEffect(() => {
     setDevicesMapCenter(null);
   }, [tenantId]);
+
+  useEffect(() => {
+    if (serverTab === 'config') {
+      getJson<{key: string; value: string; description?: string}[]>('/config', props.session.token)
+        .then(setSystemConfig)
+        .catch(console.error);
+    }
+  }, [serverTab, props.session.token]);
 
   useEffect(() => {
     if (props.session.user.role !== 'company_admin') return;
@@ -2325,28 +2335,59 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <div>
                               <div className="alert alert-info mb-3">
                                 <i className="fas fa-info-circle mr-2"></i>
-                                Configuracion del sistema. Requiere reiniciar el servidor para aplicar cambios.
+                                Configuracion del sistema. Algunos cambios requieren reiniciar el servidor.
                               </div>
-                              <table className="table table-sm table-bordered">
-                                <thead className="thead-dark">
-                                  <tr><th>Parametro</th><th>Valor</th><th style={{width: 40}}></th></tr>
-                                </thead>
-                                <tbody>
-                                  <tr><td>DEVICE_OFFLINE_SECONDS</td><td className="text-muted">5</td><td><span className="badge bg-info" title="Segundos sin heartbeat para marcar offline">?</span></td></tr>
-                                  <tr><td>CRITICAL_LEVEL_PCT</td><td className="text-muted">20</td><td><span className="badge bg-info" title="Porcentaje minimo para alerta critica">?</span></td></tr>
-                                  <tr><td>AUTH_JWT_EXPIRES</td><td className="text-muted">12h</td><td><span className="badge bg-info" title="Tiempo de expiracion del token">?</span></td></tr>
-                                  <tr><td>PORT</td><td className="text-muted">4000</td><td><span className="badge bg-info" title="Puerto del servidor API">?</span></td></tr>
-                                  <tr><td>TELEGRAM_ENABLED</td><td className="text-muted">false</td><td><span className="badge bg-info" title="Habilitar notificaciones por Telegram">?</span></td></tr>
-                                  <tr><td>TELEGRAM_BOT_TOKEN</td><td className="text-muted">****</td><td><span className="badge bg-info" title="Token del bot de Telegram">?</span></td></tr>
-                                  <tr><td>TELEGRAM_CHAT_ID</td><td className="text-muted">****</td><td><span className="badge bg-info" title="Chat ID de Telegram para recibir alertas">?</span></td></tr>
-                                  <tr><td>ARCA_ENABLED</td><td className="text-muted">false</td><td><span className="badge bg-info" title="Habilitar facturacion ARCA/AFIP">?</span></td></tr>
-                                  <tr><td>CORS_ORIGIN</td><td className="text-muted">*</td><td><span className="badge bg-info" title="URL permitida para CORS">?</span></td></tr>
-                                </tbody>
-                              </table>
-                              <div className="alert alert-warning mt-2">
-                                <i className="fas fa-exclamation-triangle mr-2"></i>
-                                Edite el archivo <code>.env</code> en el servidor y reinicie los contenedores.
-                              </div>
+                              {systemConfig.length === 0 ? (
+                                <p className="text-muted">Cargando configuración...</p>
+                              ) : (
+                                <table className="table table-sm table-bordered">
+                                  <thead className="thead-dark">
+                                    <tr><th>Parametro</th><th>Valor</th><th style={{width: 40}}></th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {systemConfig.map(cfg => (
+                                      <tr key={cfg.key}>
+                                        <td>
+                                          <strong>{cfg.key}</strong>
+                                          {cfg.description && <div className="small text-muted">{cfg.description}</div>}
+                                        </td>
+                                        <td>
+                                          {(cfg.key === 'TELEGRAM_BOT_TOKEN' || cfg.key === 'TELEGRAM_CHAT_ID') && cfg.value ? (
+                                            <input type="password" className="form-control form-control-sm" value={cfg.value} 
+                                              onChange={e => {
+                                                setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c));
+                                              }} />
+                                          ) : cfg.key === 'TELEGRAM_ENABLED' ? (
+                                            <select className="form-control form-control-sm" value={cfg.value}
+                                              onChange={e => setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c))}>
+                                              <option value="false">false</option>
+                                              <option value="true">true</option>
+                                            </select>
+                                          ) : (
+                                            <input type="text" className="form-control form-control-sm" value={cfg.value}
+                                              onChange={e => setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c))} />
+                                          )}
+                                        </td>
+                                        <td><span className="badge bg-info" title={cfg.description || cfg.key}>?</span></td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                              <button className="btn btn-primary" disabled={savingConfig} onClick={async () => {
+                                setSavingConfig(true);
+                                try {
+                                  for (const cfg of systemConfig) {
+                                    await putJson(`/config/${cfg.key}`, { value: cfg.value }, props.session.token);
+                                  }
+                                  alert('Configuración guardada. Reinicie el servidor para aplicar cambios.');
+                                } catch (err) {
+                                  alert('Error al guardar configuración');
+                                }
+                                setSavingConfig(false);
+                              }}>
+                                <i className="fas fa-save mr-1"></i>{savingConfig ? 'Guardando...' : 'Guardar Configuración'}
+                              </button>
                             </div>
                           )}
                         </div>

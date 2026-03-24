@@ -7,10 +7,12 @@ import { startSchedulers } from './jobs/scheduler.js';
 import { initSocket } from './realtime/socket.js';
 import { initMqtt } from './services/mqtt.service.js';
 import { seedInitialData } from './services/seed.service.js';
+import { loadConfig } from './services/alert.service.js';
 
 async function start() {
   await connectDb();
   await seedInitialData();
+  await loadConfig();
 
   const server = createServer(app);
   initSocket(server);
