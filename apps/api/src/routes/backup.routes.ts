@@ -8,12 +8,10 @@ export const backupRouter = Router();
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     const tenantId = resolveTenantFromRequest(req);
+    console.log('Backup export - tenantId:', tenantId);
     
-    const filterClients = tenantId && tenantId !== 'demo-tenant' ? { tenantId } : {};
-    const filterDevices = tenantId && tenantId !== 'demo-tenant' ? { tenantId, pending: false } : { pending: false };
-
-    const clients = await TenantConfigModel.find(filterClients).lean();
-    const devices = await DeviceModel.find(filterDevices).lean();
+    const clients = await TenantConfigModel.find().lean();
+    const devices = await DeviceModel.find({ pending: false }).lean();
 
     const exportClients = clients.map((c: any) => ({
       tenantId: c.tenantId,
