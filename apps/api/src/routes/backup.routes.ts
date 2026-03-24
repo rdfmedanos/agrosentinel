@@ -7,23 +7,13 @@ export const backupRouter = Router();
 
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const tenantId = resolveTenantFromRequest(req);
     const allClients = await TenantConfigModel.find().lean();
     const allDevices = await DeviceModel.find({ pending: false }).lean();
     
-    console.log('resolveTenantFromRequest:', tenantId);
-    console.log('All tenants:', allClients.map(c => c.tenantId));
-    console.log('All devices tenants:', allDevices.map(d => d.tenantId));
-    
-    if (!tenantId) {
-      res.json({ clients: allClients, devices: allDevices, debug: 'no tenantId, returning all' });
-      return;
-    }
+    console.log('All tenants in DB:', allClients.map((c: any) => c.tenantId));
+    console.log('All devices in DB:', allDevices.map((d: any) => ({ deviceId: d.deviceId, tenantId: d.tenantId })));
 
-    const clients = await TenantConfigModel.find({ tenantId }).lean();
-    const devices = await DeviceModel.find({ tenantId, pending: false }).lean();
-
-    const exportClients = clients.map(c => ({
+    const exportClients = allClients.map((c: any) => ({
       tenantId: c.tenantId,
       companyName: c.companyName,
       contactName: c.contactName,
@@ -32,7 +22,7 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
       address: c.address
     }));
 
-    const exportDevices = devices.map(d => ({
+    const exportDevices = allDevices.map((d: any) => ({
       deviceId: d.deviceId,
       tenantId: d.tenantId,
       name: d.name,
