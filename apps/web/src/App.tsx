@@ -4,6 +4,22 @@ import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e: any) => {
+      props.onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 type Device = {
   _id: string;
   deviceId: string;
@@ -890,8 +906,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     setChangingPwd(true);
     try {
       await postJson('/auth/change-password-first', { newPassword }, props.session.token);
+      setChangingPwd(false);
       props.onPasswordChanged();
-    } catch {
+    } catch (err) {
+      console.error('Password change error:', err);
       setPwdError('No se pudo cambiar la contrasena');
       setChangingPwd(false);
     }
@@ -2502,17 +2520,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           {editDevice.lat && editDevice.lng && (
                             <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} eventHandlers={{ click: () => {} }} />
                           )}
-                          {(() => {
-                            const MapClickHandler = () => {
-                              useMapEvents({
-                                click: (e) => {
-                                  setEditDevice(p => ({ ...p, lat: e.latlng.lat.toString(), lng: e.latlng.lng.toString() }));
-                                },
-                              });
-                              return null;
-                            };
-                            return <MapClickHandler />;
-                          })()}
+                          <MapClickHandler onMapClick={(lat, lng) => setEditDevice(p => ({ ...p, lat: lat.toString(), lng: lng.toString() }))} />
                         </MapContainer>
                       </div>
                       <small className="text-muted">Lat: {editDevice.lat || '—'} | Lng: {editDevice.lng || '—'}</small>
@@ -2753,7 +2761,12 @@ export function App() {
   useEffect(() => {
     const current = loadStoredSession();
     if (!current?.token) return;
-    void getJson<AuthUser>('/auth/me', current.token).catch(() => {
+    void getJson<AuthUser>('/auth/me', current.token).then(fresh => {
+      if (fresh) {
+        setSession({ token: current.token, user: fresh });
+        saveSession({ token: current.token, user: fresh });
+      }
+    }).catch(() => {
       setSession(null);
       saveSession(null);
     });
