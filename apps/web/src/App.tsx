@@ -1045,6 +1045,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [props.session.token, clients]);
 
+  useEffect(() => {
+    void loadAllDevices();
+  }, []);
+
   const loadCompanyData = useCallback(async (targetTenant: string) => {
     if (!targetTenant) return;
     const token = props.session.token;
