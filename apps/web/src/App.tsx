@@ -11,6 +11,24 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+function AssignMap(props: { lat: string; lng: string; onSelect: (lat: number, lng: number) => void }) {
+  const center: [number, number] = props.lat && props.lng ? [Number(props.lat), Number(props.lng)] : [-34.62, -58.43];
+  
+  return (
+    <MapContainer 
+      center={center} 
+      zoom={13} 
+      style={{ height: '100%', width: '100%' }}
+    >
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {props.lat && props.lng && (
+        <Marker position={[Number(props.lat), Number(props.lng)]} />
+      )}
+      <MapClickHandler onMapClick={(lat, lng) => props.onSelect(lat, lng)} />
+    </MapContainer>
+  );
+}
+
 function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click: (e: any) => {
@@ -2441,30 +2459,23 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </div>
             )}
 
-            <div className={`modal fade ${showAssigningMap ? 'show' : ''}`} style={{ display: showAssigningMap ? 'block' : 'none' }}>
-              <div className="modal-dialog modal-lg">
+            {showAssigningMap && (
+            <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <div className="modal-dialog modal-lg modal-dialog-centered">
                 <div className="modal-content">
                   <div className="modal-header bg-primary">
                     <h4 className="modal-title"><i className="fas fa-map-marker-alt mr-2"></i>Seleccionar Ubicacion</h4>
                     <button type="button" className="close text-white" onClick={() => setShowAssigningMap(false)}>&times;</button>
                   </div>
-                  <div className="modal-body p-0" style={{ height: '400px' }}>
-                    <MapContainer 
-                      center={assigningLat && assigningLng ? [Number(assigningLat), Number(assigningLng)] : [-34.62, -58.43]} 
-                      zoom={13} 
-                      style={{ height: '100%', width: '100%' }}
-                    >
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      <MapInvalidateSize>
-                        {assigningLat && assigningLng && (
-                          <Marker position={[Number(assigningLat), Number(assigningLng)]} />
-                        )}
-                        <MapClickHandler onMapClick={(lat, lng) => {
-                          setAssigningLat(lat.toString());
-                          setAssigningLng(lng.toString());
-                        }} />
-                      </MapInvalidateSize>
-                    </MapContainer>
+                  <div className="modal-body p-0" style={{ height: '450px' }}>
+                    <AssignMap 
+                      lat={assigningLat} 
+                      lng={assigningLng} 
+                      onSelect={(lat, lng) => {
+                        setAssigningLat(lat.toString());
+                        setAssigningLng(lng.toString());
+                      }} 
+                    />
                   </div>
                   <div className="modal-footer">
                     <div className="mr-auto text-muted small">
@@ -2476,6 +2487,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 </div>
               </div>
             </div>
+            )}
 
             {activeSection === 'backup' && (
               <div className="row">
