@@ -19,18 +19,15 @@ const DEFAULT_CONFIG = [
 
 export async function loadConfig() {
   try {
-    let configs = await SystemConfigModel.find().lean();
-    
     for (const defaultCfg of DEFAULT_CONFIG) {
-      const existing = configs.find(c => c.key === defaultCfg.key);
-      if (!existing) {
-        await SystemConfigModel.create(defaultCfg);
-      } else if (!existing.value || existing.value === '') {
-        await SystemConfigModel.updateOne({ _id: existing._id }, { value: defaultCfg.value });
-      }
+      await SystemConfigModel.findOneAndUpdate(
+        { key: defaultCfg.key },
+        { $setOnInsert: defaultCfg, $set: { value: defaultCfg.value } },
+        { upsert: true, new: true }
+      );
     }
     
-    configs = await SystemConfigModel.find().lean();
+    const configs = await SystemConfigModel.find().lean();
     cachedConfig = {};
     for (const c of configs) {
       cachedConfig[c.key] = c.value || '';
