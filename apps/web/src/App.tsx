@@ -1118,8 +1118,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
-      setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(nav.section));
-      setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(nav.section));
+setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices'].includes(nav.section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(nav.section));
     }
   }, []);
 
@@ -1187,7 +1187,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
-    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(section));
+    setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices'].includes(section));
     setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
@@ -1536,12 +1536,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       </a>
                     </li>
                     <li className="nav-item">
-                      <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
-                        onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
-                        <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
-                      </a>
-                    </li>
-                    <li className="nav-item">
                       <a href="#" className={`nav-link ${activeSection === 'notificaciones' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('notificaciones'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Notificaciones</p>
@@ -1559,13 +1553,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </li>
 
               <li className={`nav-item has-treeview ${configOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); setOperacionOpen(false); }}>
                   <i className="nav-icon fas fa-cog"></i>
                   <p>Configuracion <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
                 </a>
                 {configOpen && (
                   <ul className="nav nav-treeview" style={{ marginLeft: '1rem' }}>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
+                      </a>
+                    </li>
                     <li className="nav-item">
                       <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
