@@ -22,15 +22,18 @@ export async function loadConfig() {
     let configs = await SystemConfigModel.find().lean();
     
     for (const defaultCfg of DEFAULT_CONFIG) {
-      if (!configs.find(c => c.key === defaultCfg.key)) {
+      const existing = configs.find(c => c.key === defaultCfg.key);
+      if (!existing) {
         await SystemConfigModel.create(defaultCfg);
+      } else if (!existing.value || existing.value === '') {
+        await SystemConfigModel.updateOne({ _id: existing._id }, { value: defaultCfg.value });
       }
     }
     
     configs = await SystemConfigModel.find().lean();
     cachedConfig = {};
     for (const c of configs) {
-      cachedConfig[c.key] = c.value;
+      cachedConfig[c.key] = c.value || '';
     }
     console.log('Config loaded:', cachedConfig);
   } catch (e) {

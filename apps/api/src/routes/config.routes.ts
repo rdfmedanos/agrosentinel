@@ -17,13 +17,15 @@ const DEFAULT_CONFIG = [
 configRouter.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     console.log('Loading system config...');
-    console.log('SystemConfigModel:', SystemConfigModel?.collection?.name);
     let configs = await SystemConfigModel.find().lean();
     console.log('Found configs:', configs.length);
     
     for (const defaultCfg of DEFAULT_CONFIG) {
-      if (!configs.find(c => c.key === defaultCfg.key)) {
+      const existing = configs.find(c => c.key === defaultCfg.key);
+      if (!existing) {
         await SystemConfigModel.create(defaultCfg);
+      } else if (!existing.value || existing.value === '') {
+        await SystemConfigModel.updateOne({ _id: existing._id }, { value: defaultCfg.value });
       }
     }
     
