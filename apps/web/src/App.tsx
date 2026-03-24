@@ -2401,11 +2401,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     />
                                   </td>
                                   <td style={{ minWidth: '180px' }}>
-                                    <input type="text" className="form-control form-control-sm" placeholder="Direccion"
-                                      value={assigningDevice === d.device_id ? assigningAddress : ''}
-                                      onChange={e => { setAssigningDevice(d.device_id); setAssigningAddress(e.target.value); }}
-                                    />
-                                    <button className="btn btn-outline-primary btn-sm w-100 mt-1" 
+                                    <button className="btn btn-outline-primary btn-sm w-100" 
                                       onClick={() => { setAssigningDevice(d.device_id); setShowAssigningMap(true); }}>
                                       <i className="fas fa-map-marker-alt mr-1"></i>
                                       {assigningDevice === d.device_id && assigningLat && assigningLng ? 'Ubicado' : 'Seleccionar en mapa'}
@@ -2429,7 +2425,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                             device_id: d.device_id, 
                                             tenant_id: selectedUserId,
                                             name: assigningName || undefined,
-                                            address: assigningAddress || undefined,
                                             lat: assigningLat ? Number(assigningLat) : undefined,
                                             lng: assigningLng ? Number(assigningLng) : undefined
                                           }, props.session.token);
@@ -2742,7 +2737,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <table className="table table-sm table-borderless">
                         <tr><td className="text-muted fw-bold">Latitud:</td><td>{editDevice.lat || '—'}</td></tr>
                         <tr><td className="text-muted fw-bold">Longitud:</td><td>{editDevice.lng || '—'}</td></tr>
-                        <tr><td className="text-muted fw-bold">Direccion:</td><td>{selectedDevice.location.address || '—'}</td></tr>
                       </table>
                       <div className="alert alert-warning py-2 small mt-3">
                         <i className="fas fa-clock mr-1"></i>
@@ -2765,10 +2759,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           <option key={c._id} value={c.tenantId}>{c.companyName}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label small fw-bold">Direccion</label>
-                      <input className="form-control" value={editDevice.address} onChange={e => setEditDevice(p => ({ ...p, address: e.target.value }))} />
                     </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Latitud</label>
