@@ -878,6 +878,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [pendingDevices, setPendingDevices] = useState<{ device_id: string; status: string; last_seen: number; created_at?: number }[]>([]);
   const [usersList, setUsersList] = useState<{ id: string; name: string; email: string; role: string; tenantId: string }[]>([]);
   const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
+  const [assigningName, setAssigningName] = useState('');
+  const [assigningAddress, setAssigningAddress] = useState('');
+  const [assigningLat, setAssigningLat] = useState('');
+  const [assigningLng, setAssigningLng] = useState('');
   const [pendingFilter, setPendingFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [newUser, setNewUser] = useState({
     name: '',
@@ -2349,7 +2353,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       ) : (
                         <div className="table-responsive">
                           <table className="table table-hover m-0">
-                            <thead><tr><th>Device ID</th><th>Estado</th><th>Ultima Conexion</th><th>Asignar a Cliente</th><th>Accion</th></tr></thead>
+                            <thead><tr><th>Device ID</th><th>Estado</th><th>Ultima Conexion</th><th>Nombre</th><th>Ubicacion</th><th>Cliente</th><th>Accion</th></tr></thead>
                             <tbody>
                               {pendingDevices.filter(d => pendingFilter === 'all' || d.status === pendingFilter).map(d => (
                                 <tr key={d.device_id}>
@@ -2363,10 +2367,32 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                   <td className="small text-muted">
                                     {d.last_seen ? new Date(d.last_seen).toLocaleString('es-AR') : 'N/A'}
                                   </td>
-                                  <td style={{ minWidth: '200px' }}>
+                                  <td style={{ minWidth: '150px' }}>
+                                    <input type="text" className="form-control form-control-sm" placeholder="Nombre del dispositivo"
+                                      value={assigningDevice === d.device_id ? assigningName : ''}
+                                      onChange={e => { setAssigningDevice(d.device_id); setAssigningName(e.target.value); }}
+                                    />
+                                  </td>
+                                  <td style={{ minWidth: '250px' }}>
+                                    <div className="d-flex gap-1">
+                                      <input type="text" className="form-control form-control-sm" placeholder="Direccion"
+                                        value={assigningDevice === d.device_id ? assigningAddress : ''}
+                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningAddress(e.target.value); }}
+                                      />
+                                      <input type="number" className="form-control form-control-sm" placeholder="Lat" style={{ width: '80px' }}
+                                        value={assigningDevice === d.device_id ? assigningLat : ''}
+                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningLat(e.target.value); }}
+                                      />
+                                      <input type="number" className="form-control form-control-sm" placeholder="Lng" style={{ width: '80px' }}
+                                        value={assigningDevice === d.device_id ? assigningLng : ''}
+                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningLng(e.target.value); }}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td style={{ minWidth: '180px' }}>
                                     <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? selectedUserId : ''} 
                                       onChange={e => { setAssigningDevice(d.device_id); setSelectedUserId(e.target.value); }}>
-                                      <option value="">Seleccionar cliente...</option>
+                                      <option value="">Seleccionar...</option>
                                       {clients.map(c => (
                                         <option key={c.tenantId} value={c.tenantId}>{c.companyName}</option>
                                       ))}
@@ -2377,10 +2403,21 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       disabled={!selectedUserId || assigningDevice !== d.device_id}
                                       onClick={async () => {
                                         try {
-                                          await postJson('/devices/assign', { device_id: d.device_id, tenant_id: selectedUserId }, props.session.token);
+                                          await postJson('/devices/assign', { 
+                                            device_id: d.device_id, 
+                                            tenant_id: selectedUserId,
+                                            name: assigningName || undefined,
+                                            address: assigningAddress || undefined,
+                                            lat: assigningLat ? Number(assigningLat) : undefined,
+                                            lng: assigningLng ? Number(assigningLng) : undefined
+                                          }, props.session.token);
                                           setPendingDevices(p => p.filter(x => x.device_id !== d.device_id));
                                           setAssigningDevice(null);
                                           setSelectedUserId('');
+                                          setAssigningName('');
+                                          setAssigningAddress('');
+                                          setAssigningLat('');
+                                          setAssigningLng('');
                                         } catch (err) {
                                           alert('Error al asignar dispositivo');
                                         }

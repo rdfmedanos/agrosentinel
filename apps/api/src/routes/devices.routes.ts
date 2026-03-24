@@ -19,7 +19,11 @@ const createSchema = z.object({
 const assignSchema = z.object({
   device_id: z.string().min(1),
   user_id: z.string().min(1).optional(),
-  tenant_id: z.string().min(1).optional()
+  tenant_id: z.string().min(1).optional(),
+  name: z.string().optional(),
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional()
 });
 
 export const devicesRouter = Router();
@@ -156,6 +160,9 @@ devicesRouter.post('/assign', requireCompanyAdmin, async (req, res) => {
   device.tenantId = tenantId;
   device.pending = false;
   device.status = device.status === 'offline' ? 'offline' : 'online';
+  if (data.name) device.name = data.name;
+  if (data.address) device.location = { ...device.location, address: data.address };
+  if (data.lat && data.lng) device.location = { ...device.location, lat: data.lat, lng: data.lng };
   await device.save();
 
   res.json({ status: 'assigned', device_id: device.deviceId, tenant_id: tenantId });
