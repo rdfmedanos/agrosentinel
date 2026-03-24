@@ -20,6 +20,14 @@ function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void
   return null;
 }
 
+function MapInvalidateSize(props: { children: React.ReactNode }) {
+  const map = useMap();
+  useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 100);
+  }, [map]);
+  return <>{props.children}</>;
+}
+
 function MapCenterUpdater(props: { lat: string; lng: string }) {
   const map = useMap();
   useEffect(() => {
@@ -2447,13 +2455,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       style={{ height: '100%', width: '100%' }}
                     >
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      {assigningLat && assigningLng && (
-                        <Marker position={[Number(assigningLat), Number(assigningLng)]} />
-                      )}
-                      <MapClickHandler onMapClick={(lat, lng) => {
-                        setAssigningLat(lat.toString());
-                        setAssigningLng(lng.toString());
-                      }} />
+                      <MapInvalidateSize>
+                        {assigningLat && assigningLng && (
+                          <Marker position={[Number(assigningLat), Number(assigningLng)]} />
+                        )}
+                        <MapClickHandler onMapClick={(lat, lng) => {
+                          setAssigningLat(lat.toString());
+                          setAssigningLng(lng.toString());
+                        }} />
+                      </MapInvalidateSize>
                     </MapContainer>
                   </div>
                   <div className="modal-footer">
