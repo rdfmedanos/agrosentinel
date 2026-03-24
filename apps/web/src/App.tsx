@@ -1032,6 +1032,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
   useEffect(() => {
     if (props.session.user.role !== 'company_admin') return;
+    void getJson<Plan[]>('/billing/plans', props.session.token).then(setPlans).catch(console.error);
+  }, [props.session.token, props.session.user.role]);
+
+  useEffect(() => {
+    if (props.session.user.role !== 'company_admin') return;
     const token = props.session.token;
     let interval: ReturnType<typeof setInterval>;
     
