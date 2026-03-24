@@ -1089,7 +1089,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [props.session.token, props.session.user.role]);
 
   useEffect(() => {
-    setDevicesMapCenter([-34.62, -58.43]);
+    setDevicesMapCenter(null);
   }, [tenantId]);
 
   useEffect(() => {
