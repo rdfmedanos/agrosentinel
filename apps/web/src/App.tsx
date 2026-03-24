@@ -70,6 +70,10 @@ function getStatusBadge(status: string) {
   return 'text-bg-danger';
 }
 
+function getPumpColor(on: boolean) {
+  return on ? '#28a745' : '#dc3545';
+}
+
 type Device = {
   _id: string;
   deviceId: string;
@@ -772,8 +776,8 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                                 </div>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                <span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i> 
                                   {d.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
                                 </span>
                               </td>
@@ -1690,8 +1694,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
                                 <td>
-                                  <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i>
+                                  <span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i>
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span>
                                 </td>
@@ -1830,8 +1834,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                               <span className="small fw-bold">{d.levelPct}%</span>
                                             </div>
                                           </td>
-                                          <td><span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                          <td><span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i> 
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span></td>
                                           <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
@@ -2009,7 +2013,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     <span className="small fw-bold">{d.levelPct}%</span>
                                   </div>
                                 </td>
-                                <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                <td><span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}><i className="fas fa-circle mr-1" style={{ fontSize: '0.6em', color: getPumpColor(d.pumpOn) }}></i>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
                                 <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                               </tr>
                             ))}
@@ -2711,8 +2715,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                         <tr><td className="text-muted fw-bold">Nombre:</td><td className="fw-bold">{selectedDevice.name}</td></tr>
                         <tr><td className="text-muted fw-bold">Nivel:</td><td><span className="badge text-bg-success">{selectedDevice.levelPct}%</span></td></tr>
                         <tr><td className="text-muted fw-bold">Reserva:</td><td>{selectedDevice.reserveLiters} litros</td></tr>
-                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge text-bg-${selectedDevice.pumpOn ? 'success' : 'danger'}`}>
-                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge ${selectedDevice.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(selectedDevice.pumpOn)}}></i> 
                                   {selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
                                 </span></td></tr>
                         <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${getStatusBadge(selectedDevice.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(selectedDevice.status) }}></i>{selectedDevice.status}</span></td></tr>
