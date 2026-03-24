@@ -882,6 +882,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [assigningAddress, setAssigningAddress] = useState('');
   const [assigningLat, setAssigningLat] = useState('');
   const [assigningLng, setAssigningLng] = useState('');
+  const [showAssigningMap, setShowAssigningMap] = useState(false);
   const [pendingFilter, setPendingFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [newUser, setNewUser] = useState({
     name: '',
@@ -2373,21 +2374,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       onChange={e => { setAssigningDevice(d.device_id); setAssigningName(e.target.value); }}
                                     />
                                   </td>
-                                  <td style={{ minWidth: '250px' }}>
-                                    <div className="d-flex gap-1">
-                                      <input type="text" className="form-control form-control-sm" placeholder="Direccion"
-                                        value={assigningDevice === d.device_id ? assigningAddress : ''}
-                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningAddress(e.target.value); }}
-                                      />
-                                      <input type="number" className="form-control form-control-sm" placeholder="Lat" style={{ width: '80px' }}
-                                        value={assigningDevice === d.device_id ? assigningLat : ''}
-                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningLat(e.target.value); }}
-                                      />
-                                      <input type="number" className="form-control form-control-sm" placeholder="Lng" style={{ width: '80px' }}
-                                        value={assigningDevice === d.device_id ? assigningLng : ''}
-                                        onChange={e => { setAssigningDevice(d.device_id); setAssigningLng(e.target.value); }}
-                                      />
-                                    </div>
+                                  <td style={{ minWidth: '180px' }}>
+                                    <input type="text" className="form-control form-control-sm" placeholder="Direccion"
+                                      value={assigningDevice === d.device_id ? assigningAddress : ''}
+                                      onChange={e => { setAssigningDevice(d.device_id); setAssigningAddress(e.target.value); }}
+                                    />
+                                    <button className="btn btn-outline-primary btn-sm w-100 mt-1" 
+                                      onClick={() => { setAssigningDevice(d.device_id); setShowAssigningMap(true); }}>
+                                      <i className="fas fa-map-marker-alt mr-1"></i>
+                                      {assigningDevice === d.device_id && assigningLat && assigningLng ? 'Ubicado' : 'Seleccionar en mapa'}
+                                    </button>
                                   </td>
                                   <td style={{ minWidth: '180px' }}>
                                     <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? selectedUserId : ''} 
@@ -2436,6 +2432,40 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 </div>
               </div>
             )}
+
+            <div className={`modal fade ${showAssigningMap ? 'show' : ''}`} style={{ display: showAssigningMap ? 'block' : 'none' }}>
+              <div className="modal-dialog modal-lg">
+                <div className="modal-content">
+                  <div className="modal-header bg-primary">
+                    <h4 className="modal-title"><i className="fas fa-map-marker-alt mr-2"></i>Seleccionar Ubicacion</h4>
+                    <button type="button" className="close text-white" onClick={() => setShowAssigningMap(false)}>&times;</button>
+                  </div>
+                  <div className="modal-body p-0" style={{ height: '400px' }}>
+                    <MapContainer 
+                      center={assigningLat && assigningLng ? [Number(assigningLat), Number(assigningLng)] : [-34.62, -58.43]} 
+                      zoom={13} 
+                      style={{ height: '100%', width: '100%' }}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      {assigningLat && assigningLng && (
+                        <Marker position={[Number(assigningLat), Number(assigningLng)]} />
+                      )}
+                      <MapClickHandler onMapClick={(lat, lng) => {
+                        setAssigningLat(lat.toString());
+                        setAssigningLng(lng.toString());
+                      }} />
+                    </MapContainer>
+                  </div>
+                  <div className="modal-footer">
+                    <div className="mr-auto text-muted small">
+                      Lat: {assigningLat || '—'} | Lng: {assigningLng || '—'}
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowAssigningMap(false)}>Cerrar</button>
+                    <button type="button" className="btn btn-primary" onClick={() => setShowAssigningMap(false)}>Confirmar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {activeSection === 'backup' && (
               <div className="row">
