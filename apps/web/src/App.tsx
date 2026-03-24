@@ -836,7 +836,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   );
 }
 
-type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices';
+type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices' | 'backup';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -858,7 +858,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingDevice, setCreatingDevice] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
-  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt'>('servidor');
+  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'backup'>('servidor');
+  const [creatingBackup, setCreatingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [backupError, setBackupError] = useState('');
+  const [backupSuccess, setBackupSuccess] = useState('');
   const [showMqttConfig, setShowMqttConfig] = useState(false);
   const [mqttConfig, setMqttConfig] = useState({ host: 'localhost', port: '1883', username: '', password: '', qos: '1' });
   const [showMqttPassword, setShowMqttPassword] = useState(false);
@@ -1208,6 +1212,44 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   };
 
+  const createBackup = async () => {
+    setCreatingBackup(true);
+    setBackupError('');
+    setBackupSuccess('');
+    try {
+      const data = await getJson<{ clients: TenantClient[]; devices: Device[] }>('/backup/export', props.session.token);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agrosentinel_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupSuccess('Backup creado exitosamente');
+    } catch (err) {
+      setBackupError('Error al crear backup');
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const restoreBackup = async (file: File) => {
+    setRestoringBackup(true);
+    setBackupError('');
+    setBackupSuccess('');
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await postJson('/backup/import', data, props.session.token);
+      setBackupSuccess('Backup restaurado exitosamente');
+      await loadCompanyData(tenantId);
+    } catch (err) {
+      setBackupError('Error al restaurar backup. Verifique el archivo.');
+    } finally {
+      setRestoringBackup(false);
+    }
+  };
+
   const createUser = async () => {
     setCreatingUser(true);
     try {
@@ -1339,7 +1381,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       reportes: 'Reportes',
       actividad: 'Actividad',
       servidor: 'Servidor',
-      'pending-devices': 'Dispositivos Pendientes'
+      'pending-devices': 'Dispositivos Pendientes',
+      backup: 'Backup'
     };
     return map[activeSection];
   };
@@ -1484,6 +1527,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <a href="#" className={`nav-link ${activeSection === 'servidor' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('servidor'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Servidor</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'backup' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('backup'); }}>
+                        <i className="nav-icon fas fa-database"></i><p>Backup</p>
                       </a>
                     </li>
                   </ul>
@@ -2301,6 +2350,61 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           </table>
                         </div>
                       )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'backup' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-database me-2"></i>Backup y Restauracion</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6">
+                          <div className="card card-primary">
+                            <div className="card-header">
+                              <h5 className="card-title mb-0"><i className="fas fa-download mr-2"></i>Exportar Datos</h5>
+                            </div>
+                            <div className="card-body">
+                              <p className="text-muted">Exporta todos los clientes y dispositivos a un archivo JSON.</p>
+                              <button className="btn btn-primary" onClick={() => void createBackup()} disabled={creatingBackup}>
+                                {creatingBackup ? <><i className="fas fa-spinner fa-spin mr-1"></i>Generando...</> : <><i className="fas fa-download mr-1"></i>Descargar Backup</>}
+                              </button>
+                              {backupSuccess && <div className="alert alert-success mt-3 mb-0">{backupSuccess}</div>}
+                              {backupError && <div className="alert alert-danger mt-3 mb-0">{backupError}</div>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="card card-warning">
+                            <div className="card-header">
+                              <h5 className="card-title mb-0"><i className="fas fa-upload mr-2"></i>Importar Datos</h5>
+                            </div>
+                            <div className="card-body">
+                              <p className="text-muted">Restaura clientes y dispositivos desde un archivo JSON de backup.</p>
+                              <input 
+                                type="file" 
+                                accept=".json" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) void restoreBackup(file);
+                                }} 
+                                disabled={restoringBackup}
+                              />
+                              {restoringBackup && <div className="mt-2"><i className="fas fa-spinner fa-spin mr-1"></i>Restaurando...</div>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="alert alert-warning mt-3">
+                        <i className="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>Nota:</strong> La restauración no eliminará datos existentes, solo agregará o actualizará los del backup.
+                      </div>
                     </div>
                   </div>
                 </div>

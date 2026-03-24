@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../auth/auth.js';
 import { alertsRouter } from './alerts.routes.js';
 import { authRouter } from './auth.routes.js';
+import { backupRouter } from './backup.routes.js';
 import { billingRouter } from './billing.routes.js';
 import { devicesRouter } from './devices.routes.js';
 import { mqttConfigRouter } from './mqttConfig.routes.js';
@@ -18,6 +19,7 @@ apiRouter.use('/auth', authRouter);
 
 apiRouter.use(requireAuth);
 
+apiRouter.use('/backup', backupRouter);
 apiRouter.use('/mqtt-config', mqttConfigRouter);
 apiRouter.use('/tenants', tenantsRouter);
 apiRouter.use('/devices', devicesRouter);
