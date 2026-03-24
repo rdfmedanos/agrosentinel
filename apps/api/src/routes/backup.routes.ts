@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, requireCompanyAdmin, resolveTenantFromRequest } from '../auth/auth.js';
+import { requireAuth, requireCompanyAdmin } from '../auth/auth.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 import { DeviceModel } from '../models/Device.js';
 
@@ -7,9 +7,6 @@ export const backupRouter = Router();
 
 backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const tenantId = resolveTenantFromRequest(req);
-    console.log('Backup export - tenantId:', tenantId);
-    
     const clients = await TenantConfigModel.find().lean();
     const devices = await DeviceModel.find({ pending: false }).lean();
 
@@ -43,41 +40,35 @@ backupRouter.get('/export', requireAuth, requireCompanyAdmin, async (req, res) =
 
 backupRouter.post('/import', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const tenantId = resolveTenantFromRequest(req);
-
     const { clients, devices } = req.body as { clients?: unknown[]; devices?: unknown[] };
 
     if (clients && Array.isArray(clients)) {
       for (const client of clients) {
         const c = client as { tenantId?: string; companyName?: string; contactName?: string; email?: string; phone?: string; address?: string };
-        if (tenantId === 'demo-tenant' || c.tenantId === tenantId) {
-          await TenantConfigModel.findOneAndUpdate(
-            { tenantId: c.tenantId, companyName: c.companyName },
-            { $set: c },
-            { upsert: true }
-          );
-        }
+        await TenantConfigModel.findOneAndUpdate(
+          { tenantId: c.tenantId, companyName: c.companyName },
+          { $set: c },
+          { upsert: true }
+        );
       }
     }
 
     if (devices && Array.isArray(devices)) {
       for (const device of devices) {
         const d = device as { deviceId?: string; tenantId?: string; name?: string; location?: { lat?: number; lng?: number; address?: string } };
-        if (tenantId === 'demo-tenant' || d.tenantId === tenantId) {
-          await DeviceModel.findOneAndUpdate(
-            { deviceId: d.deviceId },
-            { 
-              $set: { 
-                name: d.name, 
-                location: d.location, 
-                tenantId: d.tenantId,
-                pending: false,
-                status: 'offline'
-              } 
-            },
-            { upsert: true }
-          );
-        }
+        await DeviceModel.findOneAndUpdate(
+          { deviceId: d.deviceId },
+          { 
+            $set: { 
+              name: d.name, 
+              location: d.location, 
+              tenantId: d.tenantId,
+              pending: false,
+              status: 'offline'
+            } 
+          },
+          { upsert: true }
+        );
       }
     }
 
