@@ -31,11 +31,14 @@ export const devicesRouter = Router();
 devicesRouter.get('/', async (req, res) => {
   const { all } = req.query;
   let devices;
+  const filter: any = { pending: false };
   if (all === 'true' && req.auth?.role === 'company_admin') {
-    devices = await DeviceModel.find().sort({ updatedAt: -1 });
+    delete filter.tenantId;
+    devices = await DeviceModel.find(filter).sort({ updatedAt: -1 });
   } else {
     const tenantId = resolveTenantFromRequest(req);
-    devices = await DeviceModel.find({ tenantId }).sort({ updatedAt: -1 });
+    filter.tenantId = tenantId;
+    devices = await DeviceModel.find(filter).sort({ updatedAt: -1 });
   }
   res.json(devices);
 });
