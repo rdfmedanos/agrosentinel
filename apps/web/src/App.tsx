@@ -1550,13 +1550,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       </div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Estado</th><th>Direccion</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th>Direccion</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
                               <tr key={d._id} style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); openDeviceModal(d); }}>
                                 <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
+                                <td>
+                                  <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i>
+                                    {d.pumpOn ? 'ON' : 'OFF'}
+                                  </span>
+                                </td>
                                 <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></td>
                                 <td className="small">{d.location.address}</td>
                               </tr>

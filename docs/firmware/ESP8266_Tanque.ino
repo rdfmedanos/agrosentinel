@@ -90,7 +90,7 @@ void cargarConfig() {
   if (cfg.distancia_sensor >= 0 && cfg.distancia_sensor < 500) distancia_sensor = cfg.distancia_sensor;
   
   config_modo_auto = cfg.modo_auto;
-  config_habilitar_bomba = cfg.habilitar_bomba;
+  config_habilitar_bomba = true; // Forzamos a true porque el panel web no tiene switch y la EEPROM lo rompe
 }
 
 // ---------------- SENSOR ----------------
@@ -209,9 +209,20 @@ void controlarBomba(int nivel, int reserva) {
   
   if (config_modo_auto && config_habilitar_bomba) {
     if (nivel < config_nivel_min && reserva > 10 && !ultimo_estado_bomba) {
+      Serial.printf("DEBUG PUMP: nivel(%d) < min(%d) && reserva(%d) > 10... ENCENDIENDO\n", nivel, config_nivel_min, reserva);
       nuevo_estado = true;
     } else if (nivel >= config_nivel_max && ultimo_estado_bomba) {
+      Serial.printf("DEBUG PUMP: nivel(%d) >= max(%d)... APAGANDO\n", nivel, config_nivel_max);
       nuevo_estado = false;
+    } else if (!ultimo_estado_bomba && nivel < config_nivel_min) {
+      // Si la bomba no prende, es porque reserva no es > 10
+      Serial.printf("DEBUG PUMP FALLO: nivel(%d) < min(%d) PERO reserva(%d) no es > 10\n", nivel, config_nivel_min, reserva);
+    }
+  } else {
+    static unsigned long last_debug = 0;
+    if (ahora - last_debug > 5000) {
+      Serial.printf("DEBUG PUMP BLOQUEADO: modo_auto=%d, habilitar_bomba=%d\n", config_modo_auto, config_habilitar_bomba);
+      last_debug = ahora;
     }
   }
   
