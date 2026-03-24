@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,6 +17,18 @@ function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void
       props.onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+function MapCenterUpdater(props: { lat: string; lng: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const lat = Number(props.lat);
+    const lng = Number(props.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      map.setView([lat, lng], map.getZoom());
+    }
+  }, [props.lat, props.lng, map]);
   return null;
 }
 
@@ -2472,6 +2484,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           style={{ height: '100%', width: '100%' }}
                         >
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <MapCenterUpdater lat={editDevice.lat} lng={editDevice.lng} />
                           {!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) && (
                             <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} />
                           )}
