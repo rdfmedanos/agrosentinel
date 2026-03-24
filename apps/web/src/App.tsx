@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 
 type Device = {
@@ -2490,13 +2490,43 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <label className="form-label small fw-bold">Direccion</label>
                       <input className="form-control" value={editDevice.address} onChange={e => setEditDevice(p => ({ ...p, address: e.target.value }))} />
                     </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label small fw-bold">Latitud</label>
-                      <input className="form-control" value={editDevice.lat} onChange={e => setEditDevice(p => ({ ...p, lat: e.target.value }))} />
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label small fw-bold">Longitud</label>
-                      <input className="form-control" value={editDevice.lng} onChange={e => setEditDevice(p => ({ ...p, lng: e.target.value }))} />
+                    <div className="col-md-12 mb-3">
+                      <label className="form-label small fw-bold">Ubicacion en el mapa (haz clic para seleccionar)</label>
+                      <div style={{ height: '300px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
+                        <MapContainer 
+                          center={editDevice.lat && editDevice.lng ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
+                          zoom={13} 
+                          style={{ height: '100%', width: '100%' }}
+                        >
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          {editDevice.lat && editDevice.lng && (
+                            <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} eventHandlers={{ click: () => {} }} />
+                          )}
+                          {(() => {
+                            const MapClickHandler = () => {
+                              useMapEvents({
+                                click: (e) => {
+                                  setEditDevice(p => ({ ...p, lat: e.latlng.lat.toString(), lng: e.latlng.lng.toString() }));
+                                },
+                              });
+                              return null;
+                            };
+                            return <MapClickHandler />;
+                          })()}
+                        </MapContainer>
+                      </div>
+                      <small className="text-muted">Lat: {editDevice.lat || '—'} | Lng: {editDevice.lng || '—'}</small>
+                      <div className="mt-2">
+                        <button type="button" className="btn btn-sm btn-outline-primary mr-2" onClick={() => {
+                          if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition((pos) => {
+                              setEditDevice(p => ({ ...p, lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }));
+                            });
+                          }
+                        }}>
+                          <i className="fas fa-crosshairs mr-1"></i> Usar mi ubicacion
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <hr />
