@@ -214,25 +214,34 @@ const createInvoiceSchema = z.object({
 
 billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
   try {
+    console.log('[INVOICE] Creating invoice, body:', req.body);
     const tenantId = resolveTenantFromRequest(req);
+    console.log('[INVOICE] Tenant ID:', tenantId);
     
     let data;
     try {
       data = createInvoiceSchema.parse(req.body);
+      console.log('[INVOICE] Parsed data:', data);
     } catch (parseError) {
-      console.error('Schema parse error:', parseError);
+      console.error('[INVOICE] Schema parse error:', parseError);
       res.status(400).json({ error: 'Datos inválidos', details: parseError instanceof z.ZodError ? parseError.errors : String(parseError) });
       return;
     }
     
+    console.log('[INVOICE] Getting ARCA config...');
     const config = await getEffectiveArcaConfig(tenantId);
+    console.log('[INVOICE] ARCA config:', config);
+    
     const ptoVta = Number(config.ptoVta) || 1;
     const environment = config.environment || 'mock';
     
+    console.log('[INVOICE] Finding last invoice for tenant:', tenantId, 'tipo:', data.tipo, 'ptoVta:', ptoVta);
     const lastInvoice = await InvoiceModel.findOne({ tenantId, tipo: data.tipo, puntoVenta: ptoVta })
       .sort({ numero: -1 });
     const nextNumero = lastInvoice ? lastInvoice.numero + 1 : 1;
+    console.log('[INVOICE] Next invoice number:', nextNumero);
     
+    console.log('[INVOICE] Creating invoice in database...');
     const invoice = await InvoiceModel.create({
       tenantId,
       userId: req.auth?.sub,
@@ -245,10 +254,11 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
       cliente: data.cliente,
       estado: 'pendiente'
     });
+    console.log('[INVOICE] Invoice created:', invoice._id);
     
     res.status(201).json(invoice);
   } catch (error) {
-    console.error('Create invoice error:', error);
+    console.error('[INVOICE] Error creating invoice:', error);
     res.status(500).json({ error: 'Error al crear factura', details: String(error) });
   }
 });
