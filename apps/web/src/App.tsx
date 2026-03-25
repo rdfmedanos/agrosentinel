@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents, useMap } from 'react-leaflet';
@@ -36,14 +36,6 @@ function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void
     },
   });
   return null;
-}
-
-function MapInvalidateSize(props: { children: React.ReactNode }) {
-  const map = useMap();
-  useEffect(() => {
-    setTimeout(() => map.invalidateSize(), 100);
-  }, [map]);
-  return <>{props.children}</>;
 }
 
 function MapCenterUpdater(props: { lat: string; lng: string }) {
@@ -905,7 +897,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
-  const [creatingDevice, setCreatingDevice] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
@@ -928,12 +919,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [pwdError, setPwdError] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
   const [pendingDevices, setPendingDevices] = useState<{ device_id: string; status: string; last_seen: number; created_at?: number }[]>([]);
   const [usersList, setUsersList] = useState<{ id: string; name: string; email: string; role: string; tenantId: string }[]>([]);
   const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
   const [assigningName, setAssigningName] = useState('');
-  const [assigningAddress, setAssigningAddress] = useState('');
   const [assigningLat, setAssigningLat] = useState('');
   const [assigningLng, setAssigningLng] = useState('');
   const [showAssigningMap, setShowAssigningMap] = useState(false);
@@ -1282,24 +1271,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       }
     } finally {
       setSavingClient(false);
-    }
-  };
-
-  const createDevice = async () => {
-    setCreatingDevice(true);
-    try {
-      await postJson('/devices', {
-        tenantId,
-        deviceId: newDevice.deviceId,
-        name: newDevice.name,
-        lat: Number(newDevice.lat),
-        lng: Number(newDevice.lng),
-        address: newDevice.address
-      }, props.session.token);
-      setNewDevice({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
-      await loadCompanyData(tenantId);
-    } finally {
-      setCreatingDevice(false);
     }
   };
 
@@ -2593,7 +2564,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                           setAssigningDevice(null);
                                           setSelectedUserId('');
                                           setAssigningName('');
-                                          setAssigningAddress('');
                                           setAssigningLat('');
                                           setAssigningLng('');
                                         } catch (err) {
