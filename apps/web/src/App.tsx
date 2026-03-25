@@ -2388,7 +2388,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card-body p-0">
                       <div className="card card-primary card-outline card-tabs">
                         <div className="card-header p-0 border-bottom-0">
-                          <ul className="nav nav-tabs" role="tablist">
+                      <ul className="nav nav-tabs" role="tablist" style={{ paddingLeft: '1rem' }}>
                             <li className="nav-item">
                               <a className={`nav-link ${serverTab === 'servidor' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('servidor'); }}>
                                 <i className="fas fa-server mr-1"></i> Servidor
