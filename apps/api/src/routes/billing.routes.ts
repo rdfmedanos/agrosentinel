@@ -8,6 +8,16 @@ import { TenantConfigModel } from '../models/TenantConfig.js';
 import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
+import {
+  generatePrivateKey,
+  generateCSR,
+  validateCertificate,
+  generateP12,
+  saveCertificateData,
+  loadCertificateData,
+  getCertificateFiles,
+  deleteCertificateData
+} from '../services/certificate.service.js';
 import type { ArcaEnvironment } from '../config/env.js';
 
 export const billingRouter = Router();
@@ -441,5 +451,199 @@ billingRouter.delete('/arca/cert', requireCompanyAdmin, async (req, res) => {
     res.json({ success: true, message: 'Certificado eliminado' });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar certificado' });
+  }
+});
+
+// ============ GENERADOR DE CERTIFICADOS ARCA ============
+
+const csrDataSchema = z.object({
+  companyName: z.string().min(1),
+  taxId: z.string().min(11).max(11),
+  province: z.string().min(1),
+  city: z.string().min(1),
+  environment: z.enum(['homologacion', 'produccion'])
+});
+
+billingRouter.post('/certificate/generate', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const data = csrDataSchema.parse(req.body);
+
+    const privateKey = generatePrivateKey();
+    const csr = generateCSR(privateKey, data);
+
+    const certData = {
+      tenantId,
+      privateKey,
+      csr,
+      environment: data.environment as 'homologacion' | 'produccion',
+      createdAt: new Date().toISOString(),
+      companyName: data.companyName,
+      taxId: data.taxId
+    };
+
+    saveCertificateData(tenantId, certData);
+
+    res.json({
+      success: true,
+      message: 'Clave privada y CSR generados correctamente',
+      csrPreview: csr.substring(0, 100) + '...'
+    });
+  } catch (error) {
+    console.error('Error generating certificate:', error);
+    res.status(500).json({ error: 'Error al generar certificado' });
+  }
+});
+
+billingRouter.get('/certificate/status', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const certData = loadCertificateData(tenantId);
+
+    if (!certData) {
+      res.json({
+        hasPrivateKey: false,
+        hasCsr: false,
+        hasCertificate: false,
+        environment: null,
+        createdAt: null
+      });
+      return;
+    }
+
+    res.json({
+      hasPrivateKey: !!certData.privateKey,
+      hasCsr: !!certData.csr,
+      hasCertificate: !!certData.certificate,
+      environment: certData.environment,
+      createdAt: certData.createdAt,
+      companyName: certData.companyName,
+      taxId: certData.taxId
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener estado del certificado' });
+  }
+});
+
+billingRouter.get('/certificate/download/:type', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const { type } = req.params;
+
+    if (!['key', 'csr'].includes(type)) {
+      res.status(400).json({ error: 'Tipo de archivo inválido' });
+      return;
+    }
+
+    const files = getCertificateFiles(tenantId);
+
+    if (type === 'key' && files.privateKey) {
+      res.setHeader('Content-Type', 'application/x-pem-file');
+      res.setHeader('Content-Disposition', `attachment; filename="private.key"`);
+      res.send(files.privateKey);
+      return;
+    }
+
+    if (type === 'csr' && files.csr) {
+      res.setHeader('Content-Type', 'application/x-pem-file');
+      res.setHeader('Content-Disposition', `attachment; filename="request.csr"`);
+      res.send(files.csr);
+      return;
+    }
+
+    res.status(404).json({ error: 'Archivo no encontrado' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al descargar archivo' });
+  }
+});
+
+billingRouter.post('/certificate/upload-crt', requireCompanyAdmin, upload.single('certificate'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No se recibió ningún archivo' });
+      return;
+    }
+
+    const tenantId = resolveTenantFromRequest(req);
+    const certData = loadCertificateData(tenantId);
+
+    if (!certData || !certData.privateKey || !certData.csr) {
+      res.status(400).json({ error: 'Primero debe generar la clave privada y el CSR' });
+      return;
+    }
+
+    const certificatePem = req.file.buffer.toString('utf8');
+
+    const isValid = validateCertificate(certificatePem, certData.privateKey, certData.csr);
+
+    if (!isValid) {
+      res.status(400).json({ 
+        error: 'El certificado no corresponde al CSR generado',
+        hint: 'Asegurese de subir el certificado correcto generado por ARCA para este CSR'
+      });
+      return;
+    }
+
+    certData.certificate = certificatePem;
+    saveCertificateData(tenantId, certData);
+
+    res.json({ success: true, message: 'Certificado cargado y validado correctamente' });
+  } catch (error) {
+    console.error('Error uploading certificate:', error);
+    res.status(500).json({ error: 'Error al procesar el certificado' });
+  }
+});
+
+billingRouter.post('/certificate/generate-p12', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: 'La contrasena debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    const certData = loadCertificateData(tenantId);
+
+    if (!certData || !certData.privateKey || !certData.certificate) {
+      res.status(400).json({ error: 'Debe generar el certificado y cargar el CRT de ARCA primero' });
+      return;
+    }
+
+    const p12Buffer = generateP12(certData.privateKey, certData.certificate, password);
+
+    res.setHeader('Content-Type', 'application/x-pkcs12');
+    res.setHeader('Content-Disposition', `attachment; filename="certificate.p12"`);
+    res.send(p12Buffer);
+  } catch (error) {
+    console.error('Error generating P12:', error);
+    res.status(500).json({ error: 'Error al generar archivo P12' });
+  }
+});
+
+billingRouter.delete('/certificate', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    deleteCertificateData(tenantId);
+    res.json({ success: true, message: 'Certificados eliminados correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar certificados' });
+  }
+});
+
+billingRouter.get('/certificate/csr', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const certData = loadCertificateData(tenantId);
+
+    if (!certData || !certData.csr) {
+      res.status(404).json({ error: 'CSR no encontrado. Genere primero la clave privada y CSR.' });
+      return;
+    }
+
+    res.json({ csr: certData.csr });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener CSR' });
   }
 });

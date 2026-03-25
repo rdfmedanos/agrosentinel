@@ -913,7 +913,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [backupError, setBackupError] = useState('');
   const [backupSuccess, setBackupSuccess] = useState('');
-  const [certStatus, setCertStatus] = useState<{hasCertificate: boolean; certFileName?: string; hasPassword: boolean; message: string} | null>(null);
+  const [certStatus, setCertStatus] = useState<{
+    hasPrivateKey: boolean;
+    hasCsr: boolean;
+    hasCertificate: boolean;
+    environment: string | null;
+    createdAt: string | null;
+    companyName?: string;
+    taxId?: string;
+  } | null>(null);
   const [uploadingCert, setUploadingCert] = useState(false);
   const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
   const [allDevicesMapCenter, setAllDevicesMapCenter] = useState<[number, number] | null>(null);
@@ -1181,16 +1189,52 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [activeSection, facturacionTab, props.session.token]);
 
+  const loadCertStatus = async () => {
+    try {
+      const status = await getJson<typeof certStatus>('/billing/certificate/status', props.session.token);
+      setCertStatus(status);
+      
+      const csrSection = document.getElementById('csrSection');
+      const uploadCrtSection = document.getElementById('uploadCrtSection');
+      const generateP12Section = document.getElementById('generateP12Section');
+      const certStatusCard = document.getElementById('certStatusCard');
+      const certStatusBody = document.getElementById('certStatusBody');
+
+      if (csrSection) csrSection.style.display = status?.hasCsr ? 'block' : 'none';
+      if (uploadCrtSection) uploadCrtSection.style.display = status?.hasCsr ? 'block' : 'none';
+      if (generateP12Section) generateP12Section.style.display = status?.hasCertificate ? 'block' : 'none';
+      if (certStatusCard) certStatusCard.style.display = status?.hasCsr ? 'block' : 'none';
+
+      if (certStatusBody && status) {
+        certStatusBody.innerHTML = `
+          <div class="row">
+            <div class="col-md-4 text-center">
+              <i class="fas ${status.hasPrivateKey ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'} fa-2x mb-2"></i>
+              <p class="mb-0"><strong>Clave Privada</strong></p>
+              <small>${status.hasPrivateKey ? 'Generada' : 'No disponible'}</small>
+            </div>
+            <div class="col-md-4 text-center">
+              <i class="fas ${status.hasCertificate ? 'fa-check-circle text-success' : 'fa-clock text-warning'} fa-2x mb-2"></i>
+              <p class="mb-0"><strong>Certificado ARCA</strong></p>
+              <small>${status.hasCertificate ? 'Cargado' : 'Pendiente'}</small>
+            </div>
+            <div class="col-md-4 text-center">
+              <i class="fas ${status.environment === 'produccion' ? 'fa-rocket text-primary' : 'fa-flask text-info'} fa-2x mb-2"></i>
+              <p class="mb-0"><strong>Entorno</strong></p>
+              <small>${status.environment === 'produccion' ? 'Produccion' : 'Homologacion'}</small>
+            </div>
+          </div>
+          ${status.createdAt ? `<p class="mt-2 mb-0 text-muted small">Generado: ${new Date(status.createdAt).toLocaleString('es-AR')}</p>` : ''}
+        `;
+      }
+    } catch (err) {
+      console.error('Error loading cert status:', err);
+    }
+  };
+
   useEffect(() => {
-    if (activeSection === 'facturacion' && facturacionTab === 'arca') {
-      void (async () => {
-        try {
-          const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
-          setCertStatus(status);
-        } catch (err) {
-          console.error('Error loading cert status:', err);
-        }
-      })();
+    if (activeSection === 'facturacion' && facturacionTab === 'certificado') {
+      void loadCertStatus();
     }
   }, [activeSection, facturacionTab, props.session.token]);
 
@@ -2344,102 +2388,252 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <div className="col-md-8">
                               <div className="alert alert-info">
                                 <i className="fas fa-key mr-2"></i>
-                                Certificado Digital ARCA - Necesario para facturacion electronica real
+                                Generador de Certificados ARCA - Necesario para facturacion electronica real
                               </div>
+
                               <div className="card mb-3">
-                                <div className="card-header">
-                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-upload mr-1"></i>Subir Certificado</h4>
+                                <div className="card-header bg-primary text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-cogs mr-1"></i>Paso 1: Generar Clave Privada y CSR</h5>
                                 </div>
                                 <div className="card-body">
-                                  <p className="text-muted small mb-3">
-                                    Debe ser un archivo <strong>.p12</strong> o <strong>.pfx</strong> obtenido de AFIP.
-                                    El certificado debe estar asociado al CUIT de su empresa.
-                                  </p>
+                                  <p className="text-muted small">Complete los datos de su empresa para generar el CSR (Certificate Signing Request)</p>
+                                  <div className="row">
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Razon Social *</label>
+                                      <input type="text" className="form-control" id="csrCompanyName" placeholder="Mi Empresa S.A." defaultValue={companyInfo.companyName} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">CUIT *</label>
+                                      <input type="text" className="form-control" id="csrTaxId" placeholder="30712345678" defaultValue={companyInfo.taxId} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Provincia *</label>
+                                      <input type="text" className="form-control" id="csrProvince" placeholder="Buenos Aires" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Ciudad *</label>
+                                      <input type="text" className="form-control" id="csrCity" placeholder="Ciudad de Buenos Aires" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Entorno *</label>
+                                      <select className="form-control" id="csrEnvironment">
+                                        <option value="homologacion">Homologacion (Testing)</option>
+                                        <option value="produccion">Produccion (Real)</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <button className="btn btn-primary" id="btnGenerateCsr" onClick={async () => {
+                                    const companyName = (document.getElementById('csrCompanyName') as HTMLInputElement).value;
+                                    const taxId = (document.getElementById('csrTaxId') as HTMLInputElement).value;
+                                    const province = (document.getElementById('csrProvince') as HTMLInputElement).value;
+                                    const city = (document.getElementById('csrCity') as HTMLInputElement).value;
+                                    const environment = (document.getElementById('csrEnvironment') as HTMLSelectElement).value;
+
+                                    if (!companyName || !taxId || !province || !city) {
+                                      alert('Complete todos los campos');
+                                      return;
+                                    }
+
+                                    const btn = document.getElementById('btnGenerateCsr') as HTMLButtonElement;
+                                    btn.disabled = true;
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+
+                                    try {
+                                      const res = await postJson('/billing/certificate/generate', {
+                                        companyName, taxId, province, city, environment
+                                      }, props.session.token);
+                                      if (res.ok) {
+                                        alert('CSR generado correctamente');
+                                        await loadCertStatus();
+                                      } else {
+                                        const err = await res.json();
+                                        alert('Error: ' + (err.error || 'Error desconocido'));
+                                      }
+                                    } catch (err) {
+                                      alert('Error al generar CSR');
+                                    } finally {
+                                      btn.disabled = false;
+                                      btn.innerHTML = '<i class="fas fa-key"></i> Generar Key + CSR';
+                                    }
+                                  }}>
+                                    <i className="fas fa-key mr-1"></i> Generar Key + CSR
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="csrSection" style={{ display: 'none' }}>
+                                <div className="card-header bg-success text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-download mr-1"></i>Paso 2: Descargar CSR y Obtener Certificado de ARCA</h5>
+                                </div>
+                                <div className="card-body">
+                                  <div className="alert alert-warning">
+                                    <i className="fas fa-exclamation-triangle mr-2"></i>
+                                    <strong>Importante:</strong> Descargue el archivo CSR y subalo a ARCA para obtener el certificado firmado.
+                                  </div>
+                                  <div className="row">
+                                    <div className="col-md-6 mb-3">
+                                      <button className="btn btn-success btn-block w-100" id="btnDownloadKey" onClick={() => {
+                                        window.open(`${API_URL}/billing/certificate/download/key?token=${props.session.token}`, '_blank');
+                                      }}>
+                                        <i className="fas fa-key mr-1"></i> Descargar Clave Privada (.key)
+                                      </button>
+                                      <small className="text-muted d-block mt-1">Guarde este archivo en un lugar seguro</small>
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <button className="btn btn-info btn-block w-100" id="btnDownloadCsr" onClick={() => {
+                                        window.open(`${API_URL}/billing/certificate/download/csr?token=${props.session.token}`, '_blank');
+                                      }}>
+                                        <i className="fas fa-file-alt mr-1"></i> Descargar CSR (.csr)
+                                      </button>
+                                      <small className="text-muted d-block mt-1">Este archivo se sube a ARCA</small>
+                                    </div>
+                                  </div>
+                                  <hr />
+                                  <h6><i className="fas fa-arrow-right mr-1"></i> Instrucciones para obtener el certificado de ARCA:</h6>
+                                  <ol className="text-muted small">
+                                    <li>Ingrese a <a href="https://www.afip.gob.ar/ws/" target="_blank">https://www.afip.gob.ar/ws/</a></li>
+                                    <li>Vaya a "Administracion de Certificados Digitales"</li>
+                                    <li>Seleccione "Crear nuevo certificado para Web Services"</li>
+                                    <li>Suba el archivo <strong>request.csr</strong> descargado</li>
+                                    <li>Siga las instrucciones de ARCA y descargue el certificado firmado (<strong>.crt</strong>)</li>
+                                  </ol>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="uploadCrtSection" style={{ display: 'none' }}>
+                                <div className="card-header bg-info text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-upload mr-1"></i>Paso 3: Subir Certificado Firmado por ARCA</h5>
+                                </div>
+                                <div className="card-body">
                                   <div className="mb-3">
-                                    <label className="form-label small fw-bold">Archivo de Certificado</label>
+                                    <label className="form-label small fw-bold">Certificado Firmado (.crt)</label>
                                     <div className="input-group">
-                                      <input type="file" className="form-control" accept=".p12,.pfx" id="certFile"
+                                      <input type="file" className="form-control" accept=".crt,.cer,.pem" id="certCrtFile"
                                         onChange={async (e) => {
                                           const file = e.target.files?.[0];
                                           if (!file) return;
-                                          setUploadingCert(true);
                                           const formData = new FormData();
                                           formData.append('certificate', file);
                                           try {
-                                            const res = await fetch(`${API_URL}/billing/arca/upload-cert`, {
+                                            const res = await fetch(`${API_URL}/billing/certificate/upload-crt`, {
                                               method: 'POST',
                                               headers: { Authorization: `Bearer ${props.session.token}` },
                                               body: formData
                                             });
+                                            const data = await res.json();
                                             if (res.ok) {
-                                              alert('Certificado subido correctamente');
-                                              const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
-                                              setCertStatus(status);
+                                              alert('Certificado cargado y validado correctamente');
+                                              await loadCertStatus();
                                             } else {
-                                              alert('Error al subir certificado');
+                                              alert('Error: ' + (data.error || 'Error al cargar certificado'));
                                             }
                                           } catch {
-                                            alert('Error al subir certificado');
+                                            alert('Error al cargar certificado');
                                           } finally {
-                                            setUploadingCert(false);
-                                            (document.getElementById('certFile') as HTMLInputElement).value = '';
+                                            (document.getElementById('certCrtFile') as HTMLInputElement).value = '';
                                           }
                                         }}
                                       />
                                     </div>
+                                    <small className="text-muted">Archivo .crt, .cer o .pem firmado por ARCA</small>
                                   </div>
-                                  <div className="mb-3">
-                                    <label className="form-label small fw-bold">Contrasena del Certificado</label>
-                                    <input type="password" className="form-control" placeholder="Contrasena del archivo .p12"
-                                      onChange={e => setArcaConfig(p => ({ ...p, certPassword: e.target.value }))} />
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="generateP12Section" style={{ display: 'none' }}>
+                                <div className="card-header bg-warning">
+                                  <h5 className="card-title mb-0"><i className="fas fa-file-archive mr-1"></i>Paso 4: Generar Archivo P12 (Opcional)</h5>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small">Genere el archivo .p12 necesario para algunos Web Services de AFIP</p>
+                                  <div className="row">
+                                    <div className="col-md-8 mb-3">
+                                      <label className="form-label small fw-bold">Contrasena para P12</label>
+                                      <input type="password" className="form-control" id="p12Password" placeholder="Minimo 6 caracteres" />
+                                    </div>
+                                    <div className="col-md-4 mb-3 d-flex align-items-end">
+                                      <button className="btn btn-warning w-100" onClick={async () => {
+                                        const password = (document.getElementById('p12Password') as HTMLInputElement).value;
+                                        if (!password || password.length < 6) {
+                                          alert('La contrasena debe tener al menos 6 caracteres');
+                                          return;
+                                        }
+                                        try {
+                                          const res = await fetch(`${API_URL}/billing/certificate/generate-p12`, {
+                                            method: 'POST',
+                                            headers: { 
+                                              'Content-Type': 'application/json',
+                                              Authorization: `Bearer ${props.session.token}`
+                                            },
+                                            body: JSON.stringify({ password })
+                                          });
+                                          if (res.ok) {
+                                            const blob = await res.blob();
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'certificate.p12';
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            alert('Archivo P12 descargado');
+                                          } else {
+                                            alert('Error al generar P12');
+                                          }
+                                        } catch {
+                                          alert('Error al generar P12');
+                                        }
+                                      }}>
+                                        <i className="fas fa-download mr-1"></i> Descargar P12
+                                      </button>
+                                    </div>
                                   </div>
-                                  <button className="btn btn-primary" onClick={() => void saveArcaConfig()} disabled={savingArca}>
-                                    {savingArca ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Contrasena</>}
+                                </div>
+                              </div>
+
+                              <div className="card" id="certStatusCard" style={{ display: 'none' }}>
+                                <div className="card-header bg-success text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Estado del Certificado</h5>
+                                </div>
+                                <div className="card-body" id="certStatusBody">
+                                </div>
+                                <div className="card-footer">
+                                  <button className="btn btn-danger btn-sm" onClick={async () => {
+                                    if (!confirm('¿Eliminar todos los certificados? Esta accion no se puede deshacer.')) return;
+                                    try {
+                                      await deleteJson('/billing/certificate', props.session.token);
+                                      alert('Certificados eliminados');
+                                      await loadCertStatus();
+                                    } catch {
+                                      alert('Error al eliminar certificados');
+                                    }
+                                  }}>
+                                    <i className="fas fa-trash mr-1"></i> Eliminar Todo
                                   </button>
                                 </div>
                               </div>
-                              {certStatus?.hasCertificate && (
-                                <div className="card border-success">
-                                  <div className="card-header bg-success text-white">
-                                    <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Certificado Cargado</h5>
-                                  </div>
-                                  <div className="card-body">
-                                    <p className="mb-2"><strong>Archivo:</strong> {certStatus.certFileName}</p>
-                                    <p className="mb-3"><strong>Estado:</strong> <span className="badge text-bg-success">Vigente</span></p>
-                                    <button className="btn btn-danger btn-sm" onClick={async () => {
-                                      if (!confirm('¿Eliminar el certificado? Debera subirlo nuevamente.')) return;
-                                      try {
-                                        await deleteJson('/billing/arca/cert', props.session.token);
-                                        const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
-                                        setCertStatus(status);
-                                        alert('Certificado eliminado');
-                                      } catch {
-                                        alert('Error al eliminar certificado');
-                                      }
-                                    }}>
-                                      <i className="fas fa-trash mr-1"></i>Eliminar Certificado
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              {!certStatus?.hasCertificate && (
-                                <div className="alert alert-warning">
-                                  <i className="fas fa-exclamation-triangle mr-2"></i>
-                                  <strong>Sin certificado</strong> - Para facturacion real debe subir el certificado digital de AFIP
-                                </div>
-                              )}
                             </div>
+
                             <div className="col-md-4">
                               <div className="card bg-light">
                                 <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Informacion</h4></div>
                                 <div className="card-body small">
-                                  <p className="mb-2"><strong>¿Como obtener el certificado?</strong></p>
+                                  <p className="mb-2"><strong>Proceso de obtencion de certificado:</strong></p>
                                   <ol className="mb-2 ps-3">
-                                    <li>Ingrese a <a href="https://www.afip.gob.ar/ws/" target="_blank" rel="noopener">afip.gob.ar/ws</a></li>
-                                    <li>Solicite el certificado de firma digital</li>
-                                    <li>Descargue el archivo .p12</li>
-                                    <li>Subalo aqui junto con su contrasena</li>
+                                    <li><strong>Genere</strong> la clave privada y el CSR</li>
+                                    <li><strong>Descargue</strong> el archivo request.csr</li>
+                                    <li><strong>Suba</strong> el CSR a ARCA</li>
+                                    <li><strong>Descargue</strong> el certificado firmado</li>
+                                    <li><strong>Suba</strong> el certificado a esta plataforma</li>
+                                    <li><strong>Genere</strong> el archivo P12 si es necesario</li>
                                   </ol>
+                                  <hr />
+                                  <p className="mb-2"><strong>Archivos generados:</strong></p>
+                                  <ul className="ps-3">
+                                    <li><code>private.key</code> - Clave privada RSA 2048 bits</li>
+                                    <li><code>request.csr</code> - Certificate Signing Request</li>
+                                    <li><code>certificate.crt</code> - Certificado firmado por ARCA</li>
+                                    <li><code>certificate.p12</code> - Archivo PKCS#12 (opcional)</li>
+                                  </ul>
                                   <hr />
                                   <p className="mb-0"><strong>Modo Mock:</strong> Puede usar el modo mock para pruebas sin certificado.</p>
                                 </div>
