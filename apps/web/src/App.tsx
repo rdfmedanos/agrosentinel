@@ -901,7 +901,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
-  const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa' | 'facturas'>('facturas');
+  const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa' | 'certificado' | 'facturas'>('facturas');
   const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto' });
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -913,6 +913,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [backupError, setBackupError] = useState('');
   const [backupSuccess, setBackupSuccess] = useState('');
+  const [certStatus, setCertStatus] = useState<{hasCertificate: boolean; certFileName?: string; hasPassword: boolean; message: string} | null>(null);
+  const [uploadingCert, setUploadingCert] = useState(false);
   const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
   const [allDevicesMapCenter, setAllDevicesMapCenter] = useState<[number, number] | null>(null);
   const [showMqttConfig, setShowMqttConfig] = useState(false);
@@ -1174,6 +1176,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
           setInvoices(data);
         } catch (err) {
           console.error('Error loading invoices:', err);
+        }
+      })();
+    }
+  }, [activeSection, facturacionTab, props.session.token]);
+
+  useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'arca') {
+      void (async () => {
+        try {
+          const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
+          setCertStatus(status);
+        } catch (err) {
+          console.error('Error loading cert status:', err);
         }
       })();
     }
@@ -2193,6 +2208,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           </a>
                         </li>
                         <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'certificado' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('certificado'); }}>
+                            <i className="fas fa-key mr-1"></i> Certificado
+                          </a>
+                        </li>
+                        <li className="nav-item">
                           <a className={`nav-link ${facturacionTab === 'facturas' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('facturas'); }}>
                             <i className="fas fa-file-invoice mr-1"></i> Facturas
                           </a>
@@ -2314,6 +2334,114 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <p className="mb-1"><strong>Contacto:</strong> {companyInfo.contactName || '—'}</p>
                                   <p className="mb-1"><strong>Email:</strong> {companyInfo.email || '—'}</p>
                                   <p className="mb-0"><strong>Telefono:</strong> {companyInfo.phone || '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`tab-pane ${facturacionTab === 'certificado' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-info">
+                                <i className="fas fa-key mr-2"></i>
+                                Certificado Digital ARCA - Necesario para facturacion electronica real
+                              </div>
+                              <div className="card mb-3">
+                                <div className="card-header">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-upload mr-1"></i>Subir Certificado</h4>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small mb-3">
+                                    Debe ser un archivo <strong>.p12</strong> o <strong>.pfx</strong> obtenido de AFIP.
+                                    El certificado debe estar asociado al CUIT de su empresa.
+                                  </p>
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Archivo de Certificado</label>
+                                    <div className="input-group">
+                                      <input type="file" className="form-control" accept=".p12,.pfx" id="certFile"
+                                        onChange={async (e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          setUploadingCert(true);
+                                          const formData = new FormData();
+                                          formData.append('certificate', file);
+                                          try {
+                                            const res = await fetch(`${API_URL}/billing/arca/upload-cert`, {
+                                              method: 'POST',
+                                              headers: { Authorization: `Bearer ${props.session.token}` },
+                                              body: formData
+                                            });
+                                            if (res.ok) {
+                                              alert('Certificado subido correctamente');
+                                              const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
+                                              setCertStatus(status);
+                                            } else {
+                                              alert('Error al subir certificado');
+                                            }
+                                          } catch {
+                                            alert('Error al subir certificado');
+                                          } finally {
+                                            setUploadingCert(false);
+                                            (document.getElementById('certFile') as HTMLInputElement).value = '';
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Contrasena del Certificado</label>
+                                    <input type="password" className="form-control" placeholder="Contrasena del archivo .p12"
+                                      onChange={e => setArcaConfig(p => ({ ...p, certPassword: e.target.value }))} />
+                                  </div>
+                                  <button className="btn btn-primary" onClick={() => void saveArcaConfig()} disabled={savingArca}>
+                                    {savingArca ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Contrasena</>}
+                                  </button>
+                                </div>
+                              </div>
+                              {certStatus?.hasCertificate && (
+                                <div className="card border-success">
+                                  <div className="card-header bg-success text-white">
+                                    <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Certificado Cargado</h5>
+                                  </div>
+                                  <div className="card-body">
+                                    <p className="mb-2"><strong>Archivo:</strong> {certStatus.certFileName}</p>
+                                    <p className="mb-3"><strong>Estado:</strong> <span className="badge text-bg-success">Vigente</span></p>
+                                    <button className="btn btn-danger btn-sm" onClick={async () => {
+                                      if (!confirm('¿Eliminar el certificado? Debera subirlo nuevamente.')) return;
+                                      try {
+                                        await deleteJson('/billing/arca/cert', props.session.token);
+                                        const status = await getJson<typeof certStatus>('/billing/arca/cert-status', props.session.token);
+                                        setCertStatus(status);
+                                        alert('Certificado eliminado');
+                                      } catch {
+                                        alert('Error al eliminar certificado');
+                                      }
+                                    }}>
+                                      <i className="fas fa-trash mr-1"></i>Eliminar Certificado
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              {!certStatus?.hasCertificate && (
+                                <div className="alert alert-warning">
+                                  <i className="fas fa-exclamation-triangle mr-2"></i>
+                                  <strong>Sin certificado</strong> - Para facturacion real debe subir el certificado digital de AFIP
+                                </div>
+                              )}
+                            </div>
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Informacion</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-2"><strong>¿Como obtener el certificado?</strong></p>
+                                  <ol className="mb-2 ps-3">
+                                    <li>Ingrese a <a href="https://www.afip.gob.ar/ws/" target="_blank" rel="noopener">afip.gob.ar/ws</a></li>
+                                    <li>Solicite el certificado de firma digital</li>
+                                    <li>Descargue el archivo .p12</li>
+                                    <li>Subalo aqui junto con su contrasena</li>
+                                  </ol>
+                                  <hr />
+                                  <p className="mb-0"><strong>Modo Mock:</strong> Puede usar el modo mock para pruebas sin certificado.</p>
                                 </div>
                               </div>
                             </div>

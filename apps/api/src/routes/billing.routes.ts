@@ -139,7 +139,8 @@ const arcaConfigSchema = z.object({
   cuit: z.string().min(11).max(11),
   ptoVta: z.string().min(1),
   token: z.string().optional().default(''),
-  sign: z.string().optional().default('')
+  sign: z.string().optional().default(''),
+  certPassword: z.string().optional().default('')
 });
 
 billingRouter.put('/arca-config', async (req, res) => {
@@ -150,15 +151,14 @@ billingRouter.put('/arca-config', async (req, res) => {
     { tenantId },
     {
       tenantId,
-      arca: {
-        enabled: data.enabled,
-        mock: data.mock,
-        cuit: data.cuit,
-        ptoVta: data.ptoVta,
-        token: data.token || undefined,
-        sign: data.sign || undefined,
-        environment: getArcaEnvironment() === 'produccion' ? 'prod' : 'homo'
-      }
+      'arca.enabled': data.enabled,
+      'arca.mock': data.mock,
+      'arca.cuit': data.cuit,
+      'arca.ptoVta': data.ptoVta,
+      'arca.token': data.token || '',
+      'arca.sign': data.sign || '',
+      'arca.certPassword': data.certPassword || '',
+      'arca.environment': getArcaEnvironment() === 'produccion' ? 'prod' : 'homo'
     },
     { upsert: true, new: true }
   );
@@ -343,5 +343,103 @@ billingRouter.get('/invoices/:id/pdf', async (req, res) => {
   } catch (error) {
     console.error('Error generating PDF:', error);
     res.status(500).json({ error: 'Error al generar PDF' });
+  }
+});
+
+// ============ CERTIFICADO ARCA ============
+
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const certStorageDir = process.env.CERT_STORAGE_DIR || path.join(process.cwd(), 'certs');
+if (!fs.existsSync(certStorageDir)) {
+  fs.mkdirSync(certStorageDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, certStorageDir);
+  },
+  filename: (req, file, cb) => {
+    const tenantId = resolveTenantFromRequest(req);
+    const ext = path.extname(file.originalname);
+    cb(null, `cert-${tenantId}${ext}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (['.p12', '.pfx'].includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos .p12 o .pfx'));
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+billingRouter.post('/arca/upload-cert', requireCompanyAdmin, upload.single('certificate'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No se recibió ningún archivo' });
+      return;
+    }
+
+    const tenantId = resolveTenantFromRequest(req);
+    const certPath = req.file.path;
+
+    await TenantConfigModel.findOneAndUpdate(
+      { tenantId },
+      { 'arca.certPath': certPath }
+    );
+
+    res.json({ success: true, message: 'Certificado subido correctamente', certPath });
+  } catch (error) {
+    console.error('Error uploading certificate:', error);
+    res.status(500).json({ error: 'Error al subir el certificado' });
+  }
+});
+
+billingRouter.get('/arca/cert-status', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const config = await TenantConfigModel.findOne({ tenantId });
+
+    const certPath = config?.arca?.certPath;
+    const hasCert = certPath && fs.existsSync(certPath);
+    const certFileName = certPath ? path.basename(certPath) : null;
+
+    res.json({
+      hasCertificate: hasCert,
+      certFileName,
+      certPath: hasCert ? certFileName : null,
+      hasPassword: !!(config?.arca?.certPassword),
+      message: hasCert ? 'Certificado cargado' : 'Sin certificado'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al verificar certificado' });
+  }
+});
+
+billingRouter.delete('/arca/cert', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const config = await TenantConfigModel.findOne({ tenantId });
+
+    if (config?.arca?.certPath && fs.existsSync(config.arca.certPath)) {
+      fs.unlinkSync(config.arca.certPath);
+    }
+
+    await TenantConfigModel.findOneAndUpdate(
+      { tenantId },
+      { 'arca.certPath': '', 'arca.certPassword': '' }
+    );
+
+    res.json({ success: true, message: 'Certificado eliminado' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar certificado' });
   }
 });

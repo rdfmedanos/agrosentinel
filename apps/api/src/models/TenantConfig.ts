@@ -1,4 +1,6 @@
 import { Schema, model } from 'mongoose';
+import path from 'path';
+import fs from 'fs';
 
 const tenantConfigSchema = new Schema(
   {
@@ -22,8 +24,11 @@ const tenantConfigSchema = new Schema(
       cuit: { type: String, default: '' },
       ptoVta: { type: String, default: '1' },
       wsfeUrl: { type: String, default: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx' },
+      wsaaUrl: { type: String, default: 'https://wsaahomo.afip.gov.ar/wsaa/services/LoginCms' },
       token: { type: String, default: '' },
       sign: { type: String, default: '' },
+      certPath: { type: String, default: '' },
+      certPassword: { type: String, default: '' },
       environment: { type: String, enum: ['homo', 'prod'], default: 'homo' }
     }
   },
@@ -31,3 +36,11 @@ const tenantConfigSchema = new Schema(
 );
 
 export const TenantConfigModel = model('TenantConfig', tenantConfigSchema);
+
+export function getCertStorageDir(): string {
+  const dir = process.env.CERT_STORAGE_DIR || path.join(process.cwd(), 'certs');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
