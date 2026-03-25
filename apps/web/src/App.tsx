@@ -2437,7 +2437,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 <div className="col-12">
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-white fw-bold mb-0">
+                      <h3 className="card-title text-white fw-bold mb-0 flex-grow-1">
                         <i className="fas fa-clock me-2"></i>Dispositivos Pendientes de Aprobacion ({pendingDevices.length})
                       </h3>
                       <div className="ms-auto">
