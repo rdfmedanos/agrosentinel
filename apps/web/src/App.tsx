@@ -1535,7 +1535,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
               </li>
 
               <li className={`nav-item has-treeview ${operacionOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['clientes', 'dispositivos', 'notificaciones'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setOperacionOpen(!operacionOpen); setConfigOpen(false); }}>
                   <i className="nav-icon fas fa-cogs"></i>
                   <p>Operacion <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
