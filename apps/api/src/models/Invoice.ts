@@ -23,7 +23,7 @@ const invoiceSchema = new Schema(
     
     // Cliente
     cliente: {
-      tipoDoc: { type: Number, enum: [80, 96, 99], required: true },
+      tipoDoc: { type: Number, required: true },
       nroDoc: { type: String, required: true },
       nombre: { type: String, required: true },
       condicionIva: { type: String, required: true },
@@ -55,7 +55,6 @@ const invoiceSchema = new Schema(
   { timestamps: true }
 );
 
-invoiceSchema.index({ tenantId: 1, period: 1 }, { unique: true });
 invoiceSchema.index({ tenantId: 1, tipo: 1, puntoVenta: 1, numero: 1 }, { unique: true });
 
 export const InvoiceModel = model('Invoice', invoiceSchema);

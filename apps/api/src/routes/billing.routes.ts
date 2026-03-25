@@ -214,8 +214,11 @@ const createInvoiceSchema = z.object({
 
 billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
   try {
+    console.log('=== CREATE INVOICE ===');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
     const tenantId = resolveTenantFromRequest(req);
     const data = createInvoiceSchema.parse(req.body);
+    console.log('Parsed data:', data);
     const config = await getEffectiveArcaConfig(tenantId);
     
     // Verificar número de comprobante
