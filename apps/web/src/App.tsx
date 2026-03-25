@@ -1807,7 +1807,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <i className="fas fa-arrow-left mr-1"></i>Volver a Clientes
                           </button>
                         </div>
-                        <ul className="nav nav-tabs mt-3" role="tablist">
+<ul className="nav nav-tabs" role="tablist">
                           <li className="nav-item">
                             <a className={`nav-link ${clientTab === 'info' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('info'); }}>
                               <i className="fas fa-info-circle mr-1"></i> Informacion
