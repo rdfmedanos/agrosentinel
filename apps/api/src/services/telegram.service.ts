@@ -3,9 +3,9 @@ import { logger } from '../config/logger.js';
 import { getConfig } from './alert.service.js';
 
 export async function sendTelegramMessage(message: string) {
-  const enabled = getConfig('TELEGRAM_ENABLED', 'false') === 'true';
-  const botToken = getConfig('TELEGRAM_BOT_TOKEN', '');
-  const chatId = getConfig('TELEGRAM_CHAT_ID', '');
+  const enabled = process.env.TELEGRAM_ENABLED === 'true' || getConfig('TELEGRAM_ENABLED', 'false') === 'true';
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || getConfig('TELEGRAM_BOT_TOKEN', '');
+  const chatId = process.env.TELEGRAM_CHAT_ID || getConfig('TELEGRAM_CHAT_ID', '');
   
   if (!enabled || !botToken || !chatId) {
     logger.debug('Telegram notifications disabled or not configured');
