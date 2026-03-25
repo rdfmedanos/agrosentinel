@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireCompanyAdmin, resolveTenantFromRequest } from '../auth/auth.js';
+import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
@@ -86,4 +87,32 @@ billingRouter.put('/arca-config', async (req, res) => {
   );
 
   res.json(config);
+});
+
+const companyInfoSchema = z.object({
+  companyName: z.string(),
+  contactName: z.string(),
+  email: z.string().email(),
+  phone: z.string(),
+  address: z.string(),
+  taxId: z.string(),
+  ivaCondition: z.string()
+});
+
+billingRouter.get('/company-info', requireCompanyAdmin, async (_, res) => {
+  let info = await CompanyInfoModel.findOne();
+  if (!info) {
+    info = await CompanyInfoModel.create({});
+  }
+  res.json(info);
+});
+
+billingRouter.put('/company-info', requireCompanyAdmin, async (req, res) => {
+  const data = companyInfoSchema.parse(req.body);
+  const info = await CompanyInfoModel.findOneAndUpdate(
+    {},
+    data,
+    { upsert: true, new: true }
+  );
+  res.json(info);
 });

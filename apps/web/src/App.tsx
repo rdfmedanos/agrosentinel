@@ -901,6 +901,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
   const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa'>('planes');
+  const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto' });
+  const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -1144,6 +1146,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [activeSection, props.session.user.role, props.session.user.tenantId, props.session.token]);
 
   useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'empresa') {
+      void (async () => {
+        try {
+          const info = await getJson<typeof companyInfo>('/billing/company-info', props.session.token);
+          setCompanyInfo(info);
+        } catch (err) {
+          console.error('Error loading company info:', err);
+        }
+      })();
+    }
+  }, [activeSection, facturacionTab, props.session.token]);
+
+  useEffect(() => {
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
@@ -1295,6 +1310,20 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       alert('Error al guardar plan');
     } finally {
       setSavingPlan(false);
+    }
+  };
+
+  const saveCompanyInfo = async () => {
+    setSavingCompanyInfo(true);
+    try {
+      const updated = await putJson('/billing/company-info', companyInfo, props.session.token);
+      setCompanyInfo(updated as typeof companyInfo);
+      alert('Datos guardados exitosamente');
+    } catch (err) {
+      console.error('Error saving company info:', err);
+      alert('Error al guardar datos');
+    } finally {
+      setSavingCompanyInfo(false);
     }
   };
 
@@ -2199,16 +2228,18 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <div className="col-md-8">
                               <div className="alert alert-info">
                                 <i className="fas fa-building mr-2"></i>
-                                Datos de la empresa para facturacion
+                                Datos fiscales y de contacto de su empresa para facturacion electronica
                               </div>
                               <div className="row">
-                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Nombre de la Empresa</label><input className="form-control" value={editClient.companyName} onChange={e => setEditClient(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
-                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={editClient.contactName} onChange={e => setEditClient(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
-                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={editClient.email} onChange={e => setEditClient(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
-                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={editClient.phone} onChange={e => setEditClient(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
-                                <div className="col-md-12 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={editClient.address} onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} placeholder="Av. Rivadavia 1234, CABA" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Razon Social</label><input className="form-control" value={companyInfo.companyName} onChange={e => setCompanyInfo(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={companyInfo.taxId} onChange={e => setCompanyInfo(p => ({ ...p, taxId: e.target.value }))} placeholder="30712345678" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Condicion IVA</label><select className="form-control" value={companyInfo.ivaCondition} onChange={e => setCompanyInfo(p => ({ ...p, ivaCondition: e.target.value }))}><option>Responsable Inscripto</option><option>Monotributista</option><option>Exento</option><option>Consumidor Final</option></select></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={companyInfo.contactName} onChange={e => setCompanyInfo(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={companyInfo.email} onChange={e => setCompanyInfo(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={companyInfo.phone} onChange={e => setCompanyInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
+                                <div className="col-md-12 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={companyInfo.address} onChange={e => setCompanyInfo(p => ({ ...p, address: e.target.value }))} placeholder="Av. Rivadavia 1234, CABA" /></div>
                                 <div className="col-12">
-                                  <button className="btn btn-primary fw-bold" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>Guardar Datos</button>
+                                  <button className="btn btn-primary fw-bold" onClick={() => void saveCompanyInfo()} disabled={savingCompanyInfo}>Guardar Datos</button>
                                 </div>
                               </div>
                             </div>
@@ -2216,11 +2247,12 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="card bg-light">
                                 <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
                                 <div className="card-body small">
-                                  <p className="mb-1"><strong>Empresa:</strong> {selectedClient?.companyName || '—'}</p>
-                                  <p className="mb-1"><strong>Contacto:</strong> {selectedClient?.contactName || '—'}</p>
-                                  <p className="mb-1"><strong>Email:</strong> {selectedClient?.email || '—'}</p>
-                                  <p className="mb-1"><strong>Telefono:</strong> {selectedClient?.phone || '—'}</p>
-                                  <p className="mb-0"><strong>Direccion:</strong> {selectedClient?.address || '—'}</p>
+                                  <p className="mb-1"><strong>Empresa:</strong> {companyInfo.companyName || '—'}</p>
+                                  <p className="mb-1"><strong>CUIT:</strong> {companyInfo.taxId || '—'}</p>
+                                  <p className="mb-1"><strong>IVA:</strong> {companyInfo.ivaCondition || '—'}</p>
+                                  <p className="mb-1"><strong>Contacto:</strong> {companyInfo.contactName || '—'}</p>
+                                  <p className="mb-1"><strong>Email:</strong> {companyInfo.email || '—'}</p>
+                                  <p className="mb-0"><strong>Telefono:</strong> {companyInfo.phone || '—'}</p>
                                 </div>
                               </div>
                             </div>
