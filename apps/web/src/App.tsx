@@ -1134,6 +1134,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [props.session]);
 
   useEffect(() => {
+    if (activeSection === 'usuarios' && tenantId) {
+      void (async () => {
+        try {
+          const tenantUsers = await getJson<AuthUser[]>(`/auth/admin/users?tenantId=${tenantId}`, props.session.token);
+          setUsers(tenantUsers);
+        } catch (err) {
+          console.error('Error loading users:', err);
+        }
+      })();
+    }
+  }, [activeSection, tenantId, props.session.token]);
+
+  useEffect(() => {
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
