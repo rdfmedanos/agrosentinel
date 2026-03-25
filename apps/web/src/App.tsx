@@ -1929,7 +1929,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card card-header-blue">
                       <div className="card-header d-flex justify-content-between align-items-center">
                         <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-building me-2"></i>Clientes</h3>
-                        <button className="btn btn-light btn-sm" onClick={() => setShowAddClient(true)}>
+                        <button className="btn btn-light btn-sm ms-auto" onClick={() => setShowAddClient(true)}>
                           <i className="fas fa-plus me-1"></i>Agregar Cliente
                         </button>
                       </div>
