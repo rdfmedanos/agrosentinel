@@ -904,7 +904,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const [newInvoice, setNewInvoice] = useState({ tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+  const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -1192,7 +1192,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
       const authResult = await authRes.json();
       setInvoices([authResult.invoice, ...invoices]);
-      setNewInvoice({ tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+      setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
       alert('Factura creada exitosamente!');
     } catch (err) {
       console.error('Error creating invoice:', err);
@@ -2321,6 +2321,32 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <h4 className="card-title small fw-bold mb-0"><i className="fas fa-plus mr-1"></i>Nueva Factura</h4>
                                 </div>
                                 <div className="card-body">
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Cliente</label>
+                                    <select className="form-control" value={newInvoice.tenantId} onChange={e => {
+                                      const client = clients.find(c => c.tenantId === e.target.value);
+                                      if (client) {
+                                        const plan = plans.find(p => p._id === client.planId);
+                                        setNewInvoice({
+                                          tenantId: client.tenantId,
+                                          tipo: 'B',
+                                          clienteNombre: client.companyName,
+                                          clienteTipoDoc: 80,
+                                          clienteNroDoc: '',
+                                          clienteCondicionIva: 'Responsable Inscripto',
+                                          amountArs: plan ? plan.monthlyPriceArs : 0,
+                                          period: newInvoice.period
+                                        });
+                                      }
+                                    }}>
+                                      <option value="">Seleccionar cliente...</option>
+                                      {clients.map(c => (
+                                        <option key={c.tenantId} value={c.tenantId}>
+                                          {c.companyName} {c.planName ? `(${c.planName})` : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
                                   <div className="mb-3">
                                     <label className="form-label small fw-bold">Tipo de Comprobante</label>
                                     <select className="form-control" value={newInvoice.tipo} onChange={e => setNewInvoice(p => ({ ...p, tipo: e.target.value }))}>
