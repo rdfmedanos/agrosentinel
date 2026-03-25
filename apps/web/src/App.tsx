@@ -2074,18 +2074,17 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 </div>
                 <div className="col-md-8">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({users.length})</h3></div>
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3></div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Tenant</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th></tr></thead>
                           <tbody>
-                            {users.map(u => (
+                            {usersList.map(u => (
                               <tr key={u.id}>
                                 <td className="fw-bold">{u.name}</td>
                                 <td className="small text-muted">{u.email}</td>
                                 <td><span className="badge text-bg-primary">{u.role}</span></td>
-                                <td>{u.mustChangePassword ? <span className="badge text-bg-warning"><i className="fas fa-exclamation-triangle me-1"></i>Pendiente</span> : <span className="badge text-bg-success">OK</span>}</td>
                                 <td className="small text-muted">{u.tenantId}</td>
                               </tr>
                             ))}
