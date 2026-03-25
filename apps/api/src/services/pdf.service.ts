@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 interface InvoiceData {
   _id: string;
   tipo: string;
+  ptoVta?: number | string;
   cbteNro?: number | null;
   period: string;
   amountArs: number;
@@ -75,7 +76,9 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
 
   if (invoice.cbteNro) {
     doc.moveDown(0.3);
-    doc.fontSize(10).font('Helvetica').text(`No. ${String(invoice.cbteNro).padStart(8, '0')}`, { align: 'center' });
+    const ptoVta = String(invoice.ptoVta || 1).padStart(5, '0');
+    const cbteNro = String(invoice.cbteNro).padStart(8, '0');
+    doc.fontSize(10).font('Helvetica-Bold').text(`FA-${invoice.tipo} ${ptoVta}-${cbteNro}`, { align: 'center' });
   }
 
   doc.moveDown(1);
