@@ -2415,11 +2415,12 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                           <th>Monto</th>
                                           <th>CAE</th>
                                           <th>Estado</th>
+                                          <th style={{width: '50px'}}>PDF</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {invoices.length === 0 ? (
-                                          <tr><td colSpan={6} className="text-center text-muted py-3">No hay facturas registradas</td></tr>
+                                          <tr><td colSpan={7} className="text-center text-muted py-3">No hay facturas registradas</td></tr>
                                         ) : (
                                           invoices.map(inv => (
                                             <tr key={inv._id}>
@@ -2427,11 +2428,21 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                               <td><span className="badge text-bg-secondary">Factura {inv.tipo || 'B'}</span></td>
                                               <td className="small">{inv.cliente?.nombre || inv.clienteNombre || '-'}</td>
                                               <td className="fw-bold text-primary">${(inv.amountArs || 0).toLocaleString('es-AR')}</td>
-                                              <td className="small">{inv.arca?.cae || '-'}</td>
+                                              <td className="small">{inv.cae || '-'}</td>
                                               <td>
-                                                <span className={`badge ${inv.status === 'authorized' ? 'text-bg-success' : inv.status === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
-                                                  {inv.status === 'authorized' ? 'Autorizada' : inv.status === 'paid' ? 'Pagada' : 'Borrador'}
+                                                <span className={`badge ${inv.estado === 'autorizado' ? 'text-bg-success' : inv.estado === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
+                                                  {inv.estado === 'autorizado' ? 'Autorizada' : inv.estado === 'paid' ? 'Pagada' : inv.estado || 'Borrador'}
                                                 </span>
+                                              </td>
+                                              <td>
+                                                <a 
+                                                  href={`${API_URL}/billing/invoices/${inv._id}/pdf?token=${props.session.token}`}
+                                                  target="_blank"
+                                                  className="btn btn-sm btn-outline-primary"
+                                                  title="Ver PDF"
+                                                >
+                                                  <i className="fas fa-file-pdf"></i>
+                                                </a>
                                               </td>
                                             </tr>
                                           ))

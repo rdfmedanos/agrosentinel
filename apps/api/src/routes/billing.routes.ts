@@ -7,6 +7,7 @@ import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
+import { generateInvoicePDF } from '../services/pdf.service.js';
 import type { ArcaEnvironment } from '../config/env.js';
 
 export const billingRouter = Router();
@@ -301,4 +302,46 @@ billingRouter.put('/company-info', requireCompanyAdmin, async (req, res) => {
 billingRouter.post('/run-monthly', requireCompanyAdmin, async (_, res) => {
   await generateMonthlyInvoices();
   res.json({ status: 'ok' });
+});
+
+// ============ PDF ============
+
+billingRouter.get('/invoices/:id/pdf', async (req, res) => {
+  try {
+    const invoice = await InvoiceModel.findById(req.params.id);
+    if (!invoice) {
+      res.status(404).json({ error: 'Factura no encontrada' });
+      return;
+    }
+
+    const companyInfo = await CompanyInfoModel.findOne();
+    const sellerInfo = companyInfo ? {
+      companyName: companyInfo.companyName || 'AgroSentinel',
+      taxId: companyInfo.taxId || '',
+      address: companyInfo.address || '',
+      ivaCondition: companyInfo.ivaCondition || '',
+      phone: companyInfo.phone
+    } : {
+      companyName: 'AgroSentinel',
+      taxId: '',
+      address: '',
+      ivaCondition: ''
+    };
+
+    const invoiceData = {
+      ...invoice.toObject(),
+      _id: invoice._id.toString()
+    };
+
+    const doc = generateInvoicePDF(invoiceData, sellerInfo);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="factura-${invoice.tipo}-${invoice.numero?.toString().padStart(8, '0') || '00000000'}.pdf"`);
+
+    doc.pipe(res);
+    doc.end();
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ error: 'Error al generar PDF' });
+  }
 });
