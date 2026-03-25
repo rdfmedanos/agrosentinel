@@ -100,6 +100,8 @@ type Alert = {
   message: string;
   type: 'offline' | 'critical_level';
   status: 'open' | 'resolved';
+  openedAt?: string;
+  createdAt?: string;
 };
 
 type WorkOrder = {
@@ -2177,23 +2179,49 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
               <div className="row">
                 <div className="col-12">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3>
+                      <div>
+                        <button className="btn btn-sm btn-outline-light me-2" onClick={async () => {
+                          if (!confirm('¿Probar notificación de Telegram?')) return;
+                          try {
+                            await postJson('/alerts/test-telegram', { message: '🧪 Prueba de AgroSentinel - Notificaciones funcionando correctamente' }, props.session.token);
+                            alert('Mensaje de prueba enviado a Telegram');
+                          } catch { alert('Error al enviar mensaje de prueba'); }
+                        }}>
+                          <i className="fab fa-telegram mr-1"></i>Probar Telegram
+                        </button>
+                        <button className="btn btn-sm btn-outline-light" onClick={async () => {
+                          if (!confirm('¿Limpiar todas las alertas resueltas?')) return;
+                          try {
+                            for (const a of alerts.filter(al => al.status === 'resolved')) {
+                              await deleteJson(`/alerts/${a._id}`, props.session.token);
+                            }
+                            setAlerts(alerts.filter(a => a.status === 'open'));
+                          } catch { alert('Error al limpiar alertas'); }
+                        }}>
+                          <i className="fas fa-trash mr-1"></i>Limpiar Resueltas
+                        </button>
+                      </div>
+                    </div>
                     <div className="card-body p-0">
                       {alerts.length === 0 ? (
                         <p className="text-center text-muted p-4">Sin notificaciones registradas</p>
                       ) : (
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
-                          <tbody>{alerts.map(a => (
+                          <thead><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th><th>Fecha</th></tr></thead>
+                          <tbody>{alerts.slice(0, 100).map(a => (
                             <tr key={a._id}>
                               <td className="fw-bold">{a.deviceId}</td>
                               <td><span className={`badge ${a.type === 'critical_level' ? 'text-bg-danger' : 'text-bg-secondary'}`}>{a.type}</span></td>
                               <td>{a.message}</td>
                               <td><span className={`badge ${a.status === 'open' ? 'text-bg-danger' : 'text-bg-success'}`}>{a.status}</span></td>
+                              <td className="small text-muted">{a.openedAt ? new Date(a.openedAt).toLocaleString('es-AR') : '-'}</td>
                             </tr>
                           ))}</tbody>
                         </table>
                       )}
+                      {alerts.length > 100 && <div className="text-center text-muted p-2 small">Mostrando las últimas 100 de {alerts.length}</div>}
                     </div>
                   </div>
                 </div>
