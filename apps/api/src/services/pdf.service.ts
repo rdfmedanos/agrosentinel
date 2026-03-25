@@ -163,17 +163,19 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   let y = 14;
 
   doc.roundedRect(leftMargin, y, pageWidth, 72, 8).lineWidth(0.9).stroke('#444444');
-  const leftColW = 290;
   const centerColW = 90;
-  const rightColW = pageWidth - leftColW - centerColW;
-  const centerX = leftMargin + leftColW;
+  const centerX = leftMargin + (pageWidth - centerColW) / 2;
+  const leftColW = centerX - leftMargin;
   const rightX = centerX + centerColW;
+  const rightColW = contentRight - rightX;
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#444444');
   doc.text(sanitizeText(seller?.companyName || 'AgroSentinel'), leftMargin + 12, y + 16, { width: leftColW - 24 });
+  const inscriptionW = 74;
+  const inscriptionX = centerX - inscriptionW - 8;
   doc.font('Helvetica').fontSize(8);
-  doc.text('Comprobante', centerX + 8, y + 16, { width: centerColW - 16, align: 'center' });
-  doc.text('electronico', centerX + 8, y + 30, { width: centerColW - 16, align: 'center' });
+  doc.text('Comprobante', inscriptionX, y + 16, { width: inscriptionW, align: 'center' });
+  doc.text('electronico', inscriptionX, y + 30, { width: inscriptionW, align: 'center' });
 
   doc.rect(centerX, y, centerColW, 58).lineWidth(0.3).stroke('#DDDDDD');
   doc.font('Helvetica-Bold').fontSize(48).fillColor('#111111');
