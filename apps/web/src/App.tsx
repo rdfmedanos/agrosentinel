@@ -2086,11 +2086,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
             {activeSection === 'facturacion' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card">
-                    <div className="card-header bg-primary">
-                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturacion y Planes</h3>
-                    </div>
-                    <div className="card-body p-0">
+                  <div className="card card-primary card-outline card-tabs">
+                    <div className="card-header">
+                      <div className="d-flex justify-content-between align-items-center w-100">
+                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturacion y Planes</h3>
+                      </div>
                       <ul className="nav nav-tabs" role="tablist">
                         <li className="nav-item">
                           <a className={`nav-link ${facturacionTab === 'planes' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('planes'); }}>
@@ -2108,9 +2108,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           </a>
                         </li>
                       </ul>
-                      <div className="tab-content p-3">
+                    </div>
+                    <div className="card-body">
+                      <div className="tab-content">
                         <div className={`tab-pane ${facturacionTab === 'planes' ? 'active show' : ''}`}>
-                          <h5 className="mb-3"><i className="fas fa-tags mr-2 text-primary"></i>Planes Disponibles</h5>
                           <div className="table-responsive">
                             <table className="table m-0">
                               <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th></tr></thead>
@@ -2153,7 +2154,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           </div>
                         </div>
                         <div className={`tab-pane ${facturacionTab === 'arca' ? 'active show' : ''}`}>
-                          <h5 className="mb-3"><i className="fas fa-shield-alt mr-2 text-danger"></i>Configuracion ARCA / AFIP</h5>
                           <div className="row">
                             <div className="col-md-8">
                               <div className="alert alert-warning">
@@ -2195,7 +2195,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           </div>
                         </div>
                         <div className={`tab-pane ${facturacionTab === 'empresa' ? 'active show' : ''}`}>
-                          <h5 className="mb-3"><i className="fas fa-building mr-2 text-info"></i>Datos de Mi Empresa</h5>
                           <div className="row">
                             <div className="col-md-8">
                               <div className="alert alert-info">
