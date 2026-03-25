@@ -554,10 +554,14 @@ billingRouter.get('/invoices/:id/pdf', async (req, res) => {
 
     const invoiceData = {
       ...invoice.toObject(),
-      _id: invoice._id.toString()
+      _id: invoice._id.toString(),
+      fechaEmision: invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'),
+      fechaVencimiento: invoice.caeDueDate || '-',
+      moneda: 'PES',
+      condicionPago: 'CONTADO'
     };
 
-    const doc = generateInvoicePDF(invoiceData, sellerInfo);
+    const doc = await generateInvoicePDF(invoiceData, sellerInfo);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="factura-${invoice.tipo}-${invoice.numero?.toString().padStart(8, '0') || '00000000'}.pdf"`);
