@@ -2339,13 +2339,18 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                       const client = clients.find(c => c.tenantId === e.target.value);
                                       if (client) {
                                         const plan = plans.find(p => p._id === client.planId);
+                                        const ivaCondition = client.ivaCondition || 'Consumidor Final';
+                                        let tipoComprobante = 'B';
+                                        if (ivaCondition === 'Responsable Inscripto') {
+                                          tipoComprobante = 'A';
+                                        }
                                         setNewInvoice({
                                           tenantId: client.tenantId,
-                                          tipo: 'B',
+                                          tipo: tipoComprobante,
                                           clienteNombre: client.companyName,
                                           clienteTipoDoc: 80,
-                                          clienteNroDoc: '',
-                                          clienteCondicionIva: 'Responsable Inscripto',
+                                          clienteNroDoc: client.taxId || '',
+                                          clienteCondicionIva: ivaCondition,
                                           amountArs: plan ? plan.monthlyPriceArs : 0,
                                           period: newInvoice.period
                                         });
