@@ -32,14 +32,16 @@ export async function generateMonthlyInvoices() {
       period,
       amountArs,
       status: 'issued',
-      arca: {
-        cae: arca.cae,
-        caeDueDate: arca.caeDueDate,
-        ptoVta: arca.ptoVta,
-        cbteNro: arca.cbteNro,
-        cbteTipo: arca.cbteTipo,
-        result: arca.result
-      }
+      tipo: 'B',
+      puntoVenta: 1,
+      numero: 1,
+      environment: 'mock',
+      cae: arca.cae,
+      caeDueDate: arca.caeDueDate,
+      cbteNro: arca.cbteNro,
+      cbteTipo: arca.cbteTipo,
+      arcaResult: arca.result,
+      estado: 'autorizado'
     });
   }
 }
