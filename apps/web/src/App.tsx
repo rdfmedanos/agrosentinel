@@ -1196,7 +1196,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [activeSection]);
 
   useEffect(() => {
-    if (activeSection === 'facturacion' && facturacionTab === 'facturas') {
+    if (activeSection === 'facturacion' && facturacionTab === 'facturas' && props.session?.token) {
       void (async () => {
         try {
           const data = await getJson<any[]>('/billing/invoices', props.session.token);
@@ -1206,7 +1206,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         }
       })();
     }
-  }, [activeSection, facturacionTab, props.session.token]);
+  }, [activeSection, facturacionTab, props.session?.token]);
 
   const loadCertStatus = async () => {
     try {
