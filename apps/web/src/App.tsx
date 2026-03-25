@@ -2440,7 +2440,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       <h3 className="card-title text-white fw-bold mb-0">
                         <i className="fas fa-clock me-2"></i>Dispositivos Pendientes de Aprobacion ({pendingDevices.length})
                       </h3>
-                      <div>
+                      <div className="ms-auto">
                         <div className="btn-group" role="group">
                           <button type="button" className={`btn btn-sm ${pendingFilter === 'all' ? 'btn-light' : 'btn-outline-light'}`} onClick={() => setPendingFilter('all')}>Todos</button>
                           <button type="button" className={`btn btn-sm ${pendingFilter === 'online' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setPendingFilter('online')}>Online</button>
