@@ -902,8 +902,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
   const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa' | 'certificado' | 'facturas'>('facturas');
-  const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto' });
+  const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto', province: '', city: '' });
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
+  const [provinces, setProvinces] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
@@ -1169,12 +1171,29 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         try {
           const info = await getJson<typeof companyInfo>('/billing/company-info', props.session.token);
           setCompanyInfo(info);
+          if (info.province) {
+            const citiesRes = await getJson<string[]>('/billing/cities/' + encodeURIComponent(info.province), props.session.token);
+            setCities(citiesRes);
+          }
         } catch (err) {
           console.error('Error loading company info:', err);
         }
       })();
     }
   }, [activeSection, facturacionTab, props.session.token]);
+
+  useEffect(() => {
+    if (provinces.length === 0) {
+      void (async () => {
+        try {
+          const provs = await getJson<string[]>('/billing/provinces', props.session.token);
+          setProvinces(provs);
+        } catch (err) {
+          console.error('Error loading provinces:', err);
+        }
+      })();
+    }
+  }, [activeSection]);
 
   useEffect(() => {
     if (activeSection === 'facturacion' && facturacionTab === 'facturas') {
@@ -2359,6 +2378,27 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Razon Social</label><input className="form-control" value={companyInfo.companyName} onChange={e => setCompanyInfo(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={companyInfo.taxId} onChange={e => setCompanyInfo(p => ({ ...p, taxId: e.target.value }))} placeholder="30712345678" /></div>
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Condicion IVA</label><select className="form-control" value={companyInfo.ivaCondition} onChange={e => setCompanyInfo(p => ({ ...p, ivaCondition: e.target.value }))}><option>Responsable Inscripto</option><option>Monotributista</option><option>Exento</option><option>Consumidor Final</option></select></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Provincia</label>
+                                  <select className="form-control" value={companyInfo.province} onChange={async e => {
+                                    const prov = e.target.value;
+                                    setCompanyInfo(p => ({ ...p, province: prov, city: '' }));
+                                    if (prov) {
+                                      try {
+                                        const citiesRes = await getJson<string[]>('/billing/cities/' + encodeURIComponent(prov), props.session.token);
+                                        setCities(citiesRes);
+                                      } catch { setCities([]); }
+                                    } else { setCities([]); }
+                                  }}>
+                                    <option value="">Seleccionar provincia...</option>
+                                    {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                                  </select>
+                                </div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Ciudad</label>
+                                  <select className="form-control" value={companyInfo.city} onChange={e => setCompanyInfo(p => ({ ...p, city: e.target.value }))}>
+                                    <option value="">Seleccionar ciudad...</option>
+                                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={companyInfo.contactName} onChange={e => setCompanyInfo(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={companyInfo.email} onChange={e => setCompanyInfo(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={companyInfo.phone} onChange={e => setCompanyInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
@@ -2375,6 +2415,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <p className="mb-1"><strong>Empresa:</strong> {companyInfo.companyName || '—'}</p>
                                   <p className="mb-1"><strong>CUIT:</strong> {companyInfo.taxId || '—'}</p>
                                   <p className="mb-1"><strong>IVA:</strong> {companyInfo.ivaCondition || '—'}</p>
+                                  <p className="mb-1"><strong>Provincia:</strong> {companyInfo.province || '—'}</p>
+                                  <p className="mb-1"><strong>Ciudad:</strong> {companyInfo.city || '—'}</p>
                                   <p className="mb-1"><strong>Contacto:</strong> {companyInfo.contactName || '—'}</p>
                                   <p className="mb-1"><strong>Email:</strong> {companyInfo.email || '—'}</p>
                                   <p className="mb-0"><strong>Telefono:</strong> {companyInfo.phone || '—'}</p>

@@ -286,6 +286,197 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
 
 // ============ EMPRESA ============
 
+billingRouter.get('/provinces', async (req, res) => {
+  const provinces = [
+    'Buenos Aires',
+    'Ciudad Autónoma de Buenos Aires',
+    'Catamarca',
+    'Chaco',
+    'Chubut',
+    'Córdoba',
+    'Corrientes',
+    'Entre Ríos',
+    'Formosa',
+    'Jujuy',
+    'La Pampa',
+    'La Rioja',
+    'Mendoza',
+    'Misiones',
+    'Neuquén',
+    'Río Negro',
+    'Salta',
+    'San Juan',
+    'San Luis',
+    'Santa Cruz',
+    'Santa Fe',
+    'Santiago del Estero',
+    'Tierra del Fuego',
+    'Tucumán'
+  ];
+  res.json(provinces);
+});
+
+billingRouter.get('/cities/:province', async (req, res) => {
+  const { province } = req.params;
+  
+  const citiesByProvince: Record<string, string[]> = {
+    'Buenos Aires': [
+      'La Plata', 'Mar del Plata', 'Bahía Blanca', 'Tandil', 'Vicente López',
+      'Avellaneda', 'Lomas de Zamora', 'Lanús', 'General San Martín', 'Quilmes',
+      'Berazategui', 'Escobar', 'Ezeiza', 'Florencio Varela', 'General Perón',
+      'Hurlingham', 'Ituzaingó', 'José C. Paz', 'Malvinas Argentinas', 'Merlo',
+      'Moreno', 'Morón', 'Néstor Kirchner', 'Pilcomayo', 'San Fernando',
+      'San Isidro', 'San Miguel', 'Tigre', 'Tres de Febrero', 'Tulúm'
+    ],
+    'Ciudad Autónoma de Buenos Aires': [
+      'Agronomía', 'Almagro', 'Balvanera', 'Barracas', 'Belgrano', 'Boca',
+      'Boedo', 'Caballito', 'Chacarita', 'Coghlan', 'Colegiales', 'Constitución',
+      'Flores', 'Floresta', 'La Paternal', 'Liniers', 'Mataderos', 'Monte Castro',
+      'Montserrat', 'Nueva Pompeya', 'Núñez', 'Palermo', 'Parque Avellaneda',
+      'Parque Chacabuco', 'Parque Chas', 'Parque Patricios', 'Puerto Madero',
+      'Recoleta', 'Retiro', 'Saavedra', 'San Cristóbal', 'San Nicolás',
+      'San Telmo', ' Vélez Sarsfield', 'Versailles', 'Villa Crespo', 'Villa del Parque',
+      'Villa Devoto', 'Villa General Mitre', 'Villa Lugano', 'Villa Luro',
+      'Villa Real', 'Villa Riachuelo', 'Villa Santa Rita', 'Villa Soldati', 'Villa Urquiza'
+    ],
+    'Córdoba': [
+      'Córdoba Capital', 'Villa María', 'Río Cuarto', 'San Francisco', 'Villa Carlos Paz',
+      'Alta Gracia', 'Jesús María', 'Cosquín', 'La Falda', 'Capilla del Monte',
+      'Mina Clavero', 'Villa Dolores', 'Santa Rosa de Calamuchita', 'Embalse',
+      'La Carlota', 'Bell Ville', 'Villa Nueva', 'Justiniano Posse', 'Marcos Juárez',
+      'Leones', 'Los Surgentes', 'Corral de Bustos', 'Cruz del Eje', 'Deán Funes'
+    ],
+    'Santa Fe': [
+      'Rosario', 'Santa Fe Capital', 'Venado Tuerto', 'Rafaela', 'Santo Tomé',
+      'Villa Constitución', 'Casilda', 'San Lorenzo', 'Granadero Baigorria', 'Funes',
+      'Roldán', 'Pérez', 'Arroyo Seco', 'Cañada de Gómez', 'Carcarañá',
+      'Gálvez', 'Coronda', 'Santo Domingo', 'San Javier', 'Reconquista',
+      'Avellaneda', 'Esperanza', 'Sunchales', 'Tostado', 'Ceres'
+    ],
+    'Mendoza': [
+      'Mendoza Capital', 'Godoy Cruz', 'Las Heras', 'Guaymallén', 'Maipú',
+      'Luján de Cuyo', 'San Rafael', 'General Alvear', 'Tunuyán', 'Tupungato',
+      'San Martín', 'Rivadavia', 'Junín', 'Santa Rosa', 'La Paz',
+      'Malargüe', 'San Carlos', 'Lavalle', 'Palmira', 'Eugenio Bustos'
+    ],
+    'Tucumán': [
+      'San Miguel de Tucumán', 'Yerba Buena', 'Tafí Viejo', 'Banda del Río Salí',
+      'Alderetes', 'Concepción', 'Monteros', 'Aguilares', 'Famaillá',
+      'Lules', 'La Cocha', 'Graneros', 'Simoca', 'Burruyacú', 'Trancas'
+    ],
+    'Entre Ríos': [
+      'Paraná', 'Concordia', 'Gualeguaychú', 'Concepción del Uruguay', 'La Paz',
+      'Villaguay', 'Federación', 'Federal', 'San Salvador', 'Diamante',
+      'La Paz', 'Nogoyá', 'Victoria', 'Rosario del Tala', 'Villaguay'
+    ],
+    'Salta': [
+      'Salta Capital', 'San Ramón de la Nueva Orán', 'Aguaray', 'Cachi',
+      'Cafayate', 'Campo Quijano', 'El Carril', 'El Quevar', 'Guachipas',
+      'Iruya', 'La Poma', 'Los Toldos', 'Molinos', 'Payogastilla',
+      'Rivadavia', 'Rosario de la Frontera', 'Rosario de Lerma', 'San Antonio de los Cobres',
+      'Santa Victoria', 'Tartagal', 'Tilcara', 'Yacuiba'
+    ],
+    'Chaco': [
+      'Resistencia', 'Presidencia Roque Sáenz Peña', 'Villa Ángela', 'San Bernardo',
+      'Juan José Castelli', 'Villa Río Bermejito', 'General José de San Martín',
+      'Charata', 'Las Breñas', 'Coronel Du Graty', 'Hermoso Campo', 'Itín',
+      'La Clotilde', 'La Tigra', 'Machagai', 'Makallé', 'Misión Nueva Pompeya',
+      'Pampa del Indio', 'Pampa del Zorro', 'Puerto Eva Perón', 'Puerto Tirol',
+      'Quitilipi', 'Samuhú', 'Taco Pozo', 'Villa Berthet'
+    ],
+    'Corrientes': [
+      'Corrientes Capital', 'Goya', 'Bella Vista', 'Santo Tomé', 'Paso de los Libres',
+      'Curuzú Cuatiá', 'Mercedes', 'Monte Caseros', 'Yatay', 'Ituzaingó',
+      'Esquina', 'Santo Domingo', 'San Lorenzo', 'San Miguel', 'San Roque',
+      'Itatí', 'Santa Ana', 'Concepción', 'Mburucuyá', 'Saladas'
+    ],
+    'Misiones': [
+      'Posadas', 'Oberá', 'Eldorado', 'Puerto Iguazú', 'Leandro N. Alem',
+      'Apóstoles', 'San Vicente', 'Jardín América', 'El Soberbio', 'Bernardo de Irigoyen',
+      'Puerto Rico', 'Aristóbulo del Valle', 'San Antonio', 'Villa La Angostura',
+      'San Javier', 'San Pedro', 'Dos de Mayo', 'Campo Grande', 'Mojón Grande'
+    ],
+    'Santiago del Estero': [
+      'Santiago del Estero Capital', 'La Banda', 'Termas de Río Hondo', 'Añatuya',
+      'Frías', 'La Paz', 'Lozano', 'Pampa de los Guanacos', 'Quimilí', 'San Pablo',
+      'Santiago del Estero', 'Tintina', 'Villa Ojo de Agua', 'Los Telares', 'Selva'
+    ],
+    'San Juan': [
+      'San Juan Capital', 'Rawson', 'Chimbas', 'Santa Lucía', 'Pocito',
+      'Caucete', 'San Martín', 'Albardón', 'Rivadavia', '25 de Mayo',
+      'Jáchal', 'Iglesia', 'Calingasta', 'Ullum', 'Zonda', 'Sarmiento',
+      'Angaco', 'Valle Fértil', '9 de Julio', '20 de Junio'
+    ],
+    'Río Negro': [
+      'Viedma', 'Bariloche', 'General Roca', 'Cipolletti', 'Neuquén',
+      'Río Colorado', 'Villa Regina', 'San Carlos de Bariloche', 'El Bolsón', 'Sierra Grande',
+      'Ingeniero Jacobacci', 'Los Menucos', 'Maquinchao', 'Valcheta', 'Chimpay',
+      'Choele Choel', 'Luis Belderrain', 'Darwin', 'Fortaleza', 'Lamarque'
+    ],
+    'Neuquén': [
+      'Neuquén Capital', 'Plottier', 'Centenario', 'Cutral Có', 'Zapala',
+      'San Martín de los Andes', 'Junín de los Andes', 'Chos Malal', 'Loncopué',
+      'Las Lajas', 'Añelo', 'Huinganco', 'Los Miches', 'Mariano Moreno',
+      'Paso Aguerre', 'Pichi Mahuida', 'Picún Leufú', 'Río Colorado', 'Vista Alegre'
+    ],
+    'Catamarca': [
+      'San Fernando del Valle de Catamarca', 'Ambato', 'Antofagasta de la Sierra',
+      'Belén', 'La Paz', 'Santa María', 'Santa Rosa', 'Tinogasta',
+      'Andalgalá', 'Fiambalá', 'Los Altos', 'Puerta de San José', 'Recreo',
+      'San Antonio', 'Saujil', 'Tuíz', 'Valle Viejo'
+    ],
+    'Chubut': [
+      'Rawson', 'Trelew', 'Puerto Madryn', 'Comodoro Rivadavia', 'Esquel',
+      'Gobernación', 'Gaiman', 'Dolavon', 'Río Mayo', 'Sarmiento',
+      'Puerto Pirámide', 'Laguna Grande', 'El Maitén', 'Lago Puelo', 'Epuyén',
+      'Corcovado', 'Gastre', 'Languiñeo', 'Paso de los Indios', 'Tehuelches'
+    ],
+    'Formosa': [
+      'Formosa Capital', 'Clorinda', 'Las Lomitas', 'Ingeniero Juarez', 'El Colorado',
+      'Pirané', 'Fontana', 'Villafañe', 'Ingeniero Guillermo N. Juárez', 'Misión San Martín',
+      'Estanislao del Campo', 'Laguna Yema', 'Pozo del Tigre', 'San Martín II', 'Subteniente Perín',
+      'Bartolomé de las Casas', 'Buena Vista', 'Colonia Pastoril', 'Gran Guardia', 'La Primavera'
+    ],
+    'Jujuy': [
+      'San Salvador de Jujuy', 'Palpalá', 'San Pedro de Jujuy', 'La Quiaca', 'Humahuaca',
+      'Tilcara', 'Perico', 'El Carmen', 'Palma Sola', 'Mina Pirita',
+      'Abreo', 'Arrayanal', 'Bermejillo', 'Caimancito', 'Calilegua',
+      'Cangrejillos', 'Cápac Pukú', 'Casira', 'Catua', 'Cieneguilla'
+    ],
+    'La Pampa': [
+      'Santa Rosa', 'General Pico', 'Toay', '25 de Mayo', 'Victorica',
+      'Eduardo Castex', 'General Acha', 'Realicó', 'Carlos Pellegrini', 'Parera',
+      'Alta Italia', 'Anguil', 'Arata', 'Bernardo Larroude', 'Ceballos',
+      'Chacharramendi', 'Colonia Baron', 'Conhello', 'Dorila', 'Embajador Martini'
+    ],
+    'La Rioja': [
+      'La Rioja Capital', 'Chilecito', 'Aimogasta', 'Tamcales', 'Villa Bustos',
+      'Villa Sanagasta', 'Famatina', 'Chamical', 'Chepes', 'Villa Unión',
+      'Villa Mazán', 'Anillaco', 'San Juan de la Punta', 'Olta', 'Malanzán',
+      'Milagro', 'Náquera', 'Nonogasta', 'Patquía', 'Punta de los Llanos'
+    ],
+    'San Luis': [
+      'San Luis Capital', 'Villa Mercedes', 'Merlo', 'La Punta', 'Juana Koslay',
+      'Potrero de los Funes', 'El Trapiche', 'El Volcán', 'Salto de la Querencia',
+      'Los Cerrillos', 'Balde', 'Bagual', 'Cañada de los Ranchos', 'Cerro de la Cruz',
+      'Desaguadero', 'El Durazno', 'El Totoral', 'Juan J. Paso', 'La Calera'
+    ],
+    'Santa Cruz': [
+      'Río Gallegos', 'Caleta Olivia', 'Puerto San Julián', 'Puerto Santa Cruz', 'Las Heras',
+      'Gobernación', 'Los Antiguos', 'Perito Moreno', '28 de Noviembre', 'Puerto Deseado',
+      'Puerto Madryn', 'Río Turbio', 'Veintiocho de Mayo', 'Comandante Luis Piedra Buena',
+      'El Calafate', 'El Chaltén', 'Gobernador Gregores', 'Lago Posadas', 'Lago Buenos Aires'
+    ],
+    'Tierra del Fuego': [
+      'Ushuaia', 'Río Grande', 'Tolhuin', 'Puerto Almanza', 'Lago Fagnano',
+      'Cerro Castor', 'Estancia Las Hijas', 'Puerto Harberton', 'San Sebastián', 'Valles'
+    ]
+  };
+  
+  const cities = citiesByProvince[province] || [];
+  res.json(cities);
+});
+
 billingRouter.get('/company-info', requireCompanyAdmin, async (_, res) => {
   let info = await CompanyInfoModel.findOne();
   if (!info) {
@@ -301,7 +492,9 @@ const companyInfoSchema = z.object({
   phone: z.string(),
   address: z.string(),
   taxId: z.string(),
-  ivaCondition: z.string()
+  ivaCondition: z.string(),
+  province: z.string(),
+  city: z.string()
 });
 
 billingRouter.put('/company-info', requireCompanyAdmin, async (req, res) => {
