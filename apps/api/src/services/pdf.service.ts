@@ -109,7 +109,7 @@ async function generateQRCode(data: object): Promise<Buffer> {
 }
 
 export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: InvoiceData['seller']): Promise<PDFKit.PDFDocument> {
-  const doc = new PDFDocument({ margin: 14, size: 'A4', layout: 'portrait' });
+  const doc = new PDFDocument({ margin: 14, size: [841.89, 1190.55], layout: 'portrait' });
 
   const leftMargin = 14;
   const pageWidth = doc.page.width - leftMargin * 2;
