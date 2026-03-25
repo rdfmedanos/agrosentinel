@@ -178,8 +178,13 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   doc.text('electronico', inscriptionX, y + 30, { width: inscriptionW, align: 'center' });
 
   doc.rect(centerX, y, centerColW, 58).lineWidth(0.3).stroke('#DDDDDD');
+  const tipoLetra = invoice.tipo || 'A';
   doc.font('Helvetica-Bold').fontSize(48).fillColor('#111111');
-  doc.text(invoice.tipo || 'A', centerX, y + 8, { width: centerColW, align: 'center' });
+  const letraW = doc.widthOfString(tipoLetra);
+  const letraH = doc.currentLineHeight();
+  const letraX = centerX + (centerColW - letraW) / 2;
+  const letraY = y + (58 - letraH) / 2;
+  doc.text(tipoLetra, letraX, letraY, { lineBreak: false });
   doc.font('Helvetica').fontSize(10).fillColor('#222222');
   doc.text(`cod. ${tipoData.codigo === '001' ? '1' : tipoData.codigo}`, centerX, y + 56, { width: centerColW, align: 'center' });
 
