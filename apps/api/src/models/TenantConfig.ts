@@ -10,6 +10,12 @@ const tenantConfigSchema = new Schema(
     address: { type: String, default: '' },
     planId: { type: Schema.Types.ObjectId, ref: 'Plan', default: null },
     active: { type: Boolean, default: true },
+    taxId: { type: String, default: '' },
+    ivaCondition: { 
+      type: String, 
+      enum: ['Responsable Inscripto', 'Monotributista', 'Exento', 'Consumidor Final'],
+      default: 'Consumidor Final'
+    },
     arca: {
       enabled: { type: Boolean, default: false },
       mock: { type: Boolean, default: true },

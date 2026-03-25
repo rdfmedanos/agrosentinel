@@ -152,6 +152,8 @@ type TenantClient = {
   createdAt: string;
   planId?: string;
   planName?: string;
+  taxId?: string;
+  ivaCondition?: string;
 };
 
 type AuthSession = {
@@ -948,7 +950,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     email: '',
     phone: '',
     address: '',
-    planId: ''
+    planId: '',
+    taxId: '',
+    ivaCondition: 'Consumidor Final'
   });
   const [editClient, setEditClient] = useState({
     companyName: '',
@@ -956,7 +960,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     email: '',
     phone: '',
     address: '',
-    planId: ''
+    planId: '',
+    taxId: '',
+    ivaCondition: 'Consumidor Final'
   });
   const [savingClient, setSavingClient] = useState(false);
   const [selectedClient, setSelectedClient] = useState<TenantClient | null>(null);
@@ -1297,7 +1303,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       email: selectedClient.email || '',
       phone: selectedClient.phone || '',
       address: selectedClient.address || '',
-      planId: (selectedClient as TenantClient & { planId?: string }).planId || ''
+      planId: (selectedClient as TenantClient & { planId?: string }).planId || '',
+      taxId: selectedClient.taxId || '',
+      ivaCondition: selectedClient.ivaCondition || 'Consumidor Final'
     });
     setShowEditClient(true);
   };
@@ -1312,7 +1320,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         email: editClient.email,
         phone: editClient.phone,
         address: editClient.address,
-        planId: editClient.planId || undefined
+        planId: editClient.planId || undefined,
+        taxId: editClient.taxId,
+        ivaCondition: editClient.ivaCondition
       }, props.session.token);
       setShowEditClient(false);
       void loadClients();
@@ -1325,7 +1335,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
           email: editClient.email,
           phone: editClient.phone,
           address: editClient.address,
-          planName: plans.find(p => p._id === editClient.planId)?.name
+          planName: plans.find(p => p._id === editClient.planId)?.name,
+          taxId: editClient.taxId,
+          ivaCondition: editClient.ivaCondition
         });
       }
     } finally {
@@ -2026,10 +2038,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <thead>
                               <tr>
                                 <th>Empresa</th>
-                                <th>Contacto</th>
+                                <th>CUIT</th>
+                                <th>Cond. IVA</th>
                                 <th>Email</th>
                                 <th>Telefono</th>
-                                <th>Direccion</th>
                                 <th>Plan</th>
                               </tr>
                             </thead>
@@ -2042,10 +2054,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 filteredClients.map(c => (
                                   <tr key={c._id} onClick={async () => { setSelectedClient(c); setTenantId(c.tenantId); setRestoreClient(true); await loadCompanyData(c.tenantId); saveNavState({ section: 'clientes', clientId: c._id }); }} style={{ cursor: 'pointer' }}>
                                     <td className="fw-bold">{c.companyName}</td>
-                                    <td>{c.contactName || '—'}</td>
+                                    <td className="small">{c.taxId || '—'}</td>
+                                    <td><span className="badge badge-secondary">{c.ivaCondition || 'Cons. Final'}</span></td>
                                     <td>{c.email || '—'}</td>
                                     <td>{c.phone || '—'}</td>
-                                    <td className="small">{c.address || '—'}</td>
                                     <td>{c.planName || '—'}</td>
                                   </tr>
                                 ))
@@ -2947,6 +2959,24 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                   onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))}
                   placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
               </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">CUIT</label>
+                  <input className="form-control" value={newClient.taxId}
+                    onChange={e => setNewClient(p => ({ ...p, taxId: e.target.value }))}
+                    placeholder="30712345678" />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Condicion IVA</label>
+                  <select className="form-control" value={newClient.ivaCondition}
+                    onChange={e => setNewClient(p => ({ ...p, ivaCondition: e.target.value }))}>
+                    <option>Consumidor Final</option>
+                    <option>Responsable Inscripto</option>
+                    <option>Monotributista</option>
+                    <option>Exento</option>
+                  </select>
+                </div>
+              </div>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Plan</label>
                 <select className="form-control" value={newClient.planId}
@@ -2969,11 +2999,13 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       email: newClient.email,
                       phone: newClient.phone,
                       address: newClient.address,
-                      planId: newClient.planId || undefined
+                      planId: newClient.planId || undefined,
+                      taxId: newClient.taxId,
+                      ivaCondition: newClient.ivaCondition
                     }, props.session.token);
                     const data = await res.json() as { tenantId: string };
                     setShowAddClient(false);
-                    setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
+                    setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '', taxId: '', ivaCondition: 'Consumidor Final' });
                     setTenantId(data.tenantId);
                     void loadClients();
                   } catch {
@@ -3024,6 +3056,24 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 <label className="form-label small fw-bold">Direccion</label>
                 <input className="form-control" value={editClient.address}
                   onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} />
+              </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">CUIT</label>
+                  <input className="form-control" value={editClient.taxId}
+                    onChange={e => setEditClient(p => ({ ...p, taxId: e.target.value }))}
+                    placeholder="30712345678" />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Condicion IVA</label>
+                  <select className="form-control" value={editClient.ivaCondition}
+                    onChange={e => setEditClient(p => ({ ...p, ivaCondition: e.target.value }))}>
+                    <option>Consumidor Final</option>
+                    <option>Responsable Inscripto</option>
+                    <option>Monotributista</option>
+                    <option>Exento</option>
+                  </select>
+                </div>
               </div>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Plan</label>
