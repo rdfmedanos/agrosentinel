@@ -2108,121 +2108,123 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       </ul>
                     </div>
                     <div className="card-body">
-                      {facturacionTab === 'planes' && (
-                        <div className="table-responsive">
-                          <table className="table m-0">
-                            <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th></tr></thead>
-                            <tbody>{plans.map(p => (
-                              <tr key={p._id} style={{ cursor: editingPlanId !== p._id ? 'pointer' : 'default' }} onClick={() => { if (editingPlanId !== p._id) { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); } }}>
-                                <td>
-                                  {editingPlanId === p._id ? (
-                                    <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} onClick={e => e.stopPropagation()} />
-                                  ) : (
-                                    <span className="fw-bold">{p.name}</span>
-                                  )}
-                                </td>
-                                <td>
-                                  {editingPlanId === p._id ? (
-                                    <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
-                                  ) : (
-                                    p.maxDevices
-                                  )}
-                                </td>
-                                <td>
-                                  {editingPlanId === p._id ? (
-                                    <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
-                                  ) : (
-                                    <span className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
-                                  )}
-                                </td>
-                                <td>
-                                  {editingPlanId === p._id ? (
-                                    <div className="d-flex gap-1">
-                                      <button className="btn btn-success btn-sm" onClick={e => { e.stopPropagation(); void savePlan(p._id); }} disabled={savingPlan}>Guardar</button>
-                                      <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setEditingPlanId(null); }}>Cancelar</button>
-                                    </div>
-                                  ) : (
-                                    <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}</tbody>
-                          </table>
+                      <div className="tab-content">
+                        <div className={`tab-pane ${facturacionTab === 'planes' ? 'active show' : ''}`}>
+                          <div className="table-responsive">
+                            <table className="table m-0">
+                              <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th></tr></thead>
+                              <tbody>{plans.map(p => (
+                                <tr key={p._id} style={{ cursor: editingPlanId !== p._id ? 'pointer' : 'default' }} onClick={() => { if (editingPlanId !== p._id) { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); } }}>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      <span className="fw-bold">{p.name}</span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      p.maxDevices
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      <span className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <div className="d-flex gap-1">
+                                        <button className="btn btn-success btn-sm" onClick={e => { e.stopPropagation(); void savePlan(p._id); }} disabled={savingPlan}>Guardar</button>
+                                        <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setEditingPlanId(null); }}>Cancelar</button>
+                                      </div>
+                                    ) : (
+                                      <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}</tbody>
+                            </table>
+                          </div>
                         </div>
-                      )}
-                      {facturacionTab === 'arca' && (
-                        <div className="row">
-                          <div className="col-md-8">
-                            <div className="alert alert-warning">
-                              <i className="fas fa-exclamation-triangle mr-2"></i>
-                              Configuracion de ARCA / AFIP para facturacion electronica
-                            </div>
-                            <div className="row">
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
-                              <div className="col-md-6 mb-3">
-                                <div className="form-check form-switch mt-4">
-                                  <input type="checkbox" className="form-check-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
-                                  <label className="form-check-label fw-bold" htmlFor="arcaEnabled">Habilitar Facturacion ARCA</label>
+                        <div className={`tab-pane ${facturacionTab === 'arca' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-warning">
+                                <i className="fas fa-exclamation-triangle mr-2"></i>
+                                Configuracion de ARCA / AFIP para facturacion electronica
+                              </div>
+                              <div className="row">
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3">
+                                  <div className="form-check form-switch mt-4">
+                                    <input type="checkbox" className="form-check-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                                    <label className="form-check-label fw-bold" htmlFor="arcaEnabled">Habilitar Facturacion ARCA</label>
+                                  </div>
+                                  <div className="form-check form-switch mt-2">
+                                    <input type="checkbox" className="form-check-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
+                                    <label className="form-check-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
+                                  </div>
                                 </div>
-                                <div className="form-check form-switch mt-2">
-                                  <input type="checkbox" className="form-check-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
-                                  <label className="form-check-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
+                                <div className="col-12">
+                                  <button className="btn btn-danger fw-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuracion'}</button>
                                 </div>
                               </div>
-                              <div className="col-12">
-                                <button className="btn btn-danger fw-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuracion'}</button>
-                              </div>
                             </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="card bg-light">
-                              <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
-                              <div className="card-body small">
-                                <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
-                                <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
-                                <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'text-bg-success' : 'text-bg-secondary'}`}>{arcaConfig.enabled ? 'Si' : 'No'}</span></p>
-                                <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'text-bg-warning' : 'text-bg-success'}`}>{arcaConfig.mock ? 'Si' : 'No'}</span></p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {facturacionTab === 'empresa' && (
-                        <div className="row">
-                          <div className="col-md-8">
-                            <div className="alert alert-info">
-                              <i className="fas fa-building mr-2"></i>
-                              Datos de la empresa para facturacion
-                            </div>
-                            <div className="row">
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Nombre de la Empresa</label><input className="form-control" value={editClient.companyName} onChange={e => setEditClient(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={editClient.contactName} onChange={e => setEditClient(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={editClient.email} onChange={e => setEditClient(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
-                              <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={editClient.phone} onChange={e => setEditClient(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
-                              <div className="col-md-12 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={editClient.address} onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} placeholder="Av. Rivadavia 1234, CABA" /></div>
-                              <div className="col-12">
-                                <button className="btn btn-primary fw-bold" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>Guardar Datos</button>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="card bg-light">
-                              <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
-                              <div className="card-body small">
-                                <p className="mb-1"><strong>Empresa:</strong> {selectedClient?.companyName || '—'}</p>
-                                <p className="mb-1"><strong>Contacto:</strong> {selectedClient?.contactName || '—'}</p>
-                                <p className="mb-1"><strong>Email:</strong> {selectedClient?.email || '—'}</p>
-                                <p className="mb-1"><strong>Telefono:</strong> {selectedClient?.phone || '—'}</p>
-                                <p className="mb-0"><strong>Direccion:</strong> {selectedClient?.address || '—'}</p>
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
+                                  <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
+                                  <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'text-bg-success' : 'text-bg-secondary'}`}>{arcaConfig.enabled ? 'Si' : 'No'}</span></p>
+                                  <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'text-bg-warning' : 'text-bg-success'}`}>{arcaConfig.mock ? 'Si' : 'No'}</span></p>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      )}
+                        <div className={`tab-pane ${facturacionTab === 'empresa' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-info">
+                                <i className="fas fa-building mr-2"></i>
+                                Datos de la empresa para facturacion
+                              </div>
+                              <div className="row">
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Nombre de la Empresa</label><input className="form-control" value={editClient.companyName} onChange={e => setEditClient(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={editClient.contactName} onChange={e => setEditClient(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={editClient.email} onChange={e => setEditClient(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={editClient.phone} onChange={e => setEditClient(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
+                                <div className="col-md-12 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={editClient.address} onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} placeholder="Av. Rivadavia 1234, CABA" /></div>
+                                <div className="col-12">
+                                  <button className="btn btn-primary fw-bold" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>Guardar Datos</button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-1"><strong>Empresa:</strong> {selectedClient?.companyName || '—'}</p>
+                                  <p className="mb-1"><strong>Contacto:</strong> {selectedClient?.contactName || '—'}</p>
+                                  <p className="mb-1"><strong>Email:</strong> {selectedClient?.email || '—'}</p>
+                                  <p className="mb-1"><strong>Telefono:</strong> {selectedClient?.phone || '—'}</p>
+                                  <p className="mb-0"><strong>Direccion:</strong> {selectedClient?.address || '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
