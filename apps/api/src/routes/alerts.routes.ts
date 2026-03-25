@@ -20,8 +20,12 @@ alertsRouter.delete('/:id', requireAuth, requireCompanyAdmin, async (req, res) =
 alertsRouter.post('/test-telegram', requireAuth, requireCompanyAdmin, async (req, res) => {
   const { message } = req.body;
   try {
-    await sendTelegramMessage(message || '🧪 Prueba de AgroSentinel');
-    res.json({ success: true });
+    const sent = await sendTelegramMessage(message || '🧪 Prueba de AgroSentinel');
+    if (sent) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'No se pudo enviar el mensaje. Revisa los logs del servidor.' });
+    }
   } catch (error) {
     res.status(500).json({ error: 'Error al enviar mensaje de prueba' });
   }

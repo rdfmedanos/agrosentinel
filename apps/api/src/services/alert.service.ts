@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { logger } from '../config/logger.js';
 import { AlertModel } from '../models/Alert.js';
 import { DeviceModel } from '../models/Device.js';
 import { SystemConfigModel } from '../models/SystemConfig.js';
@@ -66,7 +67,7 @@ export async function openAlert(params: {
   emitTenant(params.tenantId, 'alerts:updated', alert);
 
   const telegramMsg = formatAlertMessage(params.type, deviceName, params.message);
-  await sendTelegramMessage(telegramMsg);
+  await sendTelegramMessage(telegramMsg).catch(e => logger.error({e}, 'Error sending telegram alert'));
 
   return alert;
 }
@@ -83,7 +84,7 @@ export async function resolveAlert(tenantId: string, deviceId: string, type: 'of
     const device = await DeviceModel.findOne({ deviceId });
     const deviceName = device?.name || deviceId;
     const resolvedMsg = formatAlertMessage(type === 'offline' ? 'online' : 'warning', deviceName, 'Problema resuelto');
-    await sendTelegramMessage(resolvedMsg);
+    await sendTelegramMessage(resolvedMsg).catch(e => logger.error({e}, 'Error sending telegram resolve alert'));
   }
 }
 
