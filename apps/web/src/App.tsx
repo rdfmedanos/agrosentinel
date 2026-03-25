@@ -1709,7 +1709,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       </div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th>Direccion</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
                               <tr key={d._id} style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); openDeviceModal(d); }}>
