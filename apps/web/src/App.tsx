@@ -2180,9 +2180,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 <div className="col-12">
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3>
-                      <div className="ms-auto">
-                        <button className="btn btn-sm btn-light me-2" onClick={async () => {
+                      <h3 className="card-title text-white fw-bold mb-0 flex-grow-1"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3>
+                      <div className="ms-auto d-flex gap-2">
+                        <button className="btn btn-sm btn-light" onClick={async () => {
                           if (!confirm('¿Probar notificación de Telegram?')) return;
                           try {
                             await postJson('/alerts/test-telegram', { message: '🧪 Prueba de AgroSentinel - Notificaciones funcionando correctamente' }, props.session.token);
