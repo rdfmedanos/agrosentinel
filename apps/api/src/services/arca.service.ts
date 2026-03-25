@@ -1,21 +1,25 @@
 import { randomInt } from 'node:crypto';
-import { env } from '../config/env.js';
+import { env, type ArcaEnvironment } from '../config/env.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 
-type ArcaAuth = {
+export type ArcaAuth = {
   token: string;
   sign: string;
   cuit: number;
 };
 
-type EffectiveArcaConfig = {
+export type EffectiveArcaConfig = {
+  environment: ArcaEnvironment;
   enabled: boolean;
   mock: boolean;
   cuit: string;
   ptoVta: string;
   wsfeUrl: string;
+  wsaaUrl: string;
   token?: string;
   sign?: string;
+  certPath?: string;
+  certPassword?: string;
 };
 
 export type ArcaInvoiceRequest = {
@@ -30,6 +34,7 @@ export type ArcaInvoiceResult = {
   cbteTipo: number;
   ptoVta: string;
   result: string;
+  errors?: { code: string; msg: string }[];
 };
 
 function toYyyymmdd(date: Date): string {
@@ -45,18 +50,40 @@ function extractTag(xml: string, tag: string): string | null {
   return match?.[1] ?? null;
 }
 
+function extractErrors(xml: string): { code: string; msg: string }[] {
+  const errors: { code: string; msg: string }[] = [];
+  const codeMatch = xml.match(/<Code>(\d+)<\/Code>/g);
+  const msgMatch = xml.match(/<Msg>([^<]+)<\/Msg>/g);
+  
+  if (codeMatch && msgMatch) {
+    for (let i = 0; i < codeMatch.length; i++) {
+      const code = codeMatch[i].replace(/<\/?Code>/g, '');
+      const msg = msgMatch[i] ? msgMatch[i].replace(/<\/?Msg>/g, '') : '';
+      errors.push({ code, msg });
+    }
+  }
+  
+  return errors;
+}
+
 function getAuth(config: EffectiveArcaConfig): ArcaAuth {
   const token = config.token?.trim();
   const sign = config.sign?.trim();
   if (!token || !sign) {
-    throw new Error('ARCA_TOKEN y ARCA_SIGN son obligatorios cuando ARCA_ENABLED=true y ARCA_MOCK=false');
+    throw new Error('ARCA_TOKEN y ARCA_SIGN son obligatorios cuando el entorno no es mock');
   }
-
   return {
     token,
     sign,
     cuit: Number(config.cuit)
   };
+}
+
+function getUrls(env: ArcaEnvironment) {
+  if (env === 'produccion') {
+    return { wsaaUrl: 'https://wsaa.afip.gov.ar/ws/services/LoginCms', wsfeUrl: 'https://servicios1.afip.gov.ar/wsfev1/service.asmx' };
+  }
+  return { wsaaUrl: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms', wsfeUrl: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx' };
 }
 
 async function soapCall(config: EffectiveArcaConfig, action: string, body: string): Promise<string> {
@@ -84,8 +111,9 @@ async function soapCall(config: EffectiveArcaConfig, action: string, body: strin
 }
 
 async function getLastVoucherNumber(config: EffectiveArcaConfig, auth: ArcaAuth, ptoVta: number, cbteTipo: number): Promise<number> {
+  const urls = getUrls(config.environment);
   const xml = await soapCall(
-    config,
+    { ...config, wsfeUrl: urls.wsfeUrl },
     'FECompUltimoAutorizado',
     `<FECompUltimoAutorizado xmlns="http://ar.gov.afip.dif.FEV1/">
       <Auth>
@@ -102,61 +130,61 @@ async function getLastVoucherNumber(config: EffectiveArcaConfig, auth: ArcaAuth,
   return cbteNro ? Number(cbteNro) : 0;
 }
 
-async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
+export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
   const auth = getAuth(config);
   const ptoVta = Number(config.ptoVta);
-  const cbteTipo = 6;
+  const cbteTipo = 6; // Factura B por defecto
   const today = toYyyymmdd(new Date());
+  const urls = getUrls(config.environment);
+  
   const last = await getLastVoucherNumber(config, auth, ptoVta, cbteTipo);
   const nextNro = last + 1;
 
-  const xml = await soapCall(
-    config,
-    'FECAESolicitar',
-    `<FECAESolicitar xmlns="http://ar.gov.afip.dif.FEV1/">
-      <Auth>
-        <Token>${auth.token}</Token>
-        <Sign>${auth.sign}</Sign>
-        <Cuit>${auth.cuit}</Cuit>
-      </Auth>
-      <FeCAEReq>
-        <FeCabReq>
-          <CantReg>1</CantReg>
-          <PtoVta>${ptoVta}</PtoVta>
-          <CbteTipo>${cbteTipo}</CbteTipo>
-        </FeCabReq>
-        <FeDetReq>
-          <FECAEDetRequest>
-            <Concepto>2</Concepto>
-            <DocTipo>99</DocTipo>
-            <DocNro>0</DocNro>
-            <CbteDesde>${nextNro}</CbteDesde>
-            <CbteHasta>${nextNro}</CbteHasta>
-            <CbteFch>${today}</CbteFch>
-            <ImpTotal>${req.amountArs.toFixed(2)}</ImpTotal>
-            <ImpTotConc>0.00</ImpTotConc>
-            <ImpNeto>${req.amountArs.toFixed(2)}</ImpNeto>
-            <ImpOpEx>0.00</ImpOpEx>
-            <ImpIVA>0.00</ImpIVA>
-            <ImpTrib>0.00</ImpTrib>
-            <MonId>PES</MonId>
-            <MonCotiz>1</MonCotiz>
-            <FchServDesde>${today}</FchServDesde>
-            <FchServHasta>${today}</FchServHasta>
-            <FchVtoPago>${today}</FchVtoPago>
-          </FECAEDetRequest>
-        </FeDetReq>
-      </FeCAEReq>
-    </FECAESolicitar>`
-  );
+  const xmlRequest = `<FECAESolicitar xmlns="http://ar.gov.afip.dif.FEV1/">
+    <Auth>
+      <Token>${auth.token}</Token>
+      <Sign>${auth.sign}</Sign>
+      <Cuit>${auth.cuit}</Cuit>
+    </Auth>
+    <FeCAEReq>
+      <FeCabReq>
+        <CantReg>1</CantReg>
+        <PtoVta>${ptoVta}</PtoVta>
+        <CbteTipo>${cbteTipo}</CbteTipo>
+      </FeCabReq>
+      <FeDetReq>
+        <FECAEDetRequest>
+          <Concepto>2</Concepto>
+          <DocTipo>99</DocTipo>
+          <DocNro>0</DocNro>
+          <CbteDesde>${nextNro}</CbteDesde>
+          <CbteHasta>${nextNro}</CbteHasta>
+          <CbteFch>${today}</CbteFch>
+          <ImpTotal>${req.amountArs.toFixed(2)}</ImpTotal>
+          <ImpTotConc>0.00</ImpTotConc>
+          <ImpNeto>${req.amountArs.toFixed(2)}</ImpNeto>
+          <ImpOpEx>0.00</ImpOpEx>
+          <ImpIVA>0.00</ImpIVA>
+          <ImpTrib>0.00</ImpTrib>
+          <MonId>PES</MonId>
+          <MonCotiz>1</MonCotiz>
+          <FchServDesde>${today}</FchServDesde>
+          <FchServHasta>${today}</FchServHasta>
+          <FchVtoPago>${today}</FchVtoPago>
+        </FECAEDetRequest>
+      </FeDetReq>
+    </FeCAEReq>
+  </FECAESolicitar>`;
 
-  const result = extractTag(xml, 'Resultado') ?? 'R';
-  const cae = extractTag(xml, 'CAE');
-  const caeDueDate = extractTag(xml, 'CAEFchVto');
+  const xmlResponse = await soapCall({ ...config, wsfeUrl: urls.wsfeUrl }, 'FECAESolicitar', xmlRequest);
+
+  const result = extractTag(xmlResponse, 'Resultado') ?? 'R';
+  const cae = extractTag(xmlResponse, 'CAE');
+  const caeDueDate = extractTag(xmlResponse, 'CAEFchVto');
+  const errors = extractErrors(xmlResponse);
+  
   if (result !== 'A' || !cae || !caeDueDate) {
-    const errCode = extractTag(xml, 'Code');
-    const errMsg = extractTag(xml, 'Msg');
-    throw new Error(`ARCA rechazo comprobante (${errCode ?? 'N/A'}): ${errMsg ?? 'Sin detalle'}`);
+    throw new Error(`ARCA rechazo comprobante: ${errors.map(e => `${e.code}: ${e.msg}`).join(', ') || 'Sin detalle'}`);
   }
 
   return {
@@ -165,11 +193,12 @@ async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: ArcaInvoic
     cbteNro: nextNro,
     cbteTipo,
     ptoVta: config.ptoVta,
-    result
+    result,
+    errors
   };
 }
 
-function authorizeInvoiceMock(config: EffectiveArcaConfig, req: ArcaInvoiceRequest): ArcaInvoiceResult {
+export function authorizeInvoiceMock(req: ArcaInvoiceRequest): ArcaInvoiceResult {
   const now = Date.now().toString();
   const cae = now.slice(-8) + String(randomInt(100000, 999999));
   const due = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
@@ -181,40 +210,45 @@ function authorizeInvoiceMock(config: EffectiveArcaConfig, req: ArcaInvoiceReque
     caeDueDate: due,
     cbteNro: randomInt(1000, 99999),
     cbteTipo: 6,
-    ptoVta: config.ptoVta,
+    ptoVta: '1',
     result: 'A'
   };
 }
 
 export async function getEffectiveArcaConfig(tenantId: string): Promise<EffectiveArcaConfig> {
   const tenantConfig = await TenantConfigModel.findOne({ tenantId });
-  if (!tenantConfig || !tenantConfig.arca) {
-    return {
-      enabled: env.arcaEnabled,
-      mock: env.arcaMock,
-      cuit: env.arcaCuit,
-      ptoVta: env.arcaPtoVta,
-      wsfeUrl: env.arcaWsfeUrl,
-      token: env.arcaToken,
-      sign: env.arcaSign
-    };
-  }
-
+  
+  const arcaConfig = tenantConfig?.arca;
+  const isMock = !arcaConfig?.enabled || arcaConfig?.mock || env.arcaEnvironment === 'mock';
+  const environment = isMock ? 'mock' : (env.arcaEnvironment as ArcaEnvironment);
+  
   return {
-    enabled: tenantConfig.arca.enabled,
-    mock: tenantConfig.arca.mock,
-    cuit: tenantConfig.arca.cuit || env.arcaCuit,
-    ptoVta: tenantConfig.arca.ptoVta || env.arcaPtoVta,
-    wsfeUrl: tenantConfig.arca.wsfeUrl || env.arcaWsfeUrl,
-    token: tenantConfig.arca.token || env.arcaToken,
-    sign: tenantConfig.arca.sign || env.arcaSign
+    environment,
+    enabled: arcaConfig?.enabled ?? env.arcaEnabled ?? false,
+    mock: isMock,
+    cuit: arcaConfig?.cuit || env.arcaCuit,
+    ptoVta: arcaConfig?.ptoVta || env.arcaPtoVta,
+    wsfeUrl: getUrls(environment).wsfeUrl,
+    wsaaUrl: getUrls(environment).wsaaUrl,
+    token: arcaConfig?.token || env.arcaToken,
+    sign: arcaConfig?.sign || env.arcaSign,
+    certPath: env.arcaCertPath,
+    certPassword: env.arcaCertPassword
   };
 }
 
 export async function authorizeInvoiceWithArca(tenantId: string, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
   const config = await getEffectiveArcaConfig(tenantId);
-  if (!config.enabled || config.mock) {
-    return authorizeInvoiceMock(config, req);
+  if (config.mock || config.environment === 'mock') {
+    return authorizeInvoiceMock(req);
   }
   return authorizeInvoiceReal(config, req);
+}
+
+export function getArcaEnvironment(): ArcaEnvironment {
+  return env.arcaEnvironment;
+}
+
+export function setArcaEnvironment(env: ArcaEnvironment): void {
+  process.env.ARCA_ENVIRONMENT = env;
 }
