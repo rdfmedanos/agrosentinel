@@ -36,7 +36,12 @@ export async function loadConfig() {
 }
 
 export function getConfig(key: string, defaultValue: string): string {
-  return cachedConfig[key] ?? defaultValue;
+  const value = cachedConfig[key];
+  if (key === 'DEVICE_OFFLINE_SECONDS') {
+    const num = Number(value);
+    if (!num || num < 30) return defaultValue;
+  }
+  return value ?? defaultValue;
 }
 
 export async function openAlert(params: {
