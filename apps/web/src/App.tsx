@@ -1134,17 +1134,18 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [props.session]);
 
   useEffect(() => {
-    if (activeSection === 'usuarios' && tenantId) {
+    if (activeSection === 'usuarios' && props.session.user.role === 'company_admin') {
+      const tid = props.session.user.tenantId;
       void (async () => {
         try {
-          const tenantUsers = await getJson<AuthUser[]>(`/auth/admin/users?tenantId=${tenantId}`, props.session.token);
+          const tenantUsers = await getJson<AuthUser[]>(`/auth/admin/users?tenantId=${tid}`, props.session.token);
           setUsers(tenantUsers);
         } catch (err) {
           console.error('Error loading users:', err);
         }
       })();
     }
-  }, [activeSection, tenantId, props.session.token]);
+  }, [activeSection, props.session.user.role, props.session.user.tenantId, props.session.token]);
 
   useEffect(() => {
     const nav = loadNavState();
