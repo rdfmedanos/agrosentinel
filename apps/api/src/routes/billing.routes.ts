@@ -202,14 +202,14 @@ billingRouter.get('/invoices/:id', async (req, res) => {
 const createInvoiceSchema = z.object({
   tipo: z.enum(['A', 'B', 'C', 'M']),
   cliente: z.object({
-    tipoDoc: z.number().min(80).max(99),
-    nroDoc: z.string().min(1),
+    tipoDoc: z.number(),
+    nroDoc: z.string(),
     nombre: z.string().min(1),
-    condicionIva: z.string().min(1),
+    condicionIva: z.string(),
     direccion: z.string().optional().default('')
   }),
   period: z.string().min(1),
-  amountArs: z.number().positive()
+  amountArs: z.number().min(0)
 });
 
 billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
@@ -238,7 +238,11 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
     
     res.status(201).json(invoice);
   } catch (error) {
-    res.status(400).json({ error: String(error) });
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Datos inválidos', details: error.errors });
+    } else {
+      res.status(400).json({ error: String(error) });
+    }
   }
 });
 
