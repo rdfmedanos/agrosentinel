@@ -2181,8 +2181,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3>
-                      <div>
-                        <button className="btn btn-sm btn-outline-light me-2" onClick={async () => {
+                      <div className="ms-auto">
+                        <button className="btn btn-sm btn-light me-2" onClick={async () => {
                           if (!confirm('¿Probar notificación de Telegram?')) return;
                           try {
                             await postJson('/alerts/test-telegram', { message: '🧪 Prueba de AgroSentinel - Notificaciones funcionando correctamente' }, props.session.token);
@@ -2191,7 +2191,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                         }}>
                           <i className="fab fa-telegram mr-1"></i>Probar Telegram
                         </button>
-                        <button className="btn btn-sm btn-outline-light" onClick={async () => {
+                        <button className="btn btn-sm btn-light" onClick={async () => {
                           if (!confirm('¿Limpiar todas las alertas resueltas?')) return;
                           try {
                             for (const a of alerts.filter(al => al.status === 'resolved')) {
