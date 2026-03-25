@@ -2118,7 +2118,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                   <div className="card card-primary card-outline card-tabs">
                     <div className="card-header">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturacion</h3>
-                      <ul className="nav nav-tabs mt-3" role="tablist">
+                      <ul className="nav nav-tabs" role="tablist">
                         <li className="nav-item">
                           <a className={`nav-link ${facturacionTab === 'planes' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('planes'); }}>
                             <i className="fas fa-tags mr-1"></i> Planes
