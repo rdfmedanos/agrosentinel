@@ -10,8 +10,30 @@ import { generateMonthlyInvoices } from '../services/billing.service.js';
 export const billingRouter = Router();
 
 billingRouter.get('/plans', async (_, res) => {
-  const plans = await PlanModel.find({ active: true }).sort({ monthlyPriceArs: 1 });
+  const plans = await PlanModel.find({}).sort({ monthlyPriceArs: 1 });
   res.json(plans);
+});
+
+const updatePlanSchema = z.object({
+  name: z.string().min(1),
+  monthlyPriceArs: z.number().min(0),
+  maxDevices: z.number().min(1),
+  features: z.array(z.string()),
+  active: z.boolean()
+});
+
+billingRouter.put('/plans/:id', requireCompanyAdmin, async (req, res) => {
+  const data = updatePlanSchema.parse(req.body);
+  const plan = await PlanModel.findByIdAndUpdate(
+    req.params.id,
+    data,
+    { new: true }
+  );
+  if (!plan) {
+    res.status(404).json({ error: 'Plan no encontrado' });
+    return;
+  }
+  res.json(plan);
 });
 
 billingRouter.get('/invoices', async (req, res) => {

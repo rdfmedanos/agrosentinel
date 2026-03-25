@@ -125,6 +125,8 @@ type Plan = {
   name: string;
   monthlyPriceArs: number;
   maxDevices: number;
+  active?: boolean;
+  features?: string[];
 };
 
 type ArcaConfig = {
@@ -218,13 +220,14 @@ async function getJson<T>(path: string, token?: string): Promise<T> {
   return res.json();
 }
 
-async function putJson(path: string, body: unknown, token?: string) {
+async function putJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'PUT',
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error('API request failed');
+  return res.json();
 }
 
 async function postJson(path: string, body: unknown, token?: string) {
@@ -889,6 +892,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [tenantId, setTenantId] = useState<string>('');
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editPlanData, setEditPlanData] = useState<{ name: string; maxDevices: number; monthlyPriceArs: number; active: boolean; features: string[] }>({ name: '', maxDevices: 0, monthlyPriceArs: 0, active: true, features: [] });
+  const [savingPlan, setSavingPlan] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -1303,6 +1309,20 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       await loadCompanyData(tenantId);
     } finally {
       setSavingArca(false);
+    }
+  };
+
+  const savePlan = async (planId: string) => {
+    setSavingPlan(true);
+    try {
+      const updated = await putJson(`/billing/plans/${planId}`, editPlanData, props.session.token) as Plan;
+      setPlans(plans.map(p => p._id === planId ? updated : p));
+      setEditingPlanId(null);
+    } catch (err) {
+      console.error('Error saving plan:', err);
+      alert('Error al guardar plan');
+    } finally {
+      setSavingPlan(false);
     }
   };
 
@@ -2099,20 +2119,59 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
 
             {activeSection === 'facturacion' && (
               <div className="row">
-                <div className="col-md-6">
+                <div className="col-md-8">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-tags me-2"></i>Planes Disponibles</h3></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-tags me-2"></i>Planes Disponibles</h3>
+                    </div>
                     <div className="card-body p-0">
-                      <table className="table m-0">
-                        <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual</th></tr></thead>
-                        <tbody>{plans.map(p => (
-                          <tr key={p._id}>
-                            <td className="fw-bold">{p.name}</td>
-                            <td>{p.maxDevices}</td>
-                            <td className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
+                      <div className="table-responsive">
+                        <table className="table m-0">
+                          <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th><th>Accion</th></tr></thead>
+                          <tbody>{plans.map(p => (
+                            <tr key={p._id}>
+                              <td>
+                                {editingPlanId === p._id ? (
+                                  <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} />
+                                ) : (
+                                  <span className="fw-bold">{p.name}</span>
+                                )}
+                              </td>
+                              <td>
+                                {editingPlanId === p._id ? (
+                                  <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} />
+                                ) : (
+                                  p.maxDevices
+                                )}
+                              </td>
+                              <td>
+                                {editingPlanId === p._id ? (
+                                  <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} />
+                                ) : (
+                                  <span className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
+                                )}
+                              </td>
+                              <td>
+                                {editingPlanId === p._id ? (
+                                  <input type="checkbox" checked={editPlanData.active} onChange={e => setEditPlanData(d => ({ ...d, active: e.target.checked }))} />
+                                ) : (
+                                  <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
+                                )}
+                              </td>
+                              <td>
+                                {editingPlanId === p._id ? (
+                                  <div className="d-flex gap-1">
+                                    <button className="btn btn-success btn-sm" onClick={() => void savePlan(p._id)} disabled={savingPlan}>Guardar</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlanId(null)}>Cancelar</button>
+                                  </div>
+                                ) : (
+                                  <button className="btn btn-primary btn-sm" onClick={() => { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); }}><i className="fas fa-edit"></i></button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
