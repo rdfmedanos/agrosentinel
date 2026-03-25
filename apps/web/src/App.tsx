@@ -889,7 +889,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [savingPlan, setSavingPlan] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
@@ -900,9 +899,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
-  const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa'>('planes');
+  const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa' | 'facturas'>('facturas');
   const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto' });
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [newInvoice, setNewInvoice] = useState({ tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -1157,6 +1159,48 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       })();
     }
   }, [activeSection, facturacionTab, props.session.token]);
+
+  useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'facturas') {
+      void (async () => {
+        try {
+          const data = await getJson<any[]>('/billing/invoices', props.session.token);
+          setInvoices(data);
+        } catch (err) {
+          console.error('Error loading invoices:', err);
+        }
+      })();
+    }
+  }, [activeSection, facturacionTab, props.session.token]);
+
+  const createInvoice = async () => {
+    setCreatingInvoice(true);
+    try {
+      const res = await postJson('/billing/invoices', {
+        tipo: newInvoice.tipo,
+        cliente: {
+          tipoDoc: newInvoice.clienteTipoDoc,
+          nroDoc: newInvoice.clienteNroDoc,
+          nombre: newInvoice.clienteNombre,
+          condicionIva: newInvoice.clienteCondicionIva
+        },
+        period: newInvoice.period,
+        amountArs: newInvoice.amountArs
+      }, props.session.token);
+      const invoice = await res.json();
+      
+      const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
+      const authResult = await authRes.json();
+      setInvoices([authResult.invoice, ...invoices]);
+      setNewInvoice({ tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+      alert('Factura creada exitosamente!');
+    } catch (err) {
+      console.error('Error creating invoice:', err);
+      alert('Error al crear factura');
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
 
   useEffect(() => {
     const nav = loadNavState();
@@ -2136,6 +2180,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <i className="fas fa-building mr-1"></i> Mi Empresa
                           </a>
                         </li>
+                        <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'facturas' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('facturas'); }}>
+                            <i className="fas fa-file-invoice mr-1"></i> Facturas
+                          </a>
+                        </li>
                       </ul>
                     </div>
                     <div className="card-body">
@@ -2253,6 +2302,117 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <p className="mb-1"><strong>Contacto:</strong> {companyInfo.contactName || '—'}</p>
                                   <p className="mb-1"><strong>Email:</strong> {companyInfo.email || '—'}</p>
                                   <p className="mb-0"><strong>Telefono:</strong> {companyInfo.phone || '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`tab-pane ${facturacionTab === 'facturas' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-12">
+                              <div className="alert alert-info mb-3">
+                                <i className="fas fa-file-invoice mr-2"></i>
+                                Gestion de facturas electronicas ARCA
+                              </div>
+                            </div>
+                            <div className="col-md-5">
+                              <div className="card">
+                                <div className="card-header">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-plus mr-1"></i>Nueva Factura</h4>
+                                </div>
+                                <div className="card-body">
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Tipo de Comprobante</label>
+                                    <select className="form-control" value={newInvoice.tipo} onChange={e => setNewInvoice(p => ({ ...p, tipo: e.target.value }))}>
+                                      <option value="A">Factura A</option>
+                                      <option value="B">Factura B</option>
+                                      <option value="C">Factura C</option>
+                                    </select>
+                                  </div>
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Nombre / Razon Social</label>
+                                    <input className="form-control" value={newInvoice.clienteNombre} onChange={e => setNewInvoice(p => ({ ...p, clienteNombre: e.target.value }))} placeholder="Consumidor Final" />
+                                  </div>
+                                  <div className="row">
+                                    <div className="col-6 mb-3">
+                                      <label className="form-label small fw-bold">Tipo Doc</label>
+                                      <select className="form-control" value={newInvoice.clienteTipoDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteTipoDoc: Number(e.target.value) }))}>
+                                        <option value={99}>99 - Sin identificar</option>
+                                        <option value={80}>80 - CUIT</option>
+                                        <option value={86}>86 - CUIL</option>
+                                        <option value={96}>96 - DNI</option>
+                                      </select>
+                                    </div>
+                                    <div className="col-6 mb-3">
+                                      <label className="form-label small fw-bold">Nro. Documento</label>
+                                      <input className="form-control" value={newInvoice.clienteNroDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteNroDoc: e.target.value }))} placeholder="0" />
+                                    </div>
+                                  </div>
+                                  <div className="mb-3">
+                                    <label className="form-label small fw-bold">Condicion IVA</label>
+                                    <select className="form-control" value={newInvoice.clienteCondicionIva} onChange={e => setNewInvoice(p => ({ ...p, clienteCondicionIva: e.target.value }))}>
+                                      <option>Consumidor Final</option>
+                                      <option>Responsable Inscripto</option>
+                                      <option>Monotributista</option>
+                                      <option>Exento</option>
+                                    </select>
+                                  </div>
+                                  <div className="row">
+                                    <div className="col-6 mb-3">
+                                      <label className="form-label small fw-bold">Periodo</label>
+                                      <input className="form-control" type="month" value={newInvoice.period} onChange={e => setNewInvoice(p => ({ ...p, period: e.target.value }))} />
+                                    </div>
+                                    <div className="col-6 mb-3">
+                                      <label className="form-label small fw-bold">Monto (ARS)</label>
+                                      <input className="form-control" type="number" value={newInvoice.amountArs} onChange={e => setNewInvoice(p => ({ ...p, amountArs: Number(e.target.value) }))} placeholder="0" />
+                                    </div>
+                                  </div>
+                                  <button className="btn btn-primary w-100 fw-bold" onClick={() => void createInvoice()} disabled={creatingInvoice || !newInvoice.amountArs}>
+                                    {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-file-invoice mr-1"></i>Crear y Autorizar</>}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-md-7">
+                              <div className="card">
+                                <div className="card-header">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
+                                </div>
+                                <div className="card-body p-0">
+                                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="table table-sm m-0">
+                                      <thead className="thead-light">
+                                        <tr>
+                                          <th>Periodo</th>
+                                          <th>Tipo</th>
+                                          <th>Cliente</th>
+                                          <th>Monto</th>
+                                          <th>CAE</th>
+                                          <th>Estado</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {invoices.length === 0 ? (
+                                          <tr><td colSpan={6} className="text-center text-muted py-3">No hay facturas registradas</td></tr>
+                                        ) : (
+                                          invoices.map(inv => (
+                                            <tr key={inv._id}>
+                                              <td className="small">{inv.period || '-'}</td>
+                                              <td><span className="badge text-bg-secondary">Factura {inv.tipo || 'B'}</span></td>
+                                              <td className="small">{inv.cliente?.nombre || inv.clienteNombre || '-'}</td>
+                                              <td className="fw-bold text-primary">${(inv.amountArs || 0).toLocaleString('es-AR')}</td>
+                                              <td className="small">{inv.arca?.cae || '-'}</td>
+                                              <td>
+                                                <span className={`badge ${inv.status === 'authorized' ? 'text-bg-success' : inv.status === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
+                                                  {inv.status === 'authorized' ? 'Autorizada' : inv.status === 'paid' ? 'Pagada' : 'Borrador'}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </div>
                               </div>
                             </div>
