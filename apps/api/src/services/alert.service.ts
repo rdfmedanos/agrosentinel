@@ -9,7 +9,7 @@ import { sendTelegramMessage, formatAlertMessage } from './telegram.service.js';
 let cachedConfig: Record<string, string> = {};
 
 const DEFAULT_CONFIG = [
-  { key: 'DEVICE_OFFLINE_SECONDS', value: '5', description: 'Segundos sin heartbeat para marcar dispositivo como offline' },
+  { key: 'DEVICE_OFFLINE_SECONDS', value: '30', description: 'Segundos sin heartbeat para marcar dispositivo como offline' },
   { key: 'CRITICAL_LEVEL_PCT', value: '20', description: 'Porcentaje minimo de nivel para alerta critica' },
   { key: 'AUTH_JWT_EXPIRES', value: '12h', description: 'Tiempo de expiracion del token JWT' },
   { key: 'TELEGRAM_ENABLED', value: 'false', description: 'Habilitar notificaciones por Telegram' },
