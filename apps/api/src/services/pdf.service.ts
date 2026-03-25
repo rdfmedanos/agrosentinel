@@ -37,6 +37,26 @@ const tipoComprobanteMap: Record<string, string> = {
   C: 'FACTURA C'
 };
 
+function sanitizeText(text: string | undefined | null): string {
+  if (!text) return '-';
+  return String(text)
+    .replace(/[áàäâ]/g, 'a')
+    .replace(/[éèëê]/g, 'e')
+    .replace(/[íìïî]/g, 'i')
+    .replace(/[óòöô]/g, 'o')
+    .replace(/[úùüû]/g, 'u')
+    .replace(/[ñ]/g, 'n')
+    .replace(/[ÁÀÄÂ]/g, 'A')
+    .replace(/[ÉÈËÊ]/g, 'E')
+    .replace(/[ÍÌÏÎ]/g, 'I')
+    .replace(/[ÓÒÖÔ]/g, 'O')
+    .replace(/[ÚÙÜÛ]/g, 'U')
+    .replace(/[Ñ]/g, 'N')
+    .replace(/[¿?¡!]/g, '')
+    .replace(/[''']/g, "'")
+    .replace(/[""]/g, '"');
+}
+
 export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
   companyName: string;
   taxId: string;
@@ -55,7 +75,7 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
 
   if (invoice.cbteNro) {
     doc.moveDown(0.3);
-    doc.fontSize(10).font('Helvetica').text(`Nº ${String(invoice.cbteNro).padStart(8, '0')}`, { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text(`No. ${String(invoice.cbteNro).padStart(8, '0')}`, { align: 'center' });
   }
 
   doc.moveDown(1);
@@ -65,24 +85,24 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
 
   if (sellerInfo) {
     doc.fontSize(10).font('Helvetica-Bold').text('VENDEDOR:', 60, boxY);
-    doc.font('Helvetica').text(sellerInfo.companyName, 130, boxY);
+    doc.font('Helvetica').text(sanitizeText(sellerInfo.companyName), 130, boxY);
     boxY += 15;
 
     doc.font('Helvetica-Bold').text('CUIT:', 60, boxY);
-    doc.font('Helvetica').text(sellerInfo.taxId, 130, boxY);
+    doc.font('Helvetica').text(sanitizeText(sellerInfo.taxId), 130, boxY);
     boxY += 15;
 
     doc.font('Helvetica-Bold').text('Cond. IVA:', 60, boxY);
-    doc.font('Helvetica').text(sellerInfo.ivaCondition, 130, boxY);
+    doc.font('Helvetica').text(sanitizeText(sellerInfo.ivaCondition), 130, boxY);
     boxY += 15;
 
-    doc.font('Helvetica-Bold').text('Dirección:', 60, boxY);
-    doc.font('Helvetica').text(sellerInfo.address || '-', 130, boxY);
+    doc.font('Helvetica-Bold').text('Direccion:', 60, boxY);
+    doc.font('Helvetica').text(sanitizeText(sellerInfo.address), 130, boxY);
     boxY += 15;
 
     if (sellerInfo.phone) {
-      doc.font('Helvetica-Bold').text('Teléfono:', 60, boxY);
-      doc.font('Helvetica').text(sellerInfo.phone, 130, boxY);
+      doc.font('Helvetica-Bold').text('Telefono:', 60, boxY);
+      doc.font('Helvetica').text(sanitizeText(sellerInfo.phone), 130, boxY);
     }
   }
 
@@ -92,16 +112,16 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
   boxY = doc.y + 10;
 
   doc.fontSize(10).font('Helvetica-Bold').text('COMPRADOR:', 60, boxY);
-  doc.font('Helvetica').text(invoice.cliente?.nombre || '-', 130, boxY);
+  doc.font('Helvetica').text(sanitizeText(invoice.cliente?.nombre), 130, boxY);
   boxY += 15;
 
   const tipoDoc = invoice.cliente?.tipoDoc ? tipoDocMap[invoice.cliente.tipoDoc] || String(invoice.cliente.tipoDoc) : '-';
   doc.font('Helvetica-Bold').text('Doc:', 60, boxY);
-  doc.font('Helvetica').text(`${tipoDoc} ${invoice.cliente?.nroDoc || '-'}`, 130, boxY);
+  doc.font('Helvetica').text(`${tipoDoc} ${sanitizeText(invoice.cliente?.nroDoc)}`, 130, boxY);
   boxY += 15;
 
   doc.font('Helvetica-Bold').text('Cond. IVA:', 60, boxY);
-  doc.font('Helvetica').text(invoice.cliente?.condicionIva || '-', 130, boxY);
+  doc.font('Helvetica').text(sanitizeText(invoice.cliente?.condicionIva), 130, boxY);
 
   doc.y = boxY + 25;
 
@@ -110,10 +130,11 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
   doc.moveDown(0.5);
 
   doc.fontSize(10).font('Helvetica-Bold').text('Fecha:', 50, doc.y);
-  doc.font('Helvetica').text(invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'), 100, doc.y - 5);
+  const fechaStr = invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR');
+  doc.font('Helvetica').text(sanitizeText(fechaStr), 100, doc.y - 5);
 
-  doc.font('Helvetica-Bold').text('Período:', 250, doc.y);
-  doc.font('Helvetica').text(invoice.period || '-', 310, doc.y - 5);
+  doc.font('Helvetica-Bold').text('Periodo:', 250, doc.y);
+  doc.font('Helvetica').text(sanitizeText(invoice.period), 310, doc.y - 5);
 
   doc.moveDown(1.5);
 
@@ -123,7 +144,7 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
   doc.text('IMPORTE', 400, doc.y + 10, { width: 100, align: 'right' });
 
   doc.y += 30;
-  doc.font('Helvetica').text(`Servicio de monitoreo IoT - ${invoice.period || 'Período'}`, 60, doc.y);
+  doc.font('Helvetica').text(`Servicio de monitoreo IoT - ${sanitizeText(invoice.period)}`, 60, doc.y);
   doc.text(`$${invoice.amountArs.toLocaleString('es-AR')}`, 400, doc.y, { width: 100, align: 'right' });
 
   doc.y += 20;
@@ -139,11 +160,11 @@ export function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: {
 
   if (invoice.cae) {
     doc.fontSize(10).font('Helvetica-Bold').text('CAE:', 50, doc.y);
-    doc.font('Helvetica').text(invoice.cae, 90, doc.y);
+    doc.font('Helvetica').text(sanitizeText(invoice.cae), 90, doc.y);
 
     if (invoice.caeDueDate) {
       doc.font('Helvetica-Bold').text('Vto. CAE:', 250, doc.y);
-      doc.font('Helvetica').text(invoice.caeDueDate, 310, doc.y);
+      doc.font('Helvetica').text(sanitizeText(invoice.caeDueDate), 310, doc.y);
     }
   }
 
