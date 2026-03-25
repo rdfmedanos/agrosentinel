@@ -214,15 +214,22 @@ const createInvoiceSchema = z.object({
 
 billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
   try {
-    console.log('=== CREATE INVOICE ===');
-    console.log('Body:', JSON.stringify(req.body, null, 2));
     const tenantId = resolveTenantFromRequest(req);
-    const data = createInvoiceSchema.parse(req.body);
-    console.log('Parsed data:', data);
-    const config = await getEffectiveArcaConfig(tenantId);
     
-    // Verificar número de comprobante
-    const lastInvoice = await InvoiceModel.findOne({ tenantId, tipo: data.tipo, puntoVenta: Number(config.ptoVta) })
+    let data;
+    try {
+      data = createInvoiceSchema.parse(req.body);
+    } catch (parseError) {
+      console.error('Schema parse error:', parseError);
+      res.status(400).json({ error: 'Datos inválidos', details: parseError instanceof z.ZodError ? parseError.errors : String(parseError) });
+      return;
+    }
+    
+    const config = await getEffectiveArcaConfig(tenantId);
+    const ptoVta = Number(config.ptoVta) || 1;
+    const environment = config.environment || 'mock';
+    
+    const lastInvoice = await InvoiceModel.findOne({ tenantId, tipo: data.tipo, puntoVenta: ptoVta })
       .sort({ numero: -1 });
     const nextNumero = lastInvoice ? lastInvoice.numero + 1 : 1;
     
@@ -232,20 +239,17 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
       period: data.period,
       amountArs: data.amountArs,
       tipo: data.tipo,
-      puntoVenta: Number(config.ptoVta),
+      puntoVenta: ptoVta,
       numero: nextNumero,
-      environment: config.environment,
+      environment: environment as 'mock' | 'homologacion' | 'produccion',
       cliente: data.cliente,
       estado: 'pendiente'
     });
     
     res.status(201).json(invoice);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Datos inválidos', details: error.errors });
-    } else {
-      res.status(400).json({ error: String(error) });
-    }
+    console.error('Create invoice error:', error);
+    res.status(500).json({ error: 'Error al crear factura', details: String(error) });
   }
 });
 
