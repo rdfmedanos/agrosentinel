@@ -164,63 +164,68 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   
   let currentY = 20;
   
-  doc.rect(leftMargin, currentY, pageWidth, 100).stroke();
+  const leftBoxWidth = pageWidth - 170;
+  const rightBoxWidth = 150;
   
-  doc.fontSize(18).font('Helvetica-Bold');
-  doc.text(sanitizeText(seller?.companyName || 'EMPRESA'), leftMargin + 10, currentY + 10, { width: 280 });
+  doc.rect(leftMargin, currentY, leftBoxWidth, 100).stroke();
+  
+  doc.fontSize(16).font('Helvetica-Bold');
+  doc.text(sanitizeText(seller?.companyName || 'EMPRESA'), leftMargin + 10, currentY + 8, { width: 300 });
   
   doc.fontSize(8).font('Helvetica');
-  const addressText = `${sanitizeText(seller?.address || '')}${seller?.city ? ', ' + seller.city : ''}${seller?.province ? ', ' + seller.province : ''}`;
-  if (addressText.trim()) {
-    doc.text(`Domicilio: ${addressText}`, leftMargin + 10, currentY + 30);
-  }
-  if (seller?.phone) {
-    doc.text(`Telefono: ${sanitizeText(seller.phone)}`, leftMargin + 10, currentY + 42);
-  }
   if (seller?.taxId) {
-    doc.text(`CUIT: ${sanitizeText(seller.taxId)}`, leftMargin + 10, currentY + 54);
+    doc.text(`C.U.I.T.: ${sanitizeText(seller.taxId)}`, leftMargin + 10, currentY + 26);
   }
   if (seller?.ivaCondition) {
-    doc.text(`Condicion frente al IVA: ${sanitizeText(seller.ivaCondition)}`, leftMargin + 10, currentY + 66);
+    doc.text(`Condicion frente al IVA: ${sanitizeText(seller.ivaCondition)}`, leftMargin + 10, currentY + 38);
+  }
+  const addressText = `${sanitizeText(seller?.address || '')}${seller?.city ? ', ' + seller.city : ''}${seller?.province ? ', ' + seller.province : ''}`;
+  if (addressText.trim()) {
+    doc.text(`Domicilio: ${addressText}`, leftMargin + 10, currentY + 50);
+  }
+  if (seller?.phone) {
+    doc.text(`Tel: ${sanitizeText(seller.phone)}`, leftMargin + 10, currentY + 62);
   }
   if (seller?.ingresosBrutos) {
-    doc.text(`Ing. Brutos: ${sanitizeText(seller.ingresosBrutos)}`, leftMargin + 10, currentY + 78);
+    doc.text(`Ingresos Brutos: ${sanitizeText(seller.ingresosBrutos)}`, leftMargin + 200, currentY + 26);
   }
   if (seller?.inicioActividades) {
-    doc.text(`Inicio Actividades: ${sanitizeText(seller.inicioActividades)}`, leftMargin + 160, currentY + 54);
+    doc.text(`Inicio de Actividades: ${sanitizeText(seller.inicioActividades)}`, leftMargin + 200, currentY + 38);
   }
   
-  doc.rect(pageWidth - 160, currentY, 150, 100).stroke();
-  doc.fontSize(22).font('Helvetica-Bold').fillColor('#333');
-  doc.text(`${tipoData.nombre} ${invoice.tipo}`, pageWidth - 150, currentY + 15, { width: 130 });
-  doc.fontSize(10).font('Helvetica').fillColor('#000');
-  doc.text(`Punto de Venta: ${ptoVta}`, pageWidth - 150, currentY + 45);
-  doc.text(`Comprobante Nro: ${cbteNro}`, pageWidth - 150, currentY + 58);
-  doc.text(`Fecha de Emision: ${fechaEmision}`, pageWidth - 150, currentY + 71);
+  doc.rect(leftMargin + leftBoxWidth, currentY, rightBoxWidth, 100).stroke();
+  doc.fontSize(20).font('Helvetica-Bold').fillColor('#333');
+  doc.text(`${tipoData.nombre} ${invoice.tipo}`, leftMargin + leftBoxWidth + 10, currentY + 12, { width: 130 });
+  doc.fontSize(9).font('Helvetica').fillColor('#000');
+  doc.text(`Punto de Venta: ${ptoVta}`, leftMargin + leftBoxWidth + 10, currentY + 42);
+  doc.text(`Comp. Nro: ${cbteNro}`, leftMargin + leftBoxWidth + 10, currentY + 56);
+  doc.text(`Fecha de Emision: ${fechaEmision}`, leftMargin + leftBoxWidth + 10, currentY + 70);
   
   currentY += 105;
   
-  doc.rect(leftMargin, currentY, pageWidth, 65).stroke();
+  doc.rect(leftMargin, currentY, pageWidth, 70).stroke();
   
   const tipoDocCli = cli?.tipoDoc ? tipoDocMap[cli.tipoDoc] || String(cli.tipoDoc) : '-';
   const nroDocCli = cli?.nroDoc || '-';
   
-  doc.fontSize(9).font('Helvetica-Bold').text('Cliente:', leftMargin + 10, currentY + 8);
-  doc.fontSize(10).font('Helvetica-Bold').text(sanitizeText(cli?.nombre) || 'CONSUMIDOR FINAL', leftMargin + 60, currentY + 6);
+  doc.fontSize(9).font('Helvetica-Bold').text('DATOS DEL COMPRADOR', leftMargin + 10, currentY + 8);
+  
+  doc.fontSize(9).font('Helvetica-Bold').text('Señor/A:', leftMargin + 10, currentY + 24);
+  doc.fontSize(10).text(sanitizeText(cli?.nombre) || 'CONSUMIDOR FINAL', leftMargin + 70, currentY + 22);
   
   doc.fontSize(8).font('Helvetica');
-  doc.text(`${tipoDocCli}: ${nroDocCli}`, leftMargin + 10, currentY + 22);
+  doc.text(`${tipoDocCli}: ${nroDocCli}`, leftMargin + 10, currentY + 38);
   
-  doc.text(`Condicion IVA: ${sanitizeText(cli?.condicionIva) || 'Consumidor Final'}`, leftMargin + 160, currentY + 8);
+  doc.text(`Condicion frente al IVA: ${sanitizeText(cli?.condicionIva) || 'Consumidor Final'}`, leftMargin + 160, currentY + 24);
   
   if (cli?.direccion) {
-    doc.text(`Domicilio: ${sanitizeText(cli.direccion)}`, leftMargin + 160, currentY + 22);
+    doc.text(`Domicilio: ${sanitizeText(cli.direccion)}`, leftMargin + 160, currentY + 38);
   }
   
-  doc.text(`Fecha de Vto. Pago: ${fechaVencimiento}`, leftMargin + 10, currentY + 40);
-  doc.text(`Condicion de Venta: ${condicionPago}`, leftMargin + 160, currentY + 40);
+  doc.text(`Fecha de Vto. Pago: ${fechaVencimiento}`, leftMargin + 10, currentY + 54);
+  doc.text(`Condicion de Venta: ${condicionPago}`, leftMargin + 160, currentY + 54);
   
-  currentY += 70;
+  currentY += 75;
   
   doc.rect(leftMargin, currentY, pageWidth, 20).fillAndStroke('#4472C4', '#2F5496');
   doc.fillColor('#FFF');
@@ -303,22 +308,22 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   
   currentY += 35;
   
-  doc.rect(leftMargin, currentY, pageWidth, 50).stroke();
+  doc.rect(leftMargin, currentY, pageWidth, 55).stroke();
+  
+  doc.fontSize(8).font('Helvetica');
+  doc.text(`Condicion de Venta: ${condicionPago}`, leftMargin + 10, currentY + 8);
+  doc.text(`Moneda: ${moneda}`, leftMargin + 10, currentY + 22);
+  doc.text(`Tipo de Cambio: 1,000`, leftMargin + 10, currentY + 36);
+  if (invoice.period) {
+    doc.text(`Periodo: ${invoice.period}`, leftMargin + 10, currentY + 50);
+  }
   
   if (invoice.cae) {
-    doc.fontSize(8).font('Helvetica-Bold').text('CAE:', leftMargin + 10, currentY + 8);
-    doc.fontSize(11).text(sanitizeText(invoice.cae), leftMargin + 45, currentY + 6);
+    doc.fontSize(8).font('Helvetica-Bold').text('CAE:', leftMargin + 200, currentY + 8);
+    doc.fontSize(11).text(sanitizeText(invoice.cae), leftMargin + 240, currentY + 6);
     
-    doc.fontSize(8).text('Fecha Vto. CAE:', leftMargin + 200, currentY + 8);
-    doc.fontSize(10).text(invoice.caeDueDate ? formatDate(invoice.caeDueDate) : formatDate(fechaVencimientoYMD), leftMargin + 280, currentY + 6);
-    
-    if (invoice.arcaResult) {
-      const resultText = invoice.arcaResult === 'A' ? 'APROBADO' : 'RECHAZADO';
-      const resultColor = invoice.arcaResult === 'A' ? '#008000' : '#C00000';
-      doc.fontSize(8).text('Resultado:', leftMargin + 370, currentY + 8);
-      doc.fontSize(10).fillColor(resultColor).text(resultText, leftMargin + 430, currentY + 6);
-      doc.fillColor('#000');
-    }
+    doc.fontSize(8).text('Fecha de Vto. CAE:', leftMargin + 200, currentY + 22);
+    doc.fontSize(10).text(invoice.caeDueDate ? formatDate(invoice.caeDueDate) : formatDate(fechaVencimientoYMD), leftMargin + 300, currentY + 20);
     
     try {
       const qrData = {
@@ -338,17 +343,13 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
       };
       
       const qrBuffer = await generateQRCode(qrData);
-      doc.image(qrBuffer, pageWidth - 85, currentY - 5, { width: 65 });
+      doc.image(qrBuffer, pageWidth - 85, currentY + 5, { width: 60 });
     } catch (qrError) {
       console.error('Error generating QR:', qrError);
     }
   }
   
-  currentY += 55;
-  
-  doc.fontSize(6).font('Helvetica').fillColor('#666666');
-  doc.text(`Moneda: ${moneda}  |  Periodo: ${invoice.period || '-'}  |  Comprobante: ${invoiceNumber}`, leftMargin + 5, currentY);
-  doc.fillColor('#000');
+  currentY += 60;
   
   return doc;
 }
