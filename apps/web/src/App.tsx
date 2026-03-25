@@ -2127,45 +2127,38 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table m-0">
-                          <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th><th>Accion</th></tr></thead>
+                          <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th></tr></thead>
                           <tbody>{plans.map(p => (
-                            <tr key={p._id}>
+                            <tr key={p._id} style={{ cursor: editingPlanId !== p._id ? 'pointer' : 'default' }} onClick={() => { if (editingPlanId !== p._id) { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); } }}>
                               <td>
                                 {editingPlanId === p._id ? (
-                                  <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} />
+                                  <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} onClick={e => e.stopPropagation()} />
                                 ) : (
                                   <span className="fw-bold">{p.name}</span>
                                 )}
                               </td>
                               <td>
                                 {editingPlanId === p._id ? (
-                                  <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} />
+                                  <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
                                 ) : (
                                   p.maxDevices
                                 )}
                               </td>
                               <td>
                                 {editingPlanId === p._id ? (
-                                  <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} />
+                                  <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
                                 ) : (
                                   <span className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
                                 )}
                               </td>
                               <td>
                                 {editingPlanId === p._id ? (
-                                  <input type="checkbox" checked={editPlanData.active} onChange={e => setEditPlanData(d => ({ ...d, active: e.target.checked }))} />
-                                ) : (
-                                  <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
-                                )}
-                              </td>
-                              <td>
-                                {editingPlanId === p._id ? (
                                   <div className="d-flex gap-1">
-                                    <button className="btn btn-success btn-sm" onClick={() => void savePlan(p._id)} disabled={savingPlan}>Guardar</button>
-                                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingPlanId(null)}>Cancelar</button>
+                                    <button className="btn btn-success btn-sm" onClick={e => { e.stopPropagation(); void savePlan(p._id); }} disabled={savingPlan}>Guardar</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setEditingPlanId(null); }}>Cancelar</button>
                                   </div>
                                 ) : (
-                                  <button className="btn btn-primary btn-sm" onClick={() => { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); }}><i className="fas fa-edit"></i></button>
+                                  <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
                                 )}
                               </td>
                             </tr>
