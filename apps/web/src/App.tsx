@@ -982,6 +982,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [invoices, setInvoices] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [authorizingPending, setAuthorizingPending] = useState(false);
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -1334,6 +1335,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
       setInvoices([createdInvoice, ...invoices]);
       setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+      setShowCreateInvoiceModal(false);
       if (authorizeError) {
         alert(`Factura creada en estado pendiente. No se pudo autorizar en ARCA: ${authorizeError}`);
       } else {
@@ -3043,107 +3045,23 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 Gestion de facturas electronicas ARCA
                               </div>
                             </div>
-                            <div className="col-md-5">
-                              <div className="card">
-                                <div className="card-header">
-                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-plus mr-1"></i>Nueva Factura</h4>
-                                </div>
-                                <div className="card-body">
-                                  <div className="mb-3">
-                                    <label className="form-label small fw-bold">Cliente</label>
-                                    <select className="form-control" value={newInvoice.tenantId} onChange={e => {
-                                      const client = clients.find(c => c.tenantId === e.target.value);
-                                      if (client) {
-                                        const plan = plans.find(p => p._id === client.planId);
-                                        const ivaCondition = client.ivaCondition || 'Consumidor Final';
-                                        let tipoComprobante = 'B';
-                                        if (ivaCondition === 'Responsable Inscripto') {
-                                          tipoComprobante = 'A';
-                                        }
-                                        setNewInvoice({
-                                          tenantId: client.tenantId,
-                                          tipo: tipoComprobante,
-                                          clienteNombre: client.companyName,
-                                          clienteTipoDoc: 80,
-                                          clienteNroDoc: client.taxId || '',
-                                          clienteCondicionIva: ivaCondition,
-                                          amountArs: plan ? plan.monthlyPriceArs : 0,
-                                          period: newInvoice.period
-                                        });
-                                      }
-                                    }}>
-                                      <option value="">Seleccionar cliente...</option>
-                                      {clients.map(c => (
-                                        <option key={c.tenantId} value={c.tenantId}>
-                                          {c.companyName} {c.planName ? `(${c.planName})` : ''}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="mb-3">
-                                    <label className="form-label small fw-bold">Tipo de Comprobante</label>
-                                    <select className="form-control" value={newInvoice.tipo} onChange={e => setNewInvoice(p => ({ ...p, tipo: e.target.value }))}>
-                                      <option value="A">Factura A</option>
-                                      <option value="B">Factura B</option>
-                                      <option value="C">Factura C</option>
-                                    </select>
-                                  </div>
-                                  <div className="mb-3">
-                                    <label className="form-label small fw-bold">Nombre / Razon Social</label>
-                                    <input className="form-control" value={newInvoice.clienteNombre} onChange={e => setNewInvoice(p => ({ ...p, clienteNombre: e.target.value }))} placeholder="Consumidor Final" />
-                                  </div>
-                                  <div className="row">
-                                    <div className="col-6 mb-3">
-                                      <label className="form-label small fw-bold">Tipo Doc</label>
-                                      <select className="form-control" value={newInvoice.clienteTipoDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteTipoDoc: Number(e.target.value) }))}>
-                                        <option value={99}>99 - Sin identificar</option>
-                                        <option value={80}>80 - CUIT</option>
-                                        <option value={86}>86 - CUIL</option>
-                                        <option value={96}>96 - DNI</option>
-                                      </select>
-                                    </div>
-                                    <div className="col-6 mb-3">
-                                      <label className="form-label small fw-bold">Nro. Documento</label>
-                                      <input className="form-control" value={newInvoice.clienteNroDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteNroDoc: e.target.value }))} placeholder="0" />
-                                    </div>
-                                  </div>
-                                  <div className="mb-3">
-                                    <label className="form-label small fw-bold">Condicion IVA</label>
-                                    <select className="form-control" value={newInvoice.clienteCondicionIva} onChange={e => setNewInvoice(p => ({ ...p, clienteCondicionIva: e.target.value }))}>
-                                      <option>Consumidor Final</option>
-                                      <option>Responsable Inscripto</option>
-                                      <option>Monotributista</option>
-                                      <option>Exento</option>
-                                    </select>
-                                  </div>
-                                  <div className="row">
-                                    <div className="col-6 mb-3">
-                                      <label className="form-label small fw-bold">Periodo</label>
-                                      <input className="form-control" type="month" value={newInvoice.period} onChange={e => setNewInvoice(p => ({ ...p, period: e.target.value }))} />
-                                    </div>
-                                    <div className="col-6 mb-3">
-                                      <label className="form-label small fw-bold">Monto (ARS)</label>
-                                      <input className="form-control" type="number" value={newInvoice.amountArs} onChange={e => setNewInvoice(p => ({ ...p, amountArs: Number(e.target.value) }))} placeholder="0" />
-                                    </div>
-                                  </div>
-                                  <button className="btn btn-primary w-100 fw-bold" onClick={() => void createInvoice()} disabled={creatingInvoice || !newInvoice.amountArs}>
-                                    {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-file-invoice mr-1"></i>Crear y Autorizar</>}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="col-md-7">
+                            <div className="col-12">
                               <div className="card">
                                 <div className="card-header">
                                   <div className="d-flex justify-content-between align-items-center">
                                     <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
-                                    <button
-                                      className="btn btn-sm btn-outline-warning"
-                                      onClick={() => void authorizePendingInvoices()}
-                                      disabled={authorizingPending || invoices.filter(inv => inv.estado === 'pendiente').length === 0}
-                                    >
-                                      {authorizingPending ? 'Autorizando...' : 'Autorizar pendientes'}
-                                    </button>
+                                    <div className="d-flex gap-2">
+                                      <button className="btn btn-sm btn-primary" onClick={() => setShowCreateInvoiceModal(true)}>
+                                        <i className="fas fa-plus mr-1"></i>Nueva Factura
+                                      </button>
+                                      <button
+                                        className="btn btn-sm btn-outline-warning"
+                                        onClick={() => void authorizePendingInvoices()}
+                                        disabled={authorizingPending || invoices.filter(inv => inv.estado === 'pendiente').length === 0}
+                                      >
+                                        {authorizingPending ? 'Autorizando...' : 'Autorizar pendientes'}
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="card-body p-0">
@@ -3648,6 +3566,103 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
           </div>
         </div>
       </div>
+
+      <div className={`modal fade ${showCreateInvoiceModal ? 'show' : ''}`} style={{ display: showCreateInvoiceModal ? 'block' : 'none' }}>
+        <div className="modal-dialog modal-lg">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-file-invoice mr-2"></i>Nueva Factura</h4>
+              <button type="button" className="close text-white" onClick={() => setShowCreateInvoiceModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Cliente</label>
+                <select className="form-control" value={newInvoice.tenantId} onChange={e => {
+                  const client = clients.find(c => c.tenantId === e.target.value);
+                  if (client) {
+                    const plan = plans.find(p => p._id === client.planId);
+                    const ivaCondition = client.ivaCondition || 'Consumidor Final';
+                    let tipoComprobante = 'B';
+                    if (ivaCondition === 'Responsable Inscripto') {
+                      tipoComprobante = 'A';
+                    }
+                    setNewInvoice({
+                      tenantId: client.tenantId,
+                      tipo: tipoComprobante,
+                      clienteNombre: client.companyName,
+                      clienteTipoDoc: 80,
+                      clienteNroDoc: client.taxId || '',
+                      clienteCondicionIva: ivaCondition,
+                      amountArs: plan ? plan.monthlyPriceArs : 0,
+                      period: newInvoice.period
+                    });
+                  }
+                }}>
+                  <option value="">Seleccionar cliente...</option>
+                  {clients.map(c => (
+                    <option key={c.tenantId} value={c.tenantId}>
+                      {c.companyName} {c.planName ? `(${c.planName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Tipo de Comprobante</label>
+                <select className="form-control" value={newInvoice.tipo} onChange={e => setNewInvoice(p => ({ ...p, tipo: e.target.value }))}>
+                  <option value="A">Factura A</option>
+                  <option value="B">Factura B</option>
+                  <option value="C">Factura C</option>
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Nombre / Razon Social</label>
+                <input className="form-control" value={newInvoice.clienteNombre} onChange={e => setNewInvoice(p => ({ ...p, clienteNombre: e.target.value }))} placeholder="Consumidor Final" />
+              </div>
+              <div className="row">
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Tipo Doc</label>
+                  <select className="form-control" value={newInvoice.clienteTipoDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteTipoDoc: Number(e.target.value) }))}>
+                    <option value={99}>99 - Sin identificar</option>
+                    <option value={80}>80 - CUIT</option>
+                    <option value={86}>86 - CUIL</option>
+                    <option value={96}>96 - DNI</option>
+                  </select>
+                </div>
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Nro. Documento</label>
+                  <input className="form-control" value={newInvoice.clienteNroDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteNroDoc: e.target.value }))} placeholder="0" />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Condicion IVA</label>
+                <select className="form-control" value={newInvoice.clienteCondicionIva} onChange={e => setNewInvoice(p => ({ ...p, clienteCondicionIva: e.target.value }))}>
+                  <option>Consumidor Final</option>
+                  <option>Responsable Inscripto</option>
+                  <option>Monotributista</option>
+                  <option>Exento</option>
+                </select>
+              </div>
+              <div className="row">
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Periodo</label>
+                  <input className="form-control" type="month" value={newInvoice.period} onChange={e => setNewInvoice(p => ({ ...p, period: e.target.value }))} />
+                </div>
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Monto (ARS)</label>
+                  <input className="form-control" type="number" value={newInvoice.amountArs} onChange={e => setNewInvoice(p => ({ ...p, amountArs: Number(e.target.value) }))} placeholder="0" />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCreateInvoiceModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => void createInvoice()} disabled={creatingInvoice || !newInvoice.amountArs}>
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Autorizar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showCreateInvoiceModal && <div className="modal-backdrop fade show" onClick={() => setShowCreateInvoiceModal(false)}></div>}
 
       <div className={`modal fade ${showAddClient ? 'show' : ''}`} style={{ display: showAddClient ? 'block' : 'none' }}>
         <div className="modal-dialog">
