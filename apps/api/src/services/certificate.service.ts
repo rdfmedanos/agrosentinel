@@ -145,27 +145,40 @@ export function loadCertificateData(tenantId: string): CertificateData | null {
   if (!fs.existsSync(dir)) {
     return null;
   }
-  
-  const metadataPath = path.join(dir, 'metadata.json');
-  if (!fs.existsSync(metadataPath)) {
-    return null;
-  }
-  
-  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-  
+
   const privateKeyPath = path.join(dir, 'private.key');
   const csrPath = path.join(dir, 'request.csr');
   const certPath = path.join(dir, 'certificate.crt');
+
+  const privateKey = fs.existsSync(privateKeyPath) ? fs.readFileSync(privateKeyPath, 'utf8') : '';
+  const csr = fs.existsSync(csrPath) ? fs.readFileSync(csrPath, 'utf8') : '';
+  const certificate = fs.existsSync(certPath) ? fs.readFileSync(certPath, 'utf8') : undefined;
+
+  if (!privateKey && !csr && !certificate) {
+    return null;
+  }
+
+  const metadataPath = path.join(dir, 'metadata.json');
+  const metadata = fs.existsSync(metadataPath)
+    ? JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
+    : null;
+
+  const fallbackCreatedAt = (() => {
+    if (fs.existsSync(csrPath)) return fs.statSync(csrPath).mtime.toISOString();
+    if (fs.existsSync(privateKeyPath)) return fs.statSync(privateKeyPath).mtime.toISOString();
+    if (fs.existsSync(certPath)) return fs.statSync(certPath).mtime.toISOString();
+    return new Date().toISOString();
+  })();
   
   return {
-    tenantId: metadata.tenantId,
-    privateKey: fs.existsSync(privateKeyPath) ? fs.readFileSync(privateKeyPath, 'utf8') : '',
-    csr: fs.existsSync(csrPath) ? fs.readFileSync(csrPath, 'utf8') : '',
-    certificate: fs.existsSync(certPath) ? fs.readFileSync(certPath, 'utf8') : undefined,
-    environment: metadata.environment,
-    createdAt: metadata.createdAt,
-    companyName: metadata.companyName,
-    taxId: metadata.taxId
+    tenantId: metadata?.tenantId || tenantId,
+    privateKey,
+    csr,
+    certificate,
+    environment: metadata?.environment || 'homologacion',
+    createdAt: metadata?.createdAt || fallbackCreatedAt,
+    companyName: metadata?.companyName || '',
+    taxId: metadata?.taxId || ''
   };
 }
 
