@@ -1,6 +1,7 @@
 import forge from 'node-forge';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 export interface CertificateData {
   tenantId: string;
@@ -20,7 +21,21 @@ export interface CsrData {
   city: string;
 }
 
-const certStorageDir = process.env.CERT_STORAGE_DIR || path.join(process.cwd(), 'certs');
+const serviceDir = path.dirname(fileURLToPath(import.meta.url));
+const defaultCertStorageDir = path.resolve(serviceDir, '../../certs');
+const certStorageDir = process.env.CERT_STORAGE_DIR || defaultCertStorageDir;
+const legacyCertStorageDir = path.resolve(process.cwd(), 'certs');
+
+function getTenantDirs(tenantId: string): string[] {
+  const primary = path.join(certStorageDir, tenantId);
+  const legacy = path.join(legacyCertStorageDir, tenantId);
+  return legacy === primary ? [primary] : [primary, legacy];
+}
+
+function resolveExistingCertDir(tenantId: string): string | null {
+  const dir = getTenantDirs(tenantId).find(candidate => fs.existsSync(candidate));
+  return dir || null;
+}
 
 function ensureCertDir(tenantId: string): string {
   const dir = path.join(certStorageDir, tenantId);
@@ -140,9 +155,9 @@ export function saveCertificateData(tenantId: string, data: CertificateData): vo
 }
 
 export function loadCertificateData(tenantId: string): CertificateData | null {
-  const dir = path.join(certStorageDir, tenantId);
+  const dir = resolveExistingCertDir(tenantId);
   
-  if (!fs.existsSync(dir)) {
+  if (!dir) {
     return null;
   }
 
@@ -187,7 +202,11 @@ export function getCertificateFiles(tenantId: string): {
   csr?: Buffer;
   certificate?: Buffer;
 } {
-  const dir = path.join(certStorageDir, tenantId);
+  const dir = resolveExistingCertDir(tenantId);
+
+  if (!dir) {
+    return {};
+  }
   
   return {
     privateKey: fs.existsSync(path.join(dir, 'private.key')) 
@@ -203,9 +222,10 @@ export function getCertificateFiles(tenantId: string): {
 }
 
 export function deleteCertificateData(tenantId: string): void {
-  const dir = path.join(certStorageDir, tenantId);
-  
-  if (fs.existsSync(dir)) {
+  getTenantDirs(tenantId).forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      return;
+    }
     const files = ['private.key', 'request.csr', 'certificate.crt', 'metadata.json'];
     files.forEach(file => {
       const filePath = path.join(dir, file);
@@ -213,6 +233,8 @@ export function deleteCertificateData(tenantId: string): void {
         fs.unlinkSync(filePath);
       }
     });
-    fs.rmdirSync(dir);
-  }
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
+      fs.rmdirSync(dir);
+    }
+  });
 }

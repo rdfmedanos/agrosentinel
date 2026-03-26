@@ -2509,7 +2509,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card mb-3" id="uploadCrtSection" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
+                              <div className="card mb-3" id="uploadCrtSection" style={{ display: certStatus?.hasCsr || certStatus?.hasCertificate ? 'block' : 'none' }}>
                                 <div className="card-header bg-info text-white">
                                   <h5 className="card-title mb-0"><i className="fas fa-upload mr-1"></i>Paso 3: Subir Certificado Firmado por ARCA</h5>
                                 </div>
@@ -2646,7 +2646,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card" id="certStatusCard" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
+                              <div className="card" id="certStatusCard" style={{ display: certStatus?.hasPrivateKey || certStatus?.hasCsr || certStatus?.hasCertificate ? 'block' : 'none' }}>
                                 <div className="card-header bg-success text-white">
                                   <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Estado del Certificado</h5>
                                 </div>
