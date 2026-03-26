@@ -983,7 +983,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [cities, setCities] = useState<string[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const [authorizingPending, setAuthorizingPending] = useState(false);
+  const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
@@ -1391,40 +1392,34 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   };
 
-  const authorizePendingInvoices = async () => {
-    const pending = invoices.filter(inv => inv.estado === 'pendiente');
-    if (pending.length === 0) {
-      alert('No hay facturas pendientes para autorizar');
-      return;
-    }
-
-    setAuthorizingPending(true);
-    let authorized = 0;
-    let failed = 0;
-
+  const authorizeSingleInvoice = async (invoiceId: string) => {
+    setProcessingInvoiceId(invoiceId);
     try {
-      for (const inv of pending) {
-        try {
-          const authRes = await postJson(`/billing/invoices/${inv._id}/authorize`, {}, props.session.token);
-          const authResult = await authRes.json();
-          setInvoices(prev => prev.map(item => item._id === inv._id ? authResult.invoice : item));
-          authorized += 1;
-        } catch (err) {
-          console.error('Error authorizing pending invoice:', inv._id, err);
-          failed += 1;
-        }
-      }
-
-      const refreshed = await getJson<any[]>('/billing/invoices', props.session.token);
-      setInvoices(refreshed);
-
-      if (failed > 0) {
-        alert(`Autorizadas: ${authorized}. Con error: ${failed}. Revise diagnostico ARCA o intente nuevamente.`);
-      } else {
-        alert(`Se autorizaron ${authorized} facturas pendientes`);
-      }
+      const authRes = await postJson(`/billing/invoices/${invoiceId}/authorize`, {}, props.session.token);
+      const authResult = await authRes.json();
+      setInvoices(prev => prev.map(item => item._id === invoiceId ? authResult.invoice : item));
+      alert('Factura autorizada correctamente');
+    } catch (err) {
+      console.error('Error authorizing invoice:', invoiceId, err);
+      alert(`No se pudo autorizar la factura: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setAuthorizingPending(false);
+      setProcessingInvoiceId(null);
+    }
+  };
+
+  const deletePendingInvoice = async (invoiceId: string) => {
+    if (!confirm('¿Eliminar esta factura pendiente? Esta accion no se puede deshacer.')) return;
+    setProcessingInvoiceId(invoiceId);
+    try {
+      await deleteJson(`/billing/invoices/${invoiceId}`, props.session.token);
+      setInvoices(prev => prev.filter(item => item._id !== invoiceId));
+      if (expandedInvoiceId === invoiceId) setExpandedInvoiceId(null);
+      alert('Factura pendiente eliminada');
+    } catch (err) {
+      console.error('Error deleting invoice:', invoiceId, err);
+      alert(`No se pudo eliminar la factura: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setProcessingInvoiceId(null);
     }
   };
 
@@ -3105,13 +3100,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                       <button className="btn btn-light btn-sm" onClick={() => setShowCreateInvoiceModal(true)}>
                                         <i className="fas fa-plus me-1"></i>Nueva Factura
                                       </button>
-                                      <button
-                                        className="btn btn-light btn-sm"
-                                        onClick={() => void authorizePendingInvoices()}
-                                        disabled={authorizingPending || invoices.filter(inv => inv.estado === 'pendiente').length === 0}
-                                      >
-                                        {authorizingPending ? 'Autorizando...' : 'Autorizar pendientes'}
-                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -3120,43 +3108,85 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                     <table className="table table-sm m-0">
                                       <thead className="thead-light">
                                         <tr>
+                                          <th style={{width: '40px'}}></th>
                                           <th>Periodo</th>
                                           <th>Tipo</th>
                                           <th>Cliente</th>
                                           <th>Monto</th>
                                           <th>CAE</th>
                                           <th>Estado</th>
-                                          <th style={{width: '50px'}}>PDF</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {invoices.length === 0 ? (
                                           <tr><td colSpan={7} className="text-center text-muted py-3">No hay facturas registradas</td></tr>
                                         ) : (
-                                          invoices.map(inv => (
-                                            <tr key={inv._id}>
-                                              <td className="small">{inv.period || '-'}</td>
-                                              <td><span className="badge text-bg-secondary">Factura {inv.tipo || 'B'}</span></td>
-                                              <td className="small">{inv.cliente?.nombre || inv.clienteNombre || '-'}</td>
-                                              <td className="fw-bold text-primary">${(inv.amountArs || 0).toLocaleString('es-AR')}</td>
-                                              <td className="small">{inv.cae || '-'}</td>
-                                              <td>
-                                                <span className={`badge ${inv.estado === 'autorizado' ? 'text-bg-success' : inv.estado === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
-                                                  {inv.estado === 'autorizado' ? 'Autorizada' : inv.estado === 'paid' ? 'Pagada' : inv.estado || 'Borrador'}
-                                                </span>
-                                              </td>
-                                              <td>
-                                                <a 
-                                                  href={`${API_URL}/billing/invoices/${inv._id}/pdf?token=${props.session.token}`}
-                                                  target="_blank"
-                                                  className="btn btn-sm btn-outline-primary"
-                                                  title="Ver PDF"
-                                                >
-                                                  <i className="fas fa-file-pdf"></i>
-                                                </a>
-                                              </td>
-                                            </tr>
-                                          ))
+                                          invoices.flatMap(inv => {
+                                            const expanded = expandedInvoiceId === inv._id;
+                                            const isPending = inv.estado === 'pendiente';
+                                            const isProcessing = processingInvoiceId === inv._id;
+                                            return [
+                                              <tr key={inv._id} style={{ cursor: 'pointer' }} onClick={() => setExpandedInvoiceId(expanded ? null : inv._id)}>
+                                                <td className="text-center text-muted"><i className={`fas ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></td>
+                                                <td className="small">{inv.period || '-'}</td>
+                                                <td><span className="badge text-bg-secondary">Factura {inv.tipo || 'B'}</span></td>
+                                                <td className="small">{inv.cliente?.nombre || inv.clienteNombre || '-'}</td>
+                                                <td className="fw-bold text-primary">${(inv.amountArs || 0).toLocaleString('es-AR')}</td>
+                                                <td className="small">{inv.cae || '-'}</td>
+                                                <td>
+                                                  <span className={`badge ${inv.estado === 'autorizado' ? 'text-bg-success' : inv.estado === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
+                                                    {inv.estado === 'autorizado' ? 'Autorizada' : inv.estado === 'paid' ? 'Pagada' : inv.estado || 'Borrador'}
+                                                  </span>
+                                                </td>
+                                              </tr>,
+                                              expanded ? (
+                                                <tr key={`${inv._id}-expanded`}>
+                                                  <td colSpan={7} className="bg-light">
+                                                    <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: '8px' }}>
+                                                      <div className="small text-muted">
+                                                        <strong>ID:</strong> {inv._id} | <strong>Punto de venta:</strong> {inv.puntoVenta || '-'} | <strong>Numero:</strong> {inv.numero || '-'}
+                                                      </div>
+                                                      <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                                                        <a
+                                                          href={`${API_URL}/billing/invoices/${inv._id}/pdf?token=${props.session.token}`}
+                                                          target="_blank"
+                                                          className="btn btn-sm btn-outline-primary"
+                                                          title="Ver PDF"
+                                                          onClick={e => e.stopPropagation()}
+                                                        >
+                                                          <i className="fas fa-file-pdf me-1"></i>PDF
+                                                        </a>
+                                                        {isPending ? (
+                                                          <button
+                                                            className="btn btn-sm btn-outline-success"
+                                                            onClick={e => {
+                                                              e.stopPropagation();
+                                                              void authorizeSingleInvoice(inv._id);
+                                                            }}
+                                                            disabled={isProcessing}
+                                                          >
+                                                            {isProcessing ? 'Procesando...' : 'Autorizar'}
+                                                          </button>
+                                                        ) : null}
+                                                        {isPending ? (
+                                                          <button
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            onClick={e => {
+                                                              e.stopPropagation();
+                                                              void deletePendingInvoice(inv._id);
+                                                            }}
+                                                            disabled={isProcessing}
+                                                          >
+                                                            Eliminar pendiente
+                                                          </button>
+                                                        ) : null}
+                                                      </div>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              ) : null
+                                            ].filter(Boolean) as JSX.Element[];
+                                          })
                                         )}
                                       </tbody>
                                     </table>

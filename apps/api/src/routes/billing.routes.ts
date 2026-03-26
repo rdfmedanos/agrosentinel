@@ -410,6 +410,32 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
   }
 });
 
+billingRouter.delete('/invoices/:id', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const invoice = await InvoiceModel.findById(req.params.id);
+    if (!invoice) {
+      res.status(404).json({ error: 'Factura no encontrada' });
+      return;
+    }
+
+    if (invoice.tenantId !== tenantId) {
+      res.status(403).json({ error: 'No autorizado para eliminar esta factura' });
+      return;
+    }
+
+    if (invoice.estado !== 'pendiente') {
+      res.status(400).json({ error: 'Solo se pueden eliminar facturas pendientes' });
+      return;
+    }
+
+    await InvoiceModel.deleteOne({ _id: invoice._id });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar factura', details: String(error) });
+  }
+});
+
 // ============ EMPRESA ============
 
 billingRouter.get('/provinces', async (req, res) => {
