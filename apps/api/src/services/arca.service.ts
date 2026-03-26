@@ -46,6 +46,7 @@ export type ArcaInvoiceRequest = {
   tipo?: 'A' | 'B' | 'C' | 'M';
   clienteTipoDoc?: number;
   clienteNroDoc?: string;
+  clienteCondicionIva?: string;
 };
 
 export type ArcaInvoiceResult = {
@@ -351,6 +352,21 @@ function getInvoiceAmounts(tipo: ArcaInvoiceRequest['tipo'], total: number): Inv
   return { impTotal: total, impNeto: total, impIva: 0 };
 }
 
+function getCondicionIvaReceptorId(condicion?: string, docTipo?: number): number {
+  const normalized = (condicion || '').trim().toLowerCase();
+  if (normalized.includes('consumidor final')) return 5;
+  if (normalized.includes('monotrib')) return 6;
+  if (normalized.includes('exento')) return 4;
+  if (normalized.includes('responsable inscripto')) return 1;
+  if (normalized.includes('no alcanzado')) return 15;
+  if (normalized.includes('no categorizado')) return 7;
+  if (normalized.includes('iva liberado')) return 10;
+  if (normalized.includes('monotributo social')) return 13;
+  if (normalized.includes('trabajador independiente promovido')) return 16;
+  if (docTipo === 99 || docTipo === 0) return 5;
+  return 1;
+}
+
 function getAuth(config: EffectiveArcaConfig): ArcaAuth {
   const token = config.token?.trim();
   const sign = config.sign?.trim();
@@ -424,6 +440,7 @@ export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: Arc
   const amounts = getInvoiceAmounts(req.tipo, req.amountArs);
   const docTipo = req.clienteTipoDoc ?? 99;
   const docNro = Number(req.clienteNroDoc || '0') || 0;
+  const condicionIvaReceptorId = getCondicionIvaReceptorId(req.clienteCondicionIva, docTipo);
   const ivaNode = amounts.impIva > 0
     ? `<Iva>
             <AlicIva>
@@ -454,6 +471,7 @@ export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: Arc
           <Concepto>2</Concepto>
           <DocTipo>${docTipo}</DocTipo>
           <DocNro>${docNro}</DocNro>
+          <CondicionIVAReceptorId>${condicionIvaReceptorId}</CondicionIVAReceptorId>
           <CbteDesde>${nextNro}</CbteDesde>
           <CbteHasta>${nextNro}</CbteHasta>
           <CbteFch>${today}</CbteFch>

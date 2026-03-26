@@ -389,7 +389,8 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
       period: invoice.period,
       tipo: invoice.tipo as 'A' | 'B' | 'C' | 'M',
       clienteTipoDoc: invoice.cliente?.tipoDoc,
-      clienteNroDoc: invoice.cliente?.nroDoc
+      clienteNroDoc: invoice.cliente?.nroDoc,
+      clienteCondicionIva: invoice.cliente?.condicionIva
     });
 
     invoice.cae = arcaResult.cae;
