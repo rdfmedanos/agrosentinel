@@ -113,6 +113,12 @@ function parseTagValue(xml: string, tag: string): string | null {
   return extractTag(xml, tag);
 }
 
+function parseSoapFault(xml: string): { code: string | null; message: string | null } {
+  const code = xml.match(/<faultcode[^>]*>([^<]+)<\/faultcode>/i)?.[1] || null;
+  const message = xml.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/i)?.[1] || null;
+  return { code, message };
+}
+
 function normalizeWsaaUrl(url?: string): string {
   const raw = (url || '').trim();
   if (!raw) return raw;
@@ -197,7 +203,7 @@ function buildLoginTicketRequest(service: string): string {
   const now = new Date();
   const generationTime = new Date(now.getTime() - 60_000).toISOString();
   const expirationTime = new Date(now.getTime() + 10 * 60_000).toISOString();
-  const uniqueId = Math.floor(now.getTime() / 1000);
+  const uniqueId = Number(`${Math.floor(now.getTime() / 1000)}${randomInt(10, 99)}`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
   <header>
@@ -252,7 +258,14 @@ async function loginCms(wsaaUrl: string, cmsBase64: string): Promise<{ token: st
 
   const xml = await response.text();
   if (!response.ok) {
-    throw new Error(`WSAA HTTP ${response.status}: ${xml.slice(0, 400)}`);
+    const fault = parseSoapFault(xml);
+    if (fault.code?.includes('coe.notAuthorized') || fault.message?.toLowerCase().includes('no autorizado')) {
+      throw new Error('Computador no autorizado en AFIP/ARCA para el servicio WSFEv1. Verifique en Administrador de Certificados Digitales que el certificado este asociado al servicio WSFEv1 y que el entorno (homologacion/produccion) sea el correcto.');
+    }
+    if (fault.code?.includes('coe.alreadyAuthenticated')) {
+      throw new Error('WSAA informa que ya existe un TA valido para este certificado y servicio (coe.alreadyAuthenticated). Reutilice Token/Sign vigentes o espere su vencimiento para solicitar uno nuevo.');
+    }
+    throw new Error(`WSAA HTTP ${response.status}: ${fault.message || xml.slice(0, 400)}`);
   }
 
   const loginReturnMatch = xml.match(/<loginCmsReturn>([\s\S]*?)<\/loginCmsReturn>/);

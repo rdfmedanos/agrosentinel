@@ -2386,6 +2386,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                     <>
                                       <p className="mb-1"><strong>Estado conexion:</strong> <span className={`badge ${arcaDiagnostics.connection.ok ? 'text-bg-success' : 'text-bg-danger'}`}>{arcaDiagnostics.connection.ok ? 'Conectado' : 'Con errores'}</span></p>
                                       <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
+                                      {arcaDiagnostics.connection.message.includes('coe.alreadyAuthenticated') ? (
+                                        <div className="alert alert-warning py-2 px-3 mt-2 mb-2">
+                                          <strong>Sesion WSAA ya activa.</strong> Cargue Token/Sign vigentes (por ejemplo desde Odoo) o espere el vencimiento del TA para regenerarlos automaticamente.
+                                        </div>
+                                      ) : null}
                                       <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
                                       <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
                                       {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
