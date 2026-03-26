@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
+import forge from 'node-forge';
 import { env, type ArcaEnvironment } from '../config/env.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
+import { loadCertificateData } from './certificate.service.js';
 
 function getCurrentArcaEnvironment(): ArcaEnvironment {
   const runtime = process.env.ARCA_ENVIRONMENT as ArcaEnvironment | undefined;
@@ -70,6 +72,90 @@ function extractErrors(xml: string): { code: string; msg: string }[] {
   }
   
   return errors;
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function buildLoginTicketRequest(service: string): string {
+  const now = new Date();
+  const generationTime = new Date(now.getTime() - 60_000).toISOString();
+  const expirationTime = new Date(now.getTime() + 10 * 60_000).toISOString();
+  const uniqueId = Math.floor(now.getTime() / 1000);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<loginTicketRequest version="1.0">
+  <header>
+    <uniqueId>${uniqueId}</uniqueId>
+    <generationTime>${generationTime}</generationTime>
+    <expirationTime>${expirationTime}</expirationTime>
+  </header>
+  <service>${service}</service>
+</loginTicketRequest>`;
+}
+
+function signCmsBase64(xml: string, certificatePem: string, privateKeyPem: string): string {
+  const cert = forge.pki.certificateFromPem(certificatePem);
+  const key = forge.pki.privateKeyFromPem(privateKeyPem);
+  const p7 = forge.pkcs7.createSignedData();
+  p7.content = forge.util.createBuffer(xml, 'utf8');
+  p7.addCertificate(cert);
+  p7.addSigner({
+    key,
+    certificate: cert,
+    digestAlgorithm: forge.pki.oids.sha256,
+    authenticatedAttributes: [
+      { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
+      { type: forge.pki.oids.messageDigest },
+      { type: forge.pki.oids.signingTime, value: new Date().toUTCString() }
+    ]
+  });
+  p7.sign({ detached: false });
+  const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+  return Buffer.from(der, 'binary').toString('base64');
+}
+
+async function loginCms(wsaaUrl: string, cmsBase64: string): Promise<{ token: string; sign: string }> {
+  const envelope = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <wsaa:loginCms>
+      <wsaa:in0>${cmsBase64}</wsaa:in0>
+    </wsaa:loginCms>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+
+  const response = await fetch(wsaaUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/xml; charset=utf-8',
+      SOAPAction: '""'
+    },
+    body: envelope
+  });
+
+  const xml = await response.text();
+  if (!response.ok) {
+    throw new Error(`WSAA HTTP ${response.status}: ${xml.slice(0, 400)}`);
+  }
+
+  const loginReturnMatch = xml.match(/<loginCmsReturn>([\s\S]*?)<\/loginCmsReturn>/);
+  if (!loginReturnMatch?.[1]) {
+    throw new Error('WSAA no devolvio loginCmsReturn');
+  }
+  const taXml = decodeXmlEntities(loginReturnMatch[1]);
+  const token = extractTag(taXml, 'token');
+  const sign = extractTag(taXml, 'sign');
+  if (!token || !sign) {
+    throw new Error('WSAA devolvio respuesta sin token/sign');
+  }
+  return { token, sign };
 }
 
 function mapTipoToCbteTipo(tipo: ArcaInvoiceRequest['tipo']): number {
@@ -241,6 +327,34 @@ export async function probeArcaConnection(config: EffectiveArcaConfig): Promise<
       message: error instanceof Error ? error.message : 'Error desconocido al conectar con ARCA'
     };
   }
+}
+
+export async function refreshArcaCredentials(tenantId: string): Promise<{ token: string; sign: string }> {
+  const config = await getEffectiveArcaConfig(tenantId);
+  if (config.mock || config.environment === 'mock') {
+    throw new Error('No se generan credenciales en modo mock');
+  }
+
+  const certData = loadCertificateData(tenantId);
+  if (!certData?.certificate || !certData.privateKey) {
+    throw new Error('Falta certificado o clave privada para generar Token/Sign');
+  }
+
+  const tra = buildLoginTicketRequest('wsfe');
+  const cms = signCmsBase64(tra, certData.certificate, certData.privateKey);
+  const { token, sign } = await loginCms(config.wsaaUrl, cms);
+
+  await TenantConfigModel.findOneAndUpdate(
+    { tenantId },
+    {
+      tenantId,
+      'arca.token': token,
+      'arca.sign': sign
+    },
+    { upsert: true, new: true }
+  );
+
+  return { token, sign };
 }
 
 export function authorizeInvoiceMock(req: ArcaInvoiceRequest): ArcaInvoiceResult {

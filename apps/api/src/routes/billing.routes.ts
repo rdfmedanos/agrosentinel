@@ -5,7 +5,7 @@ import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
-import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection } from '../services/arca.service.js';
+import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection, refreshArcaCredentials } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import {
@@ -87,8 +87,8 @@ billingRouter.get('/arca/status', requireCompanyAdmin, async (req, res) => {
       status.status = 'ok';
       status.message = 'Modo mock activo - Simulación enabled';
     } else if (!config.token || !config.sign) {
-      status.status = 'error';
-      status.message = 'Faltan credenciales (TOKEN/SIGN) - Configure en ARCA_TOKEN y ARCA_SIGN';
+      status.status = 'warning';
+      status.message = 'Faltan credenciales (TOKEN/SIGN) - use Probar conexion para generarlas automaticamente';
     } else {
       status.status = 'ok';
       status.message = 'Configuración lista para conectar';
@@ -117,12 +117,7 @@ billingRouter.post('/arca/test', requireCompanyAdmin, async (req, res) => {
     }
     
     if (!config.token || !config.sign) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'Credenciales no configuradas',
-        hint: 'Configure ARCA_TOKEN y ARCA_SIGN en variables de entorno'
-      });
-      return;
+      await refreshArcaCredentials(tenantId);
     }
     
     res.json({ 
@@ -138,8 +133,19 @@ billingRouter.post('/arca/test', requireCompanyAdmin, async (req, res) => {
 billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => {
   try {
     const tenantId = resolveTenantFromRequest(req);
-    const config = await getEffectiveArcaConfig(tenantId);
+    let config = await getEffectiveArcaConfig(tenantId);
     const certData = loadCertificateData(tenantId);
+
+    let credentialsAutoRefreshed = false;
+    if (!config.mock && config.environment !== 'mock' && (!config.token || !config.sign)) {
+      try {
+        await refreshArcaCredentials(tenantId);
+        config = await getEffectiveArcaConfig(tenantId);
+        credentialsAutoRefreshed = true;
+      } catch {
+        credentialsAutoRefreshed = false;
+      }
+    }
 
     const [totalInvoices, pendingInvoices, authorizedInvoices, invoicesWithCae] = await Promise.all([
       InvoiceModel.countDocuments({ tenantId }),
@@ -168,6 +174,7 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
         environment: certData?.environment || null
       },
       connection,
+      credentialsAutoRefreshed,
       documents: {
         total: totalInvoices,
         pending: pendingInvoices,

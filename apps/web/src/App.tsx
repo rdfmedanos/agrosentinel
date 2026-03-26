@@ -156,6 +156,7 @@ type ArcaDiagnostics = {
     message: string;
     lastVoucher?: number;
   };
+  credentialsAutoRefreshed?: boolean;
   documents: {
     total: number;
     pending: number;
@@ -2376,6 +2377,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                       <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
                                       <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
                                       <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
+                                      {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
                                       <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
                                       <hr className="my-2" />
                                       <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>
