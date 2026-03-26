@@ -72,7 +72,17 @@ function formatCurrency(amount: number): string {
 
 function formatDate(dateStr: string | Date | undefined): string {
   if (!dateStr) return '';
+  if (typeof dateStr === 'string') {
+    const ymd = dateStr.trim();
+    if (/^\d{8}$/.test(ymd)) {
+      const y = ymd.slice(0, 4);
+      const m = ymd.slice(4, 6);
+      const d = ymd.slice(6, 8);
+      return `${d}/${m}/${y}`;
+    }
+  }
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -81,7 +91,14 @@ function formatDate(dateStr: string | Date | undefined): string {
 
 function formatDateYMD(dateStr: string | Date | undefined): string {
   if (!dateStr) return '';
+  if (typeof dateStr === 'string') {
+    const ymd = dateStr.trim();
+    if (/^\d{8}$/.test(ymd)) {
+      return ymd;
+    }
+  }
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
