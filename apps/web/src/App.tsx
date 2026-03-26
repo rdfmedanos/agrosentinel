@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -1019,6 +1021,42 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [assigningName, setAssigningName] = useState('');
   const [assigningLat, setAssigningLat] = useState('');
   const [assigningLng, setAssigningLng] = useState('');
+
+  const showSwal = useCallback((message: string, level: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const titles: Record<'success' | 'error' | 'warning' | 'info', string> = {
+      success: 'Exito',
+      error: 'Error',
+      warning: 'Atencion',
+      info: 'Info'
+    };
+    void Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: level,
+      title: titles[level],
+      text: message,
+      showConfirmButton: false,
+      timer: 4200,
+      timerProgressBar: true
+    });
+  }, []);
+
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message?: unknown) => {
+      const text = String(message ?? '');
+      const lower = text.toLowerCase();
+      let level: 'success' | 'error' | 'warning' | 'info' = 'info';
+      if (lower.includes('error') || lower.includes('fall') || lower.includes('no se pudo')) level = 'error';
+      else if (lower.includes('pendiente') || lower.includes('warning') || lower.includes('atencion')) level = 'warning';
+      else if (lower.includes('exitos') || lower.includes('guardad') || lower.includes('autoriz')) level = 'success';
+      showSwal(text, level);
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, [showSwal]);
   const [showAssigningMap, setShowAssigningMap] = useState(false);
   const [pendingFilter, setPendingFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [newUser, setNewUser] = useState({
