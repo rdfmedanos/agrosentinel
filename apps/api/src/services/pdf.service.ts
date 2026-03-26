@@ -362,8 +362,12 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   const footerTextX = qrX + qrSize + 26;
   const footerTextW = contentRight - footerTextX - 12;
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#111111');
-  doc.text(`CAE: ${sanitizeText(invoice.cae || '-')}`, footerTextX, footerY + 34, { width: footerTextW });
-  doc.text(`Fecha Vencimiento CAE: ${fechaVencimientoCAE || '-'}`, footerTextX, footerY + 62, { width: footerTextW });
+  doc.text(`CAE: ${sanitizeText(invoice.cae || '-')}`, footerTextX, footerY + 30, { width: footerTextW, align: 'right' });
+  doc.text(`Fecha Vencimiento CAE: ${fechaVencimientoCAE || '-'}`, footerTextX, footerY + 56, { width: footerTextW, align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111');
+  doc.text('Codigo QR AFIP', footerTextX, footerY + 94, { width: footerTextW, align: 'right' });
+  doc.font('Helvetica').fontSize(7).fillColor('#333333');
+  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', footerTextX, footerY + 112, { width: footerTextW, align: 'right' });
 
   return doc;
 }
