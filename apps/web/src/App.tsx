@@ -1213,40 +1213,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     try {
       const status = await getJson<typeof certStatus>('/billing/certificate/status', props.session.token);
       setCertStatus(status);
-      
-      const csrSection = document.getElementById('csrSection');
-      const uploadCrtSection = document.getElementById('uploadCrtSection');
-      const generateP12Section = document.getElementById('generateP12Section');
-      const certStatusCard = document.getElementById('certStatusCard');
-      const certStatusBody = document.getElementById('certStatusBody');
-
-      if (csrSection) csrSection.style.display = status?.hasCsr ? 'block' : 'none';
-      if (uploadCrtSection) uploadCrtSection.style.display = status?.hasCsr ? 'block' : 'none';
-      if (generateP12Section) generateP12Section.style.display = status?.hasCertificate ? 'block' : 'none';
-      if (certStatusCard) certStatusCard.style.display = status?.hasCsr ? 'block' : 'none';
-
-      if (certStatusBody && status) {
-        certStatusBody.innerHTML = `
-          <div class="row">
-            <div class="col-md-4 text-center">
-              <i class="fas ${status.hasPrivateKey ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'} fa-2x mb-2"></i>
-              <p class="mb-0"><strong>Clave Privada</strong></p>
-              <small>${status.hasPrivateKey ? 'Generada' : 'No disponible'}</small>
-            </div>
-            <div class="col-md-4 text-center">
-              <i class="fas ${status.hasCertificate ? 'fa-check-circle text-success' : 'fa-clock text-warning'} fa-2x mb-2"></i>
-              <p class="mb-0"><strong>Certificado ARCA</strong></p>
-              <small>${status.hasCertificate ? 'Cargado' : 'Pendiente'}</small>
-            </div>
-            <div class="col-md-4 text-center">
-              <i class="fas ${status.environment === 'produccion' ? 'fa-rocket text-primary' : 'fa-flask text-info'} fa-2x mb-2"></i>
-              <p class="mb-0"><strong>Entorno</strong></p>
-              <small>${status.environment === 'produccion' ? 'Produccion' : 'Homologacion'}</small>
-            </div>
-          </div>
-          ${status.createdAt ? `<p class="mt-2 mb-0 text-muted small">Generado: ${new Date(status.createdAt).toLocaleString('es-AR')}</p>` : ''}
-        `;
-      }
     } catch (err) {
       console.error('Error loading cert status:', err);
     }
@@ -2504,7 +2470,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card mb-3" id="csrSection" style={{ display: 'none' }}>
+                              <div className="card mb-3" id="csrSection" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
                                 <div className="card-header bg-success text-white">
                                   <h5 className="card-title mb-0"><i className="fas fa-download mr-1"></i>Paso 2: Descargar CSR y Obtener Certificado de ARCA</h5>
                                 </div>
@@ -2543,7 +2509,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card mb-3" id="uploadCrtSection" style={{ display: 'none' }}>
+                              <div className="card mb-3" id="uploadCrtSection" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
                                 <div className="card-header bg-info text-white">
                                   <h5 className="card-title mb-0"><i className="fas fa-upload mr-1"></i>Paso 3: Subir Certificado Firmado por ARCA</h5>
                                 </div>
@@ -2630,7 +2596,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card mb-3" id="generateP12Section" style={{ display: 'none' }}>
+                              <div className="card mb-3" id="generateP12Section" style={{ display: certStatus?.hasCertificate ? 'block' : 'none' }}>
                                 <div className="card-header bg-warning">
                                   <h5 className="card-title mb-0"><i className="fas fa-file-archive mr-1"></i>Paso 4: Generar Archivo P12 (Opcional)</h5>
                                 </div>
@@ -2680,11 +2646,35 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                               </div>
 
-                              <div className="card" id="certStatusCard" style={{ display: 'none' }}>
+                              <div className="card" id="certStatusCard" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
                                 <div className="card-header bg-success text-white">
                                   <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Estado del Certificado</h5>
                                 </div>
                                 <div className="card-body" id="certStatusBody">
+                                  {certStatus ? (
+                                    <>
+                                      <div className="row">
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.hasPrivateKey ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Clave Privada</strong></p>
+                                          <small>{certStatus.hasPrivateKey ? 'Generada' : 'No disponible'}</small>
+                                        </div>
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.hasCertificate ? 'fa-check-circle text-success' : 'fa-clock text-warning'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Certificado ARCA</strong></p>
+                                          <small>{certStatus.hasCertificate ? 'Cargado' : 'Pendiente'}</small>
+                                        </div>
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.environment === 'produccion' ? 'fa-rocket text-primary' : 'fa-flask text-info'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Entorno</strong></p>
+                                          <small>{certStatus.environment === 'produccion' ? 'Produccion' : 'Homologacion'}</small>
+                                        </div>
+                                      </div>
+                                      {certStatus.createdAt ? (
+                                        <p className="mt-2 mb-0 text-muted small">Generado: {new Date(certStatus.createdAt).toLocaleString('es-AR')}</p>
+                                      ) : null}
+                                    </>
+                                  ) : null}
                                 </div>
                                 <div className="card-footer">
                                   <button className="btn btn-danger btn-sm" onClick={async () => {
