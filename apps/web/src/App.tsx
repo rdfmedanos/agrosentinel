@@ -1267,7 +1267,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [activeSection, facturacionTab, props.session?.token]);
 
   useEffect(() => {
-    if (activeSection !== 'facturacion' || facturacionTab !== 'arca' || !tenantId) return;
+    if (activeSection !== 'facturacion' || (facturacionTab !== 'certificado' && facturacionTab !== 'arca') || !tenantId) return;
     void runArcaDiagnostics();
   }, [activeSection, facturacionTab, tenantId]);
 
@@ -2307,18 +2307,13 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           </a>
                         </li>
                         <li className="nav-item">
-                          <a className={`nav-link ${facturacionTab === 'arca' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('arca'); }}>
-                            <i className="fas fa-shield-alt mr-1"></i> ARCA / AFIP
-                          </a>
-                        </li>
-                        <li className="nav-item">
                           <a className={`nav-link ${facturacionTab === 'empresa' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('empresa'); }}>
                             <i className="fas fa-building mr-1"></i> Mi Empresa
                           </a>
                         </li>
                         <li className="nav-item">
                           <a className={`nav-link ${facturacionTab === 'certificado' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('certificado'); }}>
-                            <i className="fas fa-key mr-1"></i> Certificado
+                            <i className="fas fa-shield-alt mr-1"></i> ARCA / Certificado
                           </a>
                         </li>
                         <li className="nav-item">
@@ -2524,6 +2519,54 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="alert alert-info">
                                 <i className="fas fa-key mr-2"></i>
                                 Generador de Certificados ARCA - Necesario para facturacion electronica real
+                              </div>
+
+                              <div className="card mb-3 border-info">
+                                <div className="card-header d-flex justify-content-between align-items-center">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !tenantId}>
+                                    {testingArca ? 'Probando...' : 'Probar conexion'}
+                                  </button>
+                                </div>
+                                <div className="card-body small">
+                                  {arcaDiagnostics ? (
+                                    <>
+                                      <p className="mb-1"><strong>Estado conexion:</strong> <span className={`badge ${arcaDiagnostics.connection.ok ? 'text-bg-success' : 'text-bg-danger'}`}>{arcaDiagnostics.connection.ok ? 'Conectado' : 'Con errores'}</span></p>
+                                      <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
+                                      <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
+                                      <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
+                                      {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
+                                      {arcaDiagnostics.authSession ? (
+                                        <>
+                                          <p className="mb-1"><strong>Unique ID:</strong> {arcaDiagnostics.authSession.uniqueId || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Generation Time:</strong> {arcaDiagnostics.authSession.generationTime ? new Date(arcaDiagnostics.authSession.generationTime).toLocaleString('es-AR') : 'N/D'}</p>
+                                          <p className="mb-1"><strong>Expiration Time:</strong> {arcaDiagnostics.authSession.expirationTime ? new Date(arcaDiagnostics.authSession.expirationTime).toLocaleString('es-AR') : 'N/D'} {arcaDiagnostics.authSession.expired ? <span className="badge text-bg-danger ms-1">Expirado</span> : null}</p>
+                                          <p className="mb-1"><strong>Sign:</strong> {arcaDiagnostics.authSession.signPreview || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Servicio:</strong> {arcaDiagnostics.authSession.service || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP Login URL:</strong> {arcaDiagnostics.config.wsaaUrl || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP WS URL:</strong> {arcaDiagnostics.config.wsfeUrl ? (arcaDiagnostics.config.wsfeUrl.includes('?') ? arcaDiagnostics.config.wsfeUrl : `${arcaDiagnostics.config.wsfeUrl}?WSDL`) : 'N/D'}</p>
+                                        </>
+                                      ) : null}
+                                      <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
+                                      <hr className="my-2" />
+                                      <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>
+                                      <p className="mb-1"><strong>Autorizados con CAE:</strong> {arcaDiagnostics.documents.withCae}</p>
+                                      <p className="mb-1"><strong>Pendientes:</strong> {arcaDiagnostics.documents.pending}</p>
+                                      <p className="mb-0"><strong>Sincronizacion:</strong> <span className={`badge ${arcaDiagnostics.documents.syncedPct >= 80 ? 'text-bg-success' : arcaDiagnostics.documents.syncedPct >= 50 ? 'text-bg-warning' : 'text-bg-danger'}`}>{arcaDiagnostics.documents.syncedPct}%</span></p>
+                                      {arcaDiagnostics.documents.byTipo ? (
+                                        <>
+                                          <hr className="my-2" />
+                                          <p className="mb-1"><strong>Sync por tipo:</strong></p>
+                                          <p className="mb-1">A: local {arcaDiagnostics.documents.byTipo.A.localLast} / ARCA {arcaDiagnostics.documents.byTipo.A.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.A.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.A.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.A.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.A.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-1">B: local {arcaDiagnostics.documents.byTipo.B.localLast} / ARCA {arcaDiagnostics.documents.byTipo.B.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.B.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.B.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.B.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.B.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-0">C: local {arcaDiagnostics.documents.byTipo.C.localLast} / ARCA {arcaDiagnostics.documents.byTipo.C.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.C.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.C.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.C.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.C.synced ? 'OK' : 'Atrasado'}</span></p>
+                                        </>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <p className="mb-0 text-muted">Ejecute la prueba para validar conexion, certificado y sincronizacion de comprobantes.</p>
+                                  )}
+                                </div>
                               </div>
 
                               <div className="card mb-3">

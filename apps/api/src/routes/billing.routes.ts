@@ -138,6 +138,7 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
     const tenantId = resolveTenantFromRequest(req);
     let config = await getEffectiveArcaConfig(tenantId);
     const certData = loadCertificateData(tenantId);
+    let refreshError = '';
 
     let credentialsAutoRefreshed = false;
     if (!config.mock && config.environment !== 'mock' && (!config.token || !config.sign || isArcaTokenExpired(config.token))) {
@@ -145,8 +146,9 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
         await refreshArcaCredentials(tenantId);
         config = await getEffectiveArcaConfig(tenantId);
         credentialsAutoRefreshed = true;
-      } catch {
+      } catch (error) {
         credentialsAutoRefreshed = false;
+        refreshError = error instanceof Error ? error.message : String(error);
       }
     }
 
@@ -181,6 +183,9 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
     }
 
     const connection = await probeArcaConnection(config);
+    if (!connection.ok && connection.message.includes('ARCA_TOKEN y ARCA_SIGN') && refreshError) {
+      connection.message = refreshError;
+    }
     const tokenInfo = getArcaTokenInfo(config.token);
     const syncPct = totalInvoices > 0 ? Math.round((invoicesWithCae / totalInvoices) * 100) : 100;
 
@@ -205,9 +210,9 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
         signPreview: config.sign ? `${config.sign.slice(0, 18)}...` : null
       },
       certificate: {
-        hasPrivateKey: !!certData?.privateKey,
+        hasPrivateKey: !!(certData?.privateKey || config.certPath),
         hasCsr: !!certData?.csr,
-        hasCertificate: !!certData?.certificate,
+        hasCertificate: !!(certData?.certificate || config.certPath),
         createdAt: certData?.createdAt || null,
         environment: certData?.environment || null
       },
