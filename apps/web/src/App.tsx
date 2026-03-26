@@ -1408,7 +1408,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   };
 
   const deletePendingInvoice = async (invoiceId: string) => {
-    if (!confirm('¿Eliminar esta factura pendiente? Esta accion no se puede deshacer.')) return;
+    const result = await Swal.fire({
+      title: '¿Eliminar factura pendiente?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    if (!result.isConfirmed) return;
     setProcessingInvoiceId(invoiceId);
     try {
       await deleteJson(`/billing/invoices/${invoiceId}`, props.session.token);
