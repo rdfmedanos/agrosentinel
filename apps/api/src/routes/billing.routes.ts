@@ -5,7 +5,7 @@ import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
-import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca } from '../services/arca.service.js';
+import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import {
@@ -132,6 +132,52 @@ billingRouter.post('/arca/test', requireCompanyAdmin, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
+billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => {
+  try {
+    const tenantId = resolveTenantFromRequest(req);
+    const config = await getEffectiveArcaConfig(tenantId);
+    const certData = loadCertificateData(tenantId);
+
+    const [totalInvoices, pendingInvoices, authorizedInvoices, invoicesWithCae] = await Promise.all([
+      InvoiceModel.countDocuments({ tenantId }),
+      InvoiceModel.countDocuments({ tenantId, estado: 'pendiente' }),
+      InvoiceModel.countDocuments({ tenantId, estado: 'autorizado' }),
+      InvoiceModel.countDocuments({ tenantId, cae: { $exists: true, $ne: '' } })
+    ]);
+
+    const connection = await probeArcaConnection(config);
+    const syncPct = totalInvoices > 0 ? Math.round((invoicesWithCae / totalInvoices) * 100) : 100;
+
+    res.json({
+      tenantId,
+      config: {
+        environment: config.environment,
+        enabled: config.enabled,
+        mock: config.mock,
+        hasCredentials: !!(config.token && config.sign),
+        hasCertConfig: !!(config.certPath && config.certPassword)
+      },
+      certificate: {
+        hasPrivateKey: !!certData?.privateKey,
+        hasCsr: !!certData?.csr,
+        hasCertificate: !!certData?.certificate,
+        createdAt: certData?.createdAt || null,
+        environment: certData?.environment || null
+      },
+      connection,
+      documents: {
+        total: totalInvoices,
+        pending: pendingInvoices,
+        authorized: authorizedInvoices,
+        withCae: invoicesWithCae,
+        syncedPct: syncPct
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al generar diagnostico ARCA', details: String(error) });
   }
 });
 

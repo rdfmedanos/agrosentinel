@@ -135,6 +135,36 @@ type ArcaConfig = {
   certPassword?: string;
 };
 
+type ArcaDiagnostics = {
+  tenantId: string;
+  config: {
+    environment: 'mock' | 'homologacion' | 'produccion';
+    enabled: boolean;
+    mock: boolean;
+    hasCredentials: boolean;
+    hasCertConfig: boolean;
+  };
+  certificate: {
+    hasPrivateKey: boolean;
+    hasCsr: boolean;
+    hasCertificate: boolean;
+    createdAt: string | null;
+    environment: string | null;
+  };
+  connection: {
+    ok: boolean;
+    message: string;
+    lastVoucher?: number;
+  };
+  documents: {
+    total: number;
+    pending: number;
+    authorized: number;
+    withCae: number;
+    syncedPct: number;
+  };
+};
+
 type AuthUser = {
   id: string;
   name: string;
@@ -906,6 +936,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
+  const [arcaDiagnostics, setArcaDiagnostics] = useState<ArcaDiagnostics | null>(null);
+  const [testingArca, setTestingArca] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
   const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
@@ -1217,6 +1249,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [activeSection, facturacionTab, props.session?.token]);
 
+  useEffect(() => {
+    if (activeSection !== 'facturacion' || facturacionTab !== 'arca' || !tenantId) return;
+    void runArcaDiagnostics();
+  }, [activeSection, facturacionTab, tenantId]);
+
   const certificateTenantId = tenantId || props.session.user.tenantId;
   const certificateQuery = `?tenantId=${encodeURIComponent(certificateTenantId)}`;
 
@@ -1408,6 +1445,20 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       await loadCompanyData(tenantId);
     } finally {
       setSavingArca(false);
+    }
+  };
+
+  const runArcaDiagnostics = async () => {
+    if (!tenantId) return;
+    setTestingArca(true);
+    try {
+      const data = await getJson<ArcaDiagnostics>(`/billing/arca/diagnostics?tenantId=${tenantId}`, props.session.token);
+      setArcaDiagnostics(data);
+    } catch (err) {
+      console.error('Error testing ARCA connection:', err);
+      alert('No se pudo obtener el diagnostico ARCA');
+    } finally {
+      setTestingArca(false);
     }
   };
 
@@ -2310,6 +2361,32 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="alert alert-warning">
                                 <i className="fas fa-exclamation-triangle mr-2"></i>
                                 Configuracion de ARCA / AFIP para facturacion electronica
+                              </div>
+                              <div className="card mb-3 border-info">
+                                <div className="card-header d-flex justify-content-between align-items-center">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !tenantId}>
+                                    {testingArca ? 'Probando...' : 'Probar conexion'}
+                                  </button>
+                                </div>
+                                <div className="card-body small">
+                                  {arcaDiagnostics ? (
+                                    <>
+                                      <p className="mb-1"><strong>Estado conexion:</strong> <span className={`badge ${arcaDiagnostics.connection.ok ? 'text-bg-success' : 'text-bg-danger'}`}>{arcaDiagnostics.connection.ok ? 'Conectado' : 'Con errores'}</span></p>
+                                      <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
+                                      <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
+                                      <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
+                                      <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
+                                      <hr className="my-2" />
+                                      <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>
+                                      <p className="mb-1"><strong>Autorizados con CAE:</strong> {arcaDiagnostics.documents.withCae}</p>
+                                      <p className="mb-1"><strong>Pendientes:</strong> {arcaDiagnostics.documents.pending}</p>
+                                      <p className="mb-0"><strong>Sincronizacion:</strong> <span className={`badge ${arcaDiagnostics.documents.syncedPct >= 80 ? 'text-bg-success' : arcaDiagnostics.documents.syncedPct >= 50 ? 'text-bg-warning' : 'text-bg-danger'}`}>{arcaDiagnostics.documents.syncedPct}%</span></p>
+                                    </>
+                                  ) : (
+                                    <p className="mb-0 text-muted">Ejecute la prueba para validar conexion, certificado y sincronizacion de comprobantes.</p>
+                                  )}
+                                </div>
                               </div>
                               <div className="row">
                                 <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>

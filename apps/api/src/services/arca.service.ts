@@ -219,6 +219,30 @@ export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: Arc
   };
 }
 
+export async function probeArcaConnection(config: EffectiveArcaConfig): Promise<{ ok: boolean; message: string; lastVoucher?: number }> {
+  if (config.mock || config.environment === 'mock') {
+    return {
+      ok: true,
+      message: 'Modo mock activo'
+    };
+  }
+
+  try {
+    const auth = getAuth(config);
+    const lastVoucher = await getLastVoucherNumber(config, auth, Number(config.ptoVta), 6);
+    return {
+      ok: true,
+      message: 'Conexion exitosa con ARCA WSFE',
+      lastVoucher
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Error desconocido al conectar con ARCA'
+    };
+  }
+}
+
 export function authorizeInvoiceMock(req: ArcaInvoiceRequest): ArcaInvoiceResult {
   const now = Date.now().toString();
   const cae = now.slice(-8) + String(randomInt(100000, 999999));
