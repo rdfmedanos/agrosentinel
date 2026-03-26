@@ -1307,7 +1307,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [activeSection, facturacionTab, props.session.token, certificateTenantId]);
 
-  const createInvoice = async () => {
+  const createInvoice = async (autoAuthorize = true) => {
     setCreatingInvoice(true);
     try {
       const res = await postJson('/billing/invoices', {
@@ -1325,18 +1325,22 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
       let createdInvoice = invoice;
       let authorizeError = '';
-      try {
-        const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
-        const authResult = await authRes.json();
-        createdInvoice = authResult.invoice;
-      } catch (err) {
-        authorizeError = err instanceof Error ? err.message : String(err);
+      if (autoAuthorize) {
+        try {
+          const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
+          const authResult = await authRes.json();
+          createdInvoice = authResult.invoice;
+        } catch (err) {
+          authorizeError = err instanceof Error ? err.message : String(err);
+        }
       }
 
       setInvoices([createdInvoice, ...invoices]);
       setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
       setShowCreateInvoiceModal(false);
-      if (authorizeError) {
+      if (!autoAuthorize) {
+        alert('Factura guardada en estado pendiente');
+      } else if (authorizeError) {
         alert(`Factura creada en estado pendiente. No se pudo autorizar en ARCA: ${authorizeError}`);
       } else {
         alert('Factura creada y autorizada exitosamente');
@@ -3059,12 +3063,12 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 <div className="card-header">
                                   <div className="d-flex justify-content-between align-items-center">
                                     <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
-                                    <div className="d-flex gap-2">
+                                    <div className="d-flex align-items-center" style={{ gap: '8px' }}>
                                       <button className="btn btn-light btn-sm" onClick={() => setShowCreateInvoiceModal(true)}>
                                         <i className="fas fa-plus me-1"></i>Nueva Factura
                                       </button>
                                       <button
-                                        className="btn btn-sm btn-outline-warning"
+                                        className="btn btn-light btn-sm"
                                         onClick={() => void authorizePendingInvoices()}
                                         disabled={authorizingPending || invoices.filter(inv => inv.estado === 'pendiente').length === 0}
                                       >
@@ -3664,8 +3668,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
             </div>
             <div className="modal-footer" style={{ position: 'sticky', bottom: 0, backgroundColor: '#fff', borderTop: '1px solid #dee2e6', zIndex: 2 }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowCreateInvoiceModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => void createInvoice()} disabled={creatingInvoice || !newInvoice.amountArs}>
-                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Actualizar</>}
+              <button className="btn btn-outline-primary" onClick={() => void createInvoice(false)} disabled={creatingInvoice || !newInvoice.amountArs}>
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Guardando...</> : <><i className="fas fa-save mr-1"></i>Guardar sin autorizar</>}
+              </button>
+              <button className="btn btn-primary" onClick={() => void createInvoice(true)} disabled={creatingInvoice || !newInvoice.amountArs}>
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Autorizar</>}
               </button>
             </div>
           </div>
