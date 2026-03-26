@@ -925,6 +925,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     taxId?: string;
   } | null>(null);
   const [uploadingCert, setUploadingCert] = useState(false);
+  const [certificatePemInput, setCertificatePemInput] = useState('');
   const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
   const [allDevicesMapCenter, setAllDevicesMapCenter] = useState<[number, number] | null>(null);
   const [showMqttConfig, setShowMqttConfig] = useState(false);
@@ -2548,23 +2549,69 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 </div>
                                 <div className="card-body">
                                   <div className="mb-3">
-                                    <label className="form-label small fw-bold">Certificado Firmado (.crt)</label>
-                                    <div className="input-group">
-                                      <input type="file" className="form-control" accept=".crt,.cer,.pem" id="certCrtFile"
-                                        onChange={async (e) => {
-                                          const file = e.target.files?.[0];
-                                          if (!file) return;
-                                          const formData = new FormData();
-                                          formData.append('certificate', file);
+                                    {certStatus?.environment === 'produccion' ? (
+                                      <>
+                                        <label className="form-label small fw-bold">Certificado Firmado (.crt)</label>
+                                        <div className="input-group">
+                                          <input type="file" className="form-control" accept=".crt,.cer,.pem" id="certCrtFile"
+                                            onChange={async (e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+                                              const formData = new FormData();
+                                              formData.append('certificate', file);
+                                              setUploadingCert(true);
+                                              try {
+                                                const res = await fetch(`${API_URL}/billing/certificate/upload-crt`, {
+                                                  method: 'POST',
+                                                  headers: { Authorization: `Bearer ${props.session.token}` },
+                                                  body: formData
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok) {
+                                                  alert('Certificado cargado y validado correctamente');
+                                                  await loadCertStatus();
+                                                } else {
+                                                  alert('Error: ' + (data.error || 'Error al cargar certificado'));
+                                                }
+                                              } catch {
+                                                alert('Error al cargar certificado');
+                                              } finally {
+                                                setUploadingCert(false);
+                                                (document.getElementById('certCrtFile') as HTMLInputElement).value = '';
+                                              }
+                                            }}
+                                            disabled={uploadingCert}
+                                          />
+                                        </div>
+                                        <small className="text-muted">Archivo .crt, .cer o .pem firmado por ARCA</small>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <label className="form-label small fw-bold">Certificado PEM (Homologacion)</label>
+                                        <textarea
+                                          className="form-control"
+                                          rows={8}
+                                          placeholder="Pegue aqui el certificado completo en formato PEM (incluyendo BEGIN CERTIFICATE y END CERTIFICATE)"
+                                          value={certificatePemInput}
+                                          onChange={e => setCertificatePemInput(e.target.value)}
+                                          disabled={uploadingCert}
+                                        />
+                                        <small className="text-muted d-block mt-1">Copie y pegue el certificado devuelto por ARCA en homologacion</small>
+                                        <button className="btn btn-info mt-2" disabled={uploadingCert || !certificatePemInput.trim()} onClick={async () => {
+                                          setUploadingCert(true);
                                           try {
                                             const res = await fetch(`${API_URL}/billing/certificate/upload-crt`, {
                                               method: 'POST',
-                                              headers: { Authorization: `Bearer ${props.session.token}` },
-                                              body: formData
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                Authorization: `Bearer ${props.session.token}`
+                                              },
+                                              body: JSON.stringify({ certificatePem: certificatePemInput })
                                             });
                                             const data = await res.json();
                                             if (res.ok) {
                                               alert('Certificado cargado y validado correctamente');
+                                              setCertificatePemInput('');
                                               await loadCertStatus();
                                             } else {
                                               alert('Error: ' + (data.error || 'Error al cargar certificado'));
@@ -2572,12 +2619,13 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                           } catch {
                                             alert('Error al cargar certificado');
                                           } finally {
-                                            (document.getElementById('certCrtFile') as HTMLInputElement).value = '';
+                                            setUploadingCert(false);
                                           }
-                                        }}
-                                      />
-                                    </div>
-                                    <small className="text-muted">Archivo .crt, .cer o .pem firmado por ARCA</small>
+                                        }}>
+                                          <i className="fas fa-paste mr-1"></i> Pegar y Validar Certificado
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>

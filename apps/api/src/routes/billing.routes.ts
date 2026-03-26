@@ -784,11 +784,6 @@ billingRouter.get('/certificate/download/:type', requireCompanyAdmin, async (req
 
 billingRouter.post('/certificate/upload-crt', requireCompanyAdmin, upload.single('certificate'), async (req, res) => {
   try {
-    if (!req.file) {
-      res.status(400).json({ error: 'No se recibió ningún archivo' });
-      return;
-    }
-
     const tenantId = resolveTenantFromRequest(req);
     const certData = loadCertificateData(tenantId);
 
@@ -797,7 +792,16 @@ billingRouter.post('/certificate/upload-crt', requireCompanyAdmin, upload.single
       return;
     }
 
-    const certificatePem = req.file.buffer.toString('utf8');
+    const certificatePem = req.file
+      ? req.file.buffer.toString('utf8')
+      : typeof req.body?.certificatePem === 'string'
+        ? req.body.certificatePem.trim()
+        : '';
+
+    if (!certificatePem) {
+      res.status(400).json({ error: 'Debe subir un archivo CRT o pegar el contenido PEM del certificado' });
+      return;
+    }
 
     const isValid = validateCertificate(certificatePem, certData.privateKey, certData.csr);
 

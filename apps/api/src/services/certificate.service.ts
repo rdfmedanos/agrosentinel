@@ -60,6 +60,10 @@ export function generateCSR(privateKeyPem: string, csrData: CsrData): string {
       value: csrData.companyName
     },
     {
+      name: 'serialNumber',
+      value: `CUIT ${csrData.taxId}`
+    },
+    {
       name: 'commonName',
       value: `AFIP ${csrData.taxId} - ${csrData.companyName}`
     }
