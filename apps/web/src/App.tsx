@@ -263,9 +263,25 @@ function authHeaders(token?: string, json = false): HeadersInit {
   return headers;
 }
 
+async function buildApiError(res: Response): Promise<Error> {
+  let detail = '';
+  try {
+    const data = await res.clone().json() as { error?: string; details?: string };
+    detail = data.details || data.error || '';
+  } catch {
+    try {
+      detail = await res.clone().text();
+    } catch {
+      detail = '';
+    }
+  }
+  const suffix = detail ? `: ${detail}` : '';
+  return new Error(`API ${res.status}${suffix}`);
+}
+
 async function getJson<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { headers: authHeaders(token) });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res.json();
 }
 
@@ -275,7 +291,7 @@ async function putJson<T>(path: string, body: unknown, token?: string): Promise<
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res.json();
 }
 
@@ -285,7 +301,7 @@ async function postJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -295,7 +311,7 @@ async function patchJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -304,7 +320,7 @@ async function deleteJson(path: string, token?: string) {
     method: 'DELETE',
     headers: authHeaders(token)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -1304,15 +1320,27 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         amountArs: newInvoice.amountArs
       }, props.session.token);
       const invoice = await res.json();
-      
-      const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
-      const authResult = await authRes.json();
-      setInvoices([authResult.invoice, ...invoices]);
+
+      let createdInvoice = invoice;
+      let authorizeError = '';
+      try {
+        const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
+        const authResult = await authRes.json();
+        createdInvoice = authResult.invoice;
+      } catch (err) {
+        authorizeError = err instanceof Error ? err.message : String(err);
+      }
+
+      setInvoices([createdInvoice, ...invoices]);
       setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
-      alert('Factura creada exitosamente!');
+      if (authorizeError) {
+        alert(`Factura creada en estado pendiente. No se pudo autorizar en ARCA: ${authorizeError}`);
+      } else {
+        alert('Factura creada y autorizada exitosamente');
+      }
     } catch (err) {
       console.error('Error creating invoice:', err);
-      alert('Error al crear factura');
+      alert(`Error al crear factura: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setCreatingInvoice(false);
     }

@@ -93,6 +93,7 @@ ARCA_PTO_VTA=1
 ARCA_WSFE_URL=https://wswhomo.afip.gov.ar/wsfev1/service.asmx
 ARCA_TOKEN=
 ARCA_SIGN=
+CERT_STORAGE_DIR=./certs
 
 # Notificaciones Telegram (opcional)
 
@@ -102,6 +103,11 @@ TELEGRAM_CHAT_ID=
 ```
 
 Para produccion con dominio y HTTPS, usa tu dominio real en `CORS_ORIGIN` (en este caso `https://agrosentinel.jaz.ar`).
+
+Importante para ARCA/Certificado:
+- El servicio `api` usa un volumen persistente `api_certs:/app/certs` para guardar `private.key`, `request.csr` y `certificate.crt`.
+- Eso evita perder certificados al reconstruir imagen o reiniciar contenedores.
+- No uses `docker compose down -v` en operacion normal, porque elimina volumenes (incluyendo certificados).
 
 ## 5) Levantar servicios
 
@@ -161,6 +167,10 @@ Actualizar a nueva version:
 git pull
 docker compose up -d --build
 ```
+
+Nota:
+- `docker compose down` conserva volumenes.
+- `docker compose down -v` borra volumenes (`mongo_data`, `mosquitto_data`, `api_certs`).
 
 ## 8) SSL con `agrosentinel.jaz.ar` (paso a paso)
 
@@ -265,6 +275,12 @@ docker run --rm -v agrosentinel_mongo_data:/data/db -v $(pwd):/backup alpine tar
 Backup de configuracion:
 - Guardar `.env`
 - Guardar `infra/mosquitto/mosquitto.conf`
+
+Backup de certificados ARCA (volumen Docker):
+
+```bash
+docker run --rm -v agrosentinel_api_certs:/data -v $(pwd):/backup alpine tar czf /backup/api_certs_$(date +%F).tar.gz -C /data .
+```
 
 ## 11) Notificaciones por Telegram
 
