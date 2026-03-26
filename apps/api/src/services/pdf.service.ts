@@ -342,8 +342,8 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
 
   doc.font('Helvetica').fontSize(11).fillColor('#222222').text(`Plazo de pago: ${condicionPago}`, leftMargin + 10, y + 208);
 
-  const footerY = doc.page.height - 225;
-  const footerH = 210;
+  const footerH = 168;
+  const footerY = doc.page.height - (footerH + 15);
   const qrSize = 120;
   const qrX = leftMargin + 14;
   const qrY = footerY + 14;
