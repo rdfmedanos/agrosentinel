@@ -32,9 +32,26 @@ function getTenantDirs(tenantId: string): string[] {
   return legacy === primary ? [primary] : [primary, legacy];
 }
 
-function resolveExistingCertDir(tenantId: string): string | null {
-  const dir = getTenantDirs(tenantId).find(candidate => fs.existsSync(candidate));
-  return dir || null;
+function readFirstExistingFile(tenantId: string, fileName: string): { value?: string; path?: string } {
+  const dirs = getTenantDirs(tenantId);
+  for (const dir of dirs) {
+    const filePath = path.join(dir, fileName);
+    if (fs.existsSync(filePath)) {
+      return { value: fs.readFileSync(filePath, 'utf8'), path: filePath };
+    }
+  }
+  return {};
+}
+
+function readFirstExistingBuffer(tenantId: string, fileName: string): Buffer | undefined {
+  const dirs = getTenantDirs(tenantId);
+  for (const dir of dirs) {
+    const filePath = path.join(dir, fileName);
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath);
+    }
+  }
+  return undefined;
 }
 
 function ensureCertDir(tenantId: string): string {
@@ -155,33 +172,27 @@ export function saveCertificateData(tenantId: string, data: CertificateData): vo
 }
 
 export function loadCertificateData(tenantId: string): CertificateData | null {
-  const dir = resolveExistingCertDir(tenantId);
-  
-  if (!dir) {
-    return null;
-  }
+  const privateKeyData = readFirstExistingFile(tenantId, 'private.key');
+  const csrData = readFirstExistingFile(tenantId, 'request.csr');
+  const certificateData = readFirstExistingFile(tenantId, 'certificate.crt');
 
-  const privateKeyPath = path.join(dir, 'private.key');
-  const csrPath = path.join(dir, 'request.csr');
-  const certPath = path.join(dir, 'certificate.crt');
-
-  const privateKey = fs.existsSync(privateKeyPath) ? fs.readFileSync(privateKeyPath, 'utf8') : '';
-  const csr = fs.existsSync(csrPath) ? fs.readFileSync(csrPath, 'utf8') : '';
-  const certificate = fs.existsSync(certPath) ? fs.readFileSync(certPath, 'utf8') : undefined;
+  const privateKey = privateKeyData.value || '';
+  const csr = csrData.value || '';
+  const certificate = certificateData.value;
 
   if (!privateKey && !csr && !certificate) {
     return null;
   }
 
-  const metadataPath = path.join(dir, 'metadata.json');
-  const metadata = fs.existsSync(metadataPath)
-    ? JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
+  const metadataData = readFirstExistingFile(tenantId, 'metadata.json');
+  const metadata = metadataData.value
+    ? JSON.parse(metadataData.value)
     : null;
 
   const fallbackCreatedAt = (() => {
-    if (fs.existsSync(csrPath)) return fs.statSync(csrPath).mtime.toISOString();
-    if (fs.existsSync(privateKeyPath)) return fs.statSync(privateKeyPath).mtime.toISOString();
-    if (fs.existsSync(certPath)) return fs.statSync(certPath).mtime.toISOString();
+    if (csrData.path && fs.existsSync(csrData.path)) return fs.statSync(csrData.path).mtime.toISOString();
+    if (privateKeyData.path && fs.existsSync(privateKeyData.path)) return fs.statSync(privateKeyData.path).mtime.toISOString();
+    if (certificateData.path && fs.existsSync(certificateData.path)) return fs.statSync(certificateData.path).mtime.toISOString();
     return new Date().toISOString();
   })();
   
@@ -202,22 +213,10 @@ export function getCertificateFiles(tenantId: string): {
   csr?: Buffer;
   certificate?: Buffer;
 } {
-  const dir = resolveExistingCertDir(tenantId);
-
-  if (!dir) {
-    return {};
-  }
-  
   return {
-    privateKey: fs.existsSync(path.join(dir, 'private.key')) 
-      ? fs.readFileSync(path.join(dir, 'private.key')) 
-      : undefined,
-    csr: fs.existsSync(path.join(dir, 'request.csr')) 
-      ? fs.readFileSync(path.join(dir, 'request.csr')) 
-      : undefined,
-    certificate: fs.existsSync(path.join(dir, 'certificate.crt')) 
-      ? fs.readFileSync(path.join(dir, 'certificate.crt')) 
-      : undefined
+    privateKey: readFirstExistingBuffer(tenantId, 'private.key'),
+    csr: readFirstExistingBuffer(tenantId, 'request.csr'),
+    certificate: readFirstExistingBuffer(tenantId, 'certificate.crt')
   };
 }
 
