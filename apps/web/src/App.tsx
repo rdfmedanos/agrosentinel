@@ -1387,6 +1387,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   };
 
   useEffect(() => {
+    if (!showCreateInvoiceModal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showCreateInvoiceModal]);
+
+  useEffect(() => {
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
@@ -3051,8 +3060,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <div className="d-flex justify-content-between align-items-center">
                                     <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
                                     <div className="d-flex gap-2">
-                                      <button className="btn btn-sm btn-primary" onClick={() => setShowCreateInvoiceModal(true)}>
-                                        <i className="fas fa-plus mr-1"></i>Nueva Factura
+                                      <button className="btn btn-light btn-sm" onClick={() => setShowCreateInvoiceModal(true)}>
+                                        <i className="fas fa-plus me-1"></i>Nueva Factura
                                       </button>
                                       <button
                                         className="btn btn-sm btn-outline-warning"
@@ -3567,14 +3576,14 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         </div>
       </div>
 
-      <div className={`modal fade ${showCreateInvoiceModal ? 'show' : ''}`} style={{ display: showCreateInvoiceModal ? 'block' : 'none' }}>
-        <div className="modal-dialog modal-lg">
-          <div className="modal-content">
+      <div className={`modal fade ${showCreateInvoiceModal ? 'show' : ''}`} style={{ display: showCreateInvoiceModal ? 'block' : 'none', overflowY: 'auto', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal-dialog modal-lg" style={{ margin: '30px auto' }}>
+          <div className="modal-content" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header bg-primary">
               <h4 className="modal-title"><i className="fas fa-file-invoice mr-2"></i>Nueva Factura</h4>
               <button type="button" className="close text-white" onClick={() => setShowCreateInvoiceModal(false)}>&times;</button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ overflowY: 'auto' }}>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Cliente</label>
                 <select className="form-control" value={newInvoice.tenantId} onChange={e => {
@@ -3653,10 +3662,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ position: 'sticky', bottom: 0, backgroundColor: '#fff', borderTop: '1px solid #dee2e6', zIndex: 2 }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowCreateInvoiceModal(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={() => void createInvoice()} disabled={creatingInvoice || !newInvoice.amountArs}>
-                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Autorizar</>}
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Actualizar</>}
               </button>
             </div>
           </div>
