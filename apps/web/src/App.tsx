@@ -981,6 +981,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [cities, setCities] = useState<string[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [authorizingPending, setAuthorizingPending] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -1343,6 +1344,43 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       alert(`Error al crear factura: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setCreatingInvoice(false);
+    }
+  };
+
+  const authorizePendingInvoices = async () => {
+    const pending = invoices.filter(inv => inv.estado === 'pendiente');
+    if (pending.length === 0) {
+      alert('No hay facturas pendientes para autorizar');
+      return;
+    }
+
+    setAuthorizingPending(true);
+    let authorized = 0;
+    let failed = 0;
+
+    try {
+      for (const inv of pending) {
+        try {
+          const authRes = await postJson(`/billing/invoices/${inv._id}/authorize`, {}, props.session.token);
+          const authResult = await authRes.json();
+          setInvoices(prev => prev.map(item => item._id === inv._id ? authResult.invoice : item));
+          authorized += 1;
+        } catch (err) {
+          console.error('Error authorizing pending invoice:', inv._id, err);
+          failed += 1;
+        }
+      }
+
+      const refreshed = await getJson<any[]>('/billing/invoices', props.session.token);
+      setInvoices(refreshed);
+
+      if (failed > 0) {
+        alert(`Autorizadas: ${authorized}. Con error: ${failed}. Revise diagnostico ARCA o intente nuevamente.`);
+      } else {
+        alert(`Se autorizaron ${authorized} facturas pendientes`);
+      }
+    } finally {
+      setAuthorizingPending(false);
     }
   };
 
@@ -3097,7 +3135,16 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             <div className="col-md-7">
                               <div className="card">
                                 <div className="card-header">
-                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
+                                  <div className="d-flex justify-content-between align-items-center">
+                                    <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
+                                    <button
+                                      className="btn btn-sm btn-outline-warning"
+                                      onClick={() => void authorizePendingInvoices()}
+                                      disabled={authorizingPending || invoices.filter(inv => inv.estado === 'pendiente').length === 0}
+                                    >
+                                      {authorizingPending ? 'Autorizando...' : 'Autorizar pendientes'}
+                                    </button>
+                                  </div>
                                 </div>
                                 <div className="card-body p-0">
                                   <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
