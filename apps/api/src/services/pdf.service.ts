@@ -1,6 +1,9 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 
+const ARCA_LOGO_URL = 'https://neofactura.com.ar/uploads/logo-arca.jpg';
+let arcaLogoCache: Promise<Buffer | null> | null = null;
+
 export interface InvoiceItem {
   codigo: string;
   descripcion: string;
@@ -123,6 +126,22 @@ async function generateQRCode(data: object): Promise<Buffer> {
   const base64 = Buffer.from(JSON.stringify(data)).toString('base64');
   const url = `https://www.afip.gob.ar/fe/qr/?p=${base64}`;
   return await QRCode.toBuffer(url, { width: 120, margin: 1, errorCorrectionLevel: 'M' });
+}
+
+async function getArcaLogoBuffer(): Promise<Buffer | null> {
+  if (!arcaLogoCache) {
+    arcaLogoCache = (async () => {
+      try {
+        const response = await fetch(ARCA_LOGO_URL);
+        if (!response.ok) return null;
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return arcaLogoCache;
 }
 
 export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: InvoiceData['seller']): Promise<PDFKit.PDFDocument> {
@@ -323,8 +342,8 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
 
   doc.font('Helvetica').fontSize(11).fillColor('#222222').text(`Plazo de pago: ${condicionPago}`, leftMargin + 10, y + 208);
 
-  const footerY = doc.page.height - 195;
-  const footerH = 180;
+  const footerY = doc.page.height - 265;
+  const footerH = 250;
   const qrSize = 120;
   const qrX = leftMargin + 14;
   const qrY = footerY + 14;
@@ -357,17 +376,32 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
     }
   }
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante autorizado por AFIP', qrX, qrY + qrSize + 8, { width: qrSize, align: 'center' });
+  const logoSize = Math.floor(qrSize / 2);
+  const logoX = qrX + Math.floor((qrSize - logoSize) / 2);
+  const logoY = qrY + qrSize + 8;
+  const logoBuffer = await getArcaLogoBuffer();
+  if (logoBuffer) {
+    try {
+      doc.image(logoBuffer, logoX, logoY, { fit: [logoSize, logoSize], align: 'center', valign: 'center' });
+    } catch {
+      // no-op if logo can't be rendered
+    }
+  }
+
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante Autorizado', qrX, logoY + logoSize + 8, { width: qrSize, align: 'center' });
 
   const footerTextX = qrX + qrSize + 26;
   const footerTextW = contentRight - footerTextX - 12;
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#111111');
   doc.text(`CAE: ${sanitizeText(invoice.cae || '-')}`, footerTextX, footerY + 30, { width: footerTextW, align: 'right' });
   doc.text(`Fecha Vencimiento CAE: ${fechaVencimientoCAE || '-'}`, footerTextX, footerY + 56, { width: footerTextW, align: 'right' });
+
+  const qrLegendX = footerTextX;
+  const qrLegendW = Math.max(220, Math.min(340, footerTextW));
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111');
-  doc.text('Codigo QR AFIP', footerTextX, footerY + 94, { width: footerTextW, align: 'right' });
+  doc.text('Codigo QR AFIP', qrLegendX, footerY + 94, { width: qrLegendW, align: 'left' });
   doc.font('Helvetica').fontSize(7).fillColor('#333333');
-  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', footerTextX, footerY + 112, { width: footerTextW, align: 'right' });
+  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', qrLegendX, footerY + 112, { width: qrLegendW, align: 'left' });
 
   return doc;
 }
