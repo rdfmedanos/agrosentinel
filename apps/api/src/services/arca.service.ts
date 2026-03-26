@@ -1,5 +1,7 @@
 import { randomInt } from 'node:crypto';
 import forge from 'node-forge';
+import fs from 'node:fs';
+import path from 'node:path';
 import { env, type ArcaEnvironment } from '../config/env.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 import { loadCertificateData } from './certificate.service.js';
@@ -109,6 +111,21 @@ function parseEpochSeconds(value: string | null): string | null {
 
 function parseTagValue(xml: string, tag: string): string | null {
   return extractTag(xml, tag);
+}
+
+function normalizeWsaaUrl(url?: string): string {
+  const raw = (url || '').trim();
+  if (!raw) return raw;
+  if (raw.includes('/wsaa/services/LoginCms')) {
+    return raw.replace('/wsaa/services/LoginCms', '/ws/services/LoginCms');
+  }
+  return raw;
+}
+
+function normalizeWsfeUrl(url?: string): string {
+  const raw = (url || '').trim();
+  if (!raw) return raw;
+  return raw.replace(/\?WSDL$/i, '').replace(/\?wsdl$/i, '');
 }
 
 export function getArcaTokenInfo(token?: string): ArcaTokenInfo | null {
@@ -249,6 +266,48 @@ async function loginCms(wsaaUrl: string, cmsBase64: string): Promise<{ token: st
     throw new Error('WSAA devolvio respuesta sin token/sign');
   }
   return { token, sign };
+}
+
+function extractSigningMaterialFromP12(p12Path: string, password: string): { certificatePem: string; privateKeyPem: string } {
+  const absolutePath = path.isAbsolute(p12Path) ? p12Path : path.resolve(process.cwd(), p12Path);
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error(`No existe el certificado P12 en ${absolutePath}`);
+  }
+
+  const p12Buffer = fs.readFileSync(absolutePath);
+  const p12Der = forge.util.createBuffer(p12Buffer.toString('binary'));
+  const asn1 = forge.asn1.fromDer(p12Der);
+  const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, password || '');
+
+  const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || [];
+  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || [];
+
+  const keyBag = keyBags[0];
+  const certBag = certBags[0];
+  if (!keyBag?.key || !certBag?.cert) {
+    throw new Error('No se pudo extraer clave privada/certificado desde el P12');
+  }
+
+  return {
+    privateKeyPem: forge.pki.privateKeyToPem(keyBag.key),
+    certificatePem: forge.pki.certificateToPem(certBag.cert)
+  };
+}
+
+function getSigningMaterial(tenantId: string, config: EffectiveArcaConfig): { certificatePem: string; privateKeyPem: string } {
+  const certData = loadCertificateData(tenantId);
+  if (certData?.certificate && certData.privateKey) {
+    return {
+      certificatePem: certData.certificate,
+      privateKeyPem: certData.privateKey
+    };
+  }
+
+  if (config.certPath) {
+    return extractSigningMaterialFromP12(config.certPath, config.certPassword || '');
+  }
+
+  throw new Error('Falta certificado: suba CRT/KEY en la pestana Certificado o configure ARCA_CERT_PATH/ARCA_CERT_PASSWORD');
 }
 
 function mapTipoToCbteTipo(tipo: ArcaInvoiceRequest['tipo']): number {
@@ -459,14 +518,11 @@ export async function refreshArcaCredentials(tenantId: string): Promise<{ token:
     throw new Error('No se generan credenciales en modo mock');
   }
 
-  const certData = loadCertificateData(tenantId);
-  if (!certData?.certificate || !certData.privateKey) {
-    throw new Error('Falta certificado o clave privada para generar Token/Sign');
-  }
+  const material = getSigningMaterial(tenantId, config);
 
   const tra = buildLoginTicketRequest('wsfe');
-  const cms = signCmsBase64(tra, certData.certificate, certData.privateKey);
-  const { token, sign } = await loginCms(config.wsaaUrl, cms);
+  const cms = signCmsBase64(tra, material.certificatePem, material.privateKeyPem);
+  const { token, sign } = await loginCms(normalizeWsaaUrl(config.wsaaUrl), cms);
 
   await TenantConfigModel.findOneAndUpdate(
     { tenantId },
@@ -515,6 +571,8 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
   const isMock = !arcaConfig?.enabled || arcaConfig?.mock || selectedEnvironment === 'mock';
   const environment = isMock ? 'mock' : selectedEnvironment;
   const urls = getUrls(environment);
+  const wsfeUrl = normalizeWsfeUrl(arcaConfig?.wsfeUrl || urls.wsfeUrl);
+  const wsaaUrl = normalizeWsaaUrl(arcaConfig?.wsaaUrl || urls.wsaaUrl);
   
   return {
     environment,
@@ -522,8 +580,8 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
     mock: isMock,
     cuit: arcaConfig?.cuit || env.arcaCuit,
     ptoVta: arcaConfig?.ptoVta || env.arcaPtoVta,
-    wsfeUrl: arcaConfig?.wsfeUrl || urls.wsfeUrl,
-    wsaaUrl: arcaConfig?.wsaaUrl || urls.wsaaUrl,
+    wsfeUrl,
+    wsaaUrl,
     token: arcaConfig?.token || env.arcaToken,
     sign: arcaConfig?.sign || env.arcaSign,
     certPath: arcaConfig?.certPath || env.arcaCertPath,

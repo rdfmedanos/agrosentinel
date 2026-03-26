@@ -24,7 +24,7 @@ const tenantConfigSchema = new Schema(
       cuit: { type: String, default: '' },
       ptoVta: { type: String, default: '1' },
       wsfeUrl: { type: String, default: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx' },
-      wsaaUrl: { type: String, default: 'https://wsaahomo.afip.gov.ar/wsaa/services/LoginCms' },
+      wsaaUrl: { type: String, default: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms' },
       token: { type: String, default: '' },
       sign: { type: String, default: '' },
       certPath: { type: String, default: '' },
