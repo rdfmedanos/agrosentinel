@@ -5,7 +5,7 @@ import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
-import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection, refreshArcaCredentials } from '../services/arca.service.js';
+import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection, refreshArcaCredentials, getLastAuthorizedVoucher } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import {
@@ -154,6 +154,29 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
       InvoiceModel.countDocuments({ tenantId, cae: { $exists: true, $ne: '' } })
     ]);
 
+    const [localA, localB, localC] = await Promise.all([
+      InvoiceModel.findOne({ tenantId, tipo: 'A', puntoVenta: Number(config.ptoVta) }).sort({ numero: -1 }),
+      InvoiceModel.findOne({ tenantId, tipo: 'B', puntoVenta: Number(config.ptoVta) }).sort({ numero: -1 }),
+      InvoiceModel.findOne({ tenantId, tipo: 'C', puntoVenta: Number(config.ptoVta) }).sort({ numero: -1 })
+    ]);
+
+    let remoteA: number | null = null;
+    let remoteB: number | null = null;
+    let remoteC: number | null = null;
+    if (config.enabled && !config.mock && config.environment !== 'mock' && config.token && config.sign) {
+      try {
+        [remoteA, remoteB, remoteC] = await Promise.all([
+          getLastAuthorizedVoucher(config, 'A'),
+          getLastAuthorizedVoucher(config, 'B'),
+          getLastAuthorizedVoucher(config, 'C')
+        ]);
+      } catch {
+        remoteA = null;
+        remoteB = null;
+        remoteC = null;
+      }
+    }
+
     const connection = await probeArcaConnection(config);
     const syncPct = totalInvoices > 0 ? Math.round((invoicesWithCae / totalInvoices) * 100) : 100;
 
@@ -180,7 +203,12 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
         pending: pendingInvoices,
         authorized: authorizedInvoices,
         withCae: invoicesWithCae,
-        syncedPct: syncPct
+        syncedPct: syncPct,
+        byTipo: {
+          A: { localLast: localA?.numero || 0, remoteLast: remoteA, synced: remoteA === null ? null : (localA?.numero || 0) >= remoteA },
+          B: { localLast: localB?.numero || 0, remoteLast: remoteB, synced: remoteB === null ? null : (localB?.numero || 0) >= remoteB },
+          C: { localLast: localC?.numero || 0, remoteLast: remoteC, synced: remoteC === null ? null : (localC?.numero || 0) >= remoteC }
+        }
       }
     });
   } catch (error) {
@@ -339,7 +367,9 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
     const arcaResult = await authorizeInvoiceWithArca(invoice.tenantId, {
       amountArs: invoice.amountArs,
       period: invoice.period,
-      tipo: invoice.tipo as 'A' | 'B' | 'C' | 'M'
+      tipo: invoice.tipo as 'A' | 'B' | 'C' | 'M',
+      clienteTipoDoc: invoice.cliente?.tipoDoc,
+      clienteNroDoc: invoice.cliente?.nroDoc
     });
 
     invoice.cae = arcaResult.cae;

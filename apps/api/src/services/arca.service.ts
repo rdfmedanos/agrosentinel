@@ -33,6 +33,8 @@ export type ArcaInvoiceRequest = {
   amountArs: number;
   period: string;
   tipo?: 'A' | 'B' | 'C' | 'M';
+  clienteTipoDoc?: number;
+  clienteNroDoc?: string;
 };
 
 export type ArcaInvoiceResult = {
@@ -43,6 +45,12 @@ export type ArcaInvoiceResult = {
   ptoVta: string;
   result: string;
   errors?: { code: string; msg: string }[];
+};
+
+type InvoiceAmounts = {
+  impTotal: number;
+  impNeto: number;
+  impIva: number;
 };
 
 function toYyyymmdd(date: Date): string {
@@ -173,6 +181,15 @@ function mapTipoToCbteTipo(tipo: ArcaInvoiceRequest['tipo']): number {
   }
 }
 
+function getInvoiceAmounts(tipo: ArcaInvoiceRequest['tipo'], total: number): InvoiceAmounts {
+  if (tipo === 'A' || tipo === 'B' || tipo === 'M') {
+    const impNeto = Number((total / 1.21).toFixed(2));
+    const impIva = Number((total - impNeto).toFixed(2));
+    return { impTotal: total, impNeto, impIva };
+  }
+  return { impTotal: total, impNeto: total, impIva: 0 };
+}
+
 function getAuth(config: EffectiveArcaConfig): ArcaAuth {
   const token = config.token?.trim();
   const sign = config.sign?.trim();
@@ -243,6 +260,18 @@ export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: Arc
   const cbteTipo = mapTipoToCbteTipo(req.tipo);
   const today = toYyyymmdd(new Date());
   const urls = getUrls(config.environment);
+  const amounts = getInvoiceAmounts(req.tipo, req.amountArs);
+  const docTipo = req.clienteTipoDoc ?? 99;
+  const docNro = Number(req.clienteNroDoc || '0') || 0;
+  const ivaNode = amounts.impIva > 0
+    ? `<Iva>
+            <AlicIva>
+              <Id>5</Id>
+              <BaseImp>${amounts.impNeto.toFixed(2)}</BaseImp>
+              <Importe>${amounts.impIva.toFixed(2)}</Importe>
+            </AlicIva>
+          </Iva>`
+    : '';
   
   const last = await getLastVoucherNumber(config, auth, ptoVta, cbteTipo);
   const nextNro = last + 1;
@@ -262,22 +291,23 @@ export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: Arc
       <FeDetReq>
         <FECAEDetRequest>
           <Concepto>2</Concepto>
-          <DocTipo>99</DocTipo>
-          <DocNro>0</DocNro>
+          <DocTipo>${docTipo}</DocTipo>
+          <DocNro>${docNro}</DocNro>
           <CbteDesde>${nextNro}</CbteDesde>
           <CbteHasta>${nextNro}</CbteHasta>
           <CbteFch>${today}</CbteFch>
-          <ImpTotal>${req.amountArs.toFixed(2)}</ImpTotal>
+          <ImpTotal>${amounts.impTotal.toFixed(2)}</ImpTotal>
           <ImpTotConc>0.00</ImpTotConc>
-          <ImpNeto>${req.amountArs.toFixed(2)}</ImpNeto>
+          <ImpNeto>${amounts.impNeto.toFixed(2)}</ImpNeto>
           <ImpOpEx>0.00</ImpOpEx>
-          <ImpIVA>0.00</ImpIVA>
+          <ImpIVA>${amounts.impIva.toFixed(2)}</ImpIVA>
           <ImpTrib>0.00</ImpTrib>
           <MonId>PES</MonId>
           <MonCotiz>1</MonCotiz>
           <FchServDesde>${today}</FchServDesde>
           <FchServHasta>${today}</FchServHasta>
           <FchVtoPago>${today}</FchVtoPago>
+          ${ivaNode}
         </FECAEDetRequest>
       </FeDetReq>
     </FeCAEReq>
@@ -327,6 +357,15 @@ export async function probeArcaConnection(config: EffectiveArcaConfig): Promise<
       message: error instanceof Error ? error.message : 'Error desconocido al conectar con ARCA'
     };
   }
+}
+
+export async function getLastAuthorizedVoucher(config: EffectiveArcaConfig, tipo: ArcaInvoiceRequest['tipo']): Promise<number | null> {
+  if (config.mock || config.environment === 'mock') {
+    return null;
+  }
+  const auth = getAuth(config);
+  const cbteTipo = mapTipoToCbteTipo(tipo);
+  return getLastVoucherNumber(config, auth, Number(config.ptoVta), cbteTipo);
 }
 
 export async function refreshArcaCredentials(tenantId: string): Promise<{ token: string; sign: string }> {

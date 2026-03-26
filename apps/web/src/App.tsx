@@ -163,6 +163,11 @@ type ArcaDiagnostics = {
     authorized: number;
     withCae: number;
     syncedPct: number;
+    byTipo?: {
+      A: { localLast: number; remoteLast: number | null; synced: boolean | null };
+      B: { localLast: number; remoteLast: number | null; synced: boolean | null };
+      C: { localLast: number; remoteLast: number | null; synced: boolean | null };
+    };
   };
 };
 
@@ -2384,6 +2389,15 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                       <p className="mb-1"><strong>Autorizados con CAE:</strong> {arcaDiagnostics.documents.withCae}</p>
                                       <p className="mb-1"><strong>Pendientes:</strong> {arcaDiagnostics.documents.pending}</p>
                                       <p className="mb-0"><strong>Sincronizacion:</strong> <span className={`badge ${arcaDiagnostics.documents.syncedPct >= 80 ? 'text-bg-success' : arcaDiagnostics.documents.syncedPct >= 50 ? 'text-bg-warning' : 'text-bg-danger'}`}>{arcaDiagnostics.documents.syncedPct}%</span></p>
+                                      {arcaDiagnostics.documents.byTipo ? (
+                                        <>
+                                          <hr className="my-2" />
+                                          <p className="mb-1"><strong>Sync por tipo:</strong></p>
+                                          <p className="mb-1">A: local {arcaDiagnostics.documents.byTipo.A.localLast} / ARCA {arcaDiagnostics.documents.byTipo.A.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.A.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.A.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.A.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.A.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-1">B: local {arcaDiagnostics.documents.byTipo.B.localLast} / ARCA {arcaDiagnostics.documents.byTipo.B.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.B.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.B.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.B.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.B.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-0">C: local {arcaDiagnostics.documents.byTipo.C.localLast} / ARCA {arcaDiagnostics.documents.byTipo.C.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.C.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.C.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.C.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.C.synced ? 'OK' : 'Atrasado'}</span></p>
+                                        </>
+                                      ) : null}
                                     </>
                                   ) : (
                                     <p className="mb-0 text-muted">Ejecute la prueba para validar conexion, certificado y sincronizacion de comprobantes.</p>
