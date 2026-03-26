@@ -1,4 +1,4 @@
-import { authorizeInvoiceWithArca } from './arca.service.js';
+import { authorizeInvoiceWithArca, getEffectiveArcaConfig } from './arca.service.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { UserModel } from '../models/User.js';
@@ -21,9 +21,12 @@ export async function generateMonthlyInvoices() {
       : await PlanModel.findOne({ name: 'Starter', active: true });
     const amountArs = plan?.monthlyPriceArs ?? 0;
 
+    const config = await getEffectiveArcaConfig(user.tenantId);
+
     const arca = await authorizeInvoiceWithArca(user.tenantId, {
       amountArs,
-      period
+      period,
+      tipo: 'B'
     });
 
     await InvoiceModel.create({
@@ -33,9 +36,9 @@ export async function generateMonthlyInvoices() {
       amountArs,
       status: 'issued',
       tipo: 'B',
-      puntoVenta: 1,
-      numero: 1,
-      environment: 'mock',
+      puntoVenta: Number(arca.ptoVta) || 1,
+      numero: arca.cbteNro,
+      environment: config.environment,
       cae: arca.cae,
       caeDueDate: arca.caeDueDate,
       cbteNro: arca.cbteNro,

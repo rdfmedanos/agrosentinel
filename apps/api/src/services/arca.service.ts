@@ -25,6 +25,7 @@ export type EffectiveArcaConfig = {
 export type ArcaInvoiceRequest = {
   amountArs: number;
   period: string;
+  tipo?: 'A' | 'B' | 'C' | 'M';
 };
 
 export type ArcaInvoiceResult = {
@@ -64,6 +65,21 @@ function extractErrors(xml: string): { code: string; msg: string }[] {
   }
   
   return errors;
+}
+
+function mapTipoToCbteTipo(tipo: ArcaInvoiceRequest['tipo']): number {
+  switch (tipo) {
+    case 'A':
+      return 1;
+    case 'B':
+      return 6;
+    case 'C':
+      return 11;
+    case 'M':
+      return 51;
+    default:
+      return 6;
+  }
 }
 
 function getAuth(config: EffectiveArcaConfig): ArcaAuth {
@@ -133,7 +149,7 @@ async function getLastVoucherNumber(config: EffectiveArcaConfig, auth: ArcaAuth,
 export async function authorizeInvoiceReal(config: EffectiveArcaConfig, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
   const auth = getAuth(config);
   const ptoVta = Number(config.ptoVta);
-  const cbteTipo = 6; // Factura B por defecto
+  const cbteTipo = mapTipoToCbteTipo(req.tipo);
   const today = toYyyymmdd(new Date());
   const urls = getUrls(config.environment);
   
@@ -209,7 +225,7 @@ export function authorizeInvoiceMock(req: ArcaInvoiceRequest): ArcaInvoiceResult
     cae,
     caeDueDate: due,
     cbteNro: randomInt(1000, 99999),
-    cbteTipo: 6,
+    cbteTipo: mapTipoToCbteTipo(req.tipo),
     ptoVta: '1',
     result: 'A'
   };
@@ -240,7 +256,10 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
 export async function authorizeInvoiceWithArca(tenantId: string, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
   const config = await getEffectiveArcaConfig(tenantId);
   if (config.mock || config.environment === 'mock') {
-    return authorizeInvoiceMock(req);
+    return {
+      ...authorizeInvoiceMock(req),
+      ptoVta: config.ptoVta
+    };
   }
   return authorizeInvoiceReal(config, req);
 }

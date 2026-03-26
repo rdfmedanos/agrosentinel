@@ -5,7 +5,7 @@ import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
-import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock } from '../services/arca.service.js';
+import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import {
@@ -276,23 +276,24 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
       return;
     }
     
-    const config = await getEffectiveArcaConfig(invoice.tenantId);
-    
-    if (config.mock || config.environment === 'mock') {
-      const mockResult = authorizeInvoiceMock({ amountArs: invoice.amountArs, period: invoice.period });
-      invoice.cae = mockResult.cae;
-      invoice.caeDueDate = mockResult.caeDueDate;
-      invoice.cbteNro = mockResult.cbteNro;
-      invoice.cbteTipo = mockResult.cbteTipo;
-      invoice.arcaResult = 'A';
-      invoice.estado = 'autorizado';
-      await invoice.save();
-      res.json({ success: true, invoice });
-      return;
-    }
-    
-    // Aquí iría la lógica real de ARCA
-    res.status(400).json({ error: 'No implementado - Configure TOKEN y SIGN para ARCA real' });
+    const arcaResult = await authorizeInvoiceWithArca(invoice.tenantId, {
+      amountArs: invoice.amountArs,
+      period: invoice.period,
+      tipo: invoice.tipo as 'A' | 'B' | 'C' | 'M'
+    });
+
+    invoice.cae = arcaResult.cae;
+    invoice.caeDueDate = arcaResult.caeDueDate;
+    invoice.cbteNro = arcaResult.cbteNro;
+    invoice.cbteTipo = arcaResult.cbteTipo;
+    invoice.puntoVenta = Number(arcaResult.ptoVta) || invoice.puntoVenta;
+    invoice.numero = arcaResult.cbteNro;
+    invoice.arcaResult = arcaResult.result;
+    invoice.set('arcaErrors', (arcaResult.errors || []) as any);
+    invoice.estado = 'autorizado';
+    await invoice.save();
+
+    res.json({ success: true, invoice });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
