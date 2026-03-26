@@ -226,11 +226,14 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   doc.font('Helvetica').fontSize(10).fillColor('#222222');
   doc.text(`cod. ${tipoData.codigo === '001' ? '1' : tipoData.codigo}`, centerX, y + 56, { width: centerColW, align: 'center' });
 
-  doc.font('Helvetica-Bold').fontSize(17).text(`${tipoData.nombre}S ${invoice.tipo || 'A'}`, rightX + 12, y + 3, { width: rightColW - 24 });
+  const headerOffset = Math.round(rightColW * 0.3);
+  const headerRightX = rightX + 12 + headerOffset;
+  const headerRightW = Math.max(120, rightColW - 24 - headerOffset);
+  doc.font('Helvetica-Bold').fontSize(17).text(`${tipoData.nombre}S ${invoice.tipo || 'A'}`, headerRightX, y + 3, { width: headerRightW });
   doc.font('Helvetica').fontSize(9);
-  doc.text(`Fecha: ${fechaEmision}`, rightX + 12, y + 28, { width: rightColW - 24 });
-  doc.text(`FA-${invoice.tipo || 'A'} ${invoiceNumber}`, rightX + 12, y + 45, { width: rightColW - 24 });
-  doc.fontSize(7).text(`Tipo de Documento ${tipoData.nombre}S ${invoice.tipo || 'A'}`, rightX + 12, y + 60, { width: rightColW - 24 });
+  doc.text(`Fecha: ${fechaEmision}`, headerRightX, y + 28, { width: headerRightW });
+  doc.text(`FA-${invoice.tipo || 'A'} ${invoiceNumber}`, headerRightX, y + 45, { width: headerRightW });
+  doc.fontSize(7).text(`Tipo de Documento ${tipoData.nombre}S ${invoice.tipo || 'A'}`, headerRightX, y + 60, { width: headerRightW });
 
   y += 82;
   doc.roundedRect(leftMargin, y, pageWidth, 20, 8).lineWidth(0.8).stroke('#444444');
