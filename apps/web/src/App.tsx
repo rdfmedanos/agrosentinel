@@ -1217,9 +1217,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [activeSection, facturacionTab, props.session?.token]);
 
+  const certificateTenantId = tenantId || props.session.user.tenantId;
+  const certificateQuery = `?tenantId=${encodeURIComponent(certificateTenantId)}`;
+
   const loadCertStatus = async () => {
     try {
-      const status = await getJson<typeof certStatus>('/billing/certificate/status', props.session.token);
+      const status = await getJson<typeof certStatus>(`/billing/certificate/status${certificateQuery}`, props.session.token);
       setCertStatus(status);
     } catch (err) {
       console.error('Error loading cert status:', err);
@@ -2531,7 +2534,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
 
                                     try {
-                                      const res = await postJson('/billing/certificate/generate', {
+                                      const res = await postJson(`/billing/certificate/generate${certificateQuery}`, {
                                         companyName, taxId, province, city, environment
                                       }, props.session.token);
                                       if (res.ok) {
@@ -2565,7 +2568,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <div className="row">
                                     <div className="col-md-6 mb-3">
                                       <button className="btn btn-success btn-block w-100" id="btnDownloadKey" onClick={() => {
-                                        window.open(`${API_URL}/billing/certificate/download/key?token=${props.session.token}`, '_blank');
+                                        window.open(`${API_URL}/billing/certificate/download/key${certificateQuery}&token=${props.session.token}`, '_blank');
                                       }}>
                                         <i className="fas fa-key mr-1"></i> Descargar Clave Privada (.key)
                                       </button>
@@ -2573,7 +2576,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                     </div>
                                     <div className="col-md-6 mb-3">
                                       <button className="btn btn-info btn-block w-100" id="btnDownloadCsr" onClick={() => {
-                                        window.open(`${API_URL}/billing/certificate/download/csr?token=${props.session.token}`, '_blank');
+                                        window.open(`${API_URL}/billing/certificate/download/csr${certificateQuery}&token=${props.session.token}`, '_blank');
                                       }}>
                                         <i className="fas fa-file-alt mr-1"></i> Descargar CSR (.csr)
                                       </button>
@@ -2610,10 +2613,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                               formData.append('certificate', file);
                                               setUploadingCert(true);
                                               try {
-                                                const res = await fetch(`${API_URL}/billing/certificate/upload-crt`, {
-                                                  method: 'POST',
-                                                  headers: { Authorization: `Bearer ${props.session.token}` },
-                                                  body: formData
+                                                  const res = await fetch(`${API_URL}/billing/certificate/upload-crt${certificateQuery}`, {
+                                                    method: 'POST',
+                                                    headers: { Authorization: `Bearer ${props.session.token}` },
+                                                    body: formData
                                                 });
                                                 const data = await res.json();
                                                 if (res.ok) {
@@ -2649,10 +2652,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                         <button className="btn btn-info mt-2" disabled={uploadingCert || !certificatePemInput.trim()} onClick={async () => {
                                           setUploadingCert(true);
                                           try {
-                                            const res = await fetch(`${API_URL}/billing/certificate/upload-crt`, {
-                                              method: 'POST',
-                                              headers: {
-                                                'Content-Type': 'application/json',
+                                              const res = await fetch(`${API_URL}/billing/certificate/upload-crt${certificateQuery}`, {
+                                                method: 'POST',
+                                                headers: {
+                                                  'Content-Type': 'application/json',
                                                 Authorization: `Bearer ${props.session.token}`
                                               },
                                               body: JSON.stringify({ certificatePem: certificatePemInput })
@@ -2698,10 +2701,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                           return;
                                         }
                                         try {
-                                          const res = await fetch(`${API_URL}/billing/certificate/generate-p12`, {
-                                            method: 'POST',
-                                            headers: { 
-                                              'Content-Type': 'application/json',
+                                            const res = await fetch(`${API_URL}/billing/certificate/generate-p12${certificateQuery}`, {
+                                              method: 'POST',
+                                              headers: { 
+                                                'Content-Type': 'application/json',
                                               Authorization: `Bearer ${props.session.token}`
                                             },
                                             body: JSON.stringify({ password })
@@ -2763,7 +2766,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <button className="btn btn-danger btn-sm" onClick={async () => {
                                     if (!confirm('¿Eliminar todos los certificados? Esta accion no se puede deshacer.')) return;
                                     try {
-                                      await deleteJson('/billing/certificate', props.session.token);
+                                      await deleteJson(`/billing/certificate${certificateQuery}`, props.session.token);
                                       alert('Certificados eliminados');
                                       await loadCertStatus();
                                     } catch {
