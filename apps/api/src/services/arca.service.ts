@@ -113,6 +113,10 @@ function parseTagValue(xml: string, tag: string): string | null {
   return extractTag(xml, tag);
 }
 
+function formatWsaaDate(date: Date): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
 function parseSoapFault(xml: string): { code: string | null; message: string | null } {
   const code = xml.match(/<faultcode[^>]*>([^<]+)<\/faultcode>/i)?.[1] || null;
   const message = xml.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/i)?.[1] || null;
@@ -201,9 +205,9 @@ export function isArcaTokenExpired(token?: string): boolean {
 
 function buildLoginTicketRequest(service: string): string {
   const now = new Date();
-  const generationTime = new Date(now.getTime() - 60_000).toISOString();
-  const expirationTime = new Date(now.getTime() + 10 * 60_000).toISOString();
-  const uniqueId = Number(`${Math.floor(now.getTime() / 1000)}${randomInt(10, 99)}`);
+  const generationTime = formatWsaaDate(new Date(now.getTime() - 60_000));
+  const expirationTime = formatWsaaDate(new Date(now.getTime() + 10 * 60_000));
+  const uniqueId = Math.floor(now.getTime() / 1000) + randomInt(0, 999);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <loginTicketRequest version="1.0">
   <header>
