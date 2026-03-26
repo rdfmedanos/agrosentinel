@@ -342,8 +342,8 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
 
   doc.font('Helvetica').fontSize(11).fillColor('#222222').text(`Plazo de pago: ${condicionPago}`, leftMargin + 10, y + 208);
 
-  const footerY = doc.page.height - 265;
-  const footerH = 250;
+  const footerY = doc.page.height - 225;
+  const footerH = 210;
   const qrSize = 120;
   const qrX = leftMargin + 14;
   const qrY = footerY + 14;
@@ -379,7 +379,7 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   const logoSize = Math.floor(qrSize / 2);
   const logoBuffer = await getArcaLogoBuffer();
   const leftLabelY = qrY + qrSize + 8;
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante Autorizado', qrX, leftLabelY, { width: qrSize, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Codigo QR ARCA', qrX, leftLabelY, { width: qrSize, align: 'center' });
 
   const footerTextX = qrX + qrSize + 26;
   const footerTextW = contentRight - footerTextX - 12;
@@ -400,7 +400,7 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
     }
   }
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111');
-  doc.text('Codigo QR AFIP', qrLegendX, qrLegendY, { width: qrLegendW, align: 'left' });
+  doc.text('Comprobante Autorizado', qrLegendX, qrLegendY, { width: qrLegendW, align: 'left' });
   doc.font('Helvetica').fontSize(7).fillColor('#333333');
   doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', qrLegendX, qrLegendY + 18, { width: qrLegendW, align: 'left' });
 
