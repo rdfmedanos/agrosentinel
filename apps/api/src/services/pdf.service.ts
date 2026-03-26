@@ -377,18 +377,9 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
   }
 
   const logoSize = Math.floor(qrSize / 2);
-  const logoX = qrX + Math.floor((qrSize - logoSize) / 2);
-  const logoY = qrY + qrSize + 8;
   const logoBuffer = await getArcaLogoBuffer();
-  if (logoBuffer) {
-    try {
-      doc.image(logoBuffer, logoX, logoY, { fit: [logoSize, logoSize], align: 'center', valign: 'center' });
-    } catch {
-      // no-op if logo can't be rendered
-    }
-  }
-
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante Autorizado', qrX, logoY + logoSize + 8, { width: qrSize, align: 'center' });
+  const leftLabelY = qrY + qrSize + 8;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante Autorizado', qrX, leftLabelY, { width: qrSize, align: 'center' });
 
   const footerTextX = qrX + qrSize + 26;
   const footerTextW = contentRight - footerTextX - 12;
@@ -398,10 +389,20 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
 
   const qrLegendX = footerTextX;
   const qrLegendW = Math.max(220, Math.min(340, footerTextW));
+  const qrLegendY = footerY + 94;
+  const rightLogoX = qrLegendX;
+  const rightLogoY = qrLegendY - logoSize - 6;
+  if (logoBuffer) {
+    try {
+      doc.image(logoBuffer, rightLogoX, rightLogoY, { fit: [logoSize, logoSize] });
+    } catch {
+      // no-op if logo can't be rendered
+    }
+  }
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111');
-  doc.text('Codigo QR AFIP', qrLegendX, footerY + 94, { width: qrLegendW, align: 'left' });
+  doc.text('Codigo QR AFIP', qrLegendX, qrLegendY, { width: qrLegendW, align: 'left' });
   doc.font('Helvetica').fontSize(7).fillColor('#333333');
-  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', qrLegendX, footerY + 112, { width: qrLegendW, align: 'left' });
+  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', qrLegendX, qrLegendY + 18, { width: qrLegendW, align: 'left' });
 
   return doc;
 }
