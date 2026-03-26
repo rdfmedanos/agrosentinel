@@ -23,6 +23,8 @@ export async function upsertHeartbeat(deviceId: string) {
   const device = await DeviceModel.findOne({ deviceId });
   if (!device) return null;
 
+  const wasOffline = device.status === 'offline';
+  
   if (device.pending) {
     await DeviceModel.updateOne(
       { deviceId },
@@ -38,7 +40,9 @@ export async function upsertHeartbeat(deviceId: string) {
   );
 
   if (device.tenantId && updated) {
-    await resolveAlert(device.tenantId, device.deviceId, 'offline');
+    if (wasOffline) {
+      await resolveAlert(device.tenantId, device.deviceId, 'offline');
+    }
     emitTenant(device.tenantId, 'devices:updated', updated);
   }
   return updated;
@@ -57,6 +61,8 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
   const levelPct = data.nivel ?? data.levelPct ?? 0;
   const reserveLiters = data.reserva ?? data.reserveLiters ?? 0;
   const pumpOn = data.bomba ?? data.pumpOn ?? false;
+  
+  const wasOffline = device.status === 'offline';
   
   device.levelPct = levelPct;
   device.reserveLiters = reserveLiters;
@@ -87,6 +93,10 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
       status: device.status 
     });
     emitTenant(device.tenantId, 'devices:updated', device);
+    
+    if (wasOffline) {
+      await resolveAlert(device.tenantId, deviceId, 'offline');
+    }
     
     if (!device.pending) {
       await evaluateDeviceCriticalLevel(device.deviceId);

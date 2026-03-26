@@ -4,9 +4,9 @@ import { checkOfflineDevices } from '../services/alert.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 
 export function startSchedulers() {
-  cron.schedule('*/1 * * * *', async () => {
+  setInterval(async () => {
     await checkOfflineDevices();
-  });
+  }, 5000);
 
   cron.schedule('0 3 1 * *', async () => {
     await generateMonthlyInvoices();

@@ -19,7 +19,11 @@ const createSchema = z.object({
 const assignSchema = z.object({
   device_id: z.string().min(1),
   user_id: z.string().min(1).optional(),
-  tenant_id: z.string().min(1).optional()
+  tenant_id: z.string().min(1).optional(),
+  name: z.string().optional(),
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional()
 });
 
 export const devicesRouter = Router();
@@ -27,11 +31,14 @@ export const devicesRouter = Router();
 devicesRouter.get('/', async (req, res) => {
   const { all } = req.query;
   let devices;
+  const filter: any = { pending: false };
   if (all === 'true' && req.auth?.role === 'company_admin') {
-    devices = await DeviceModel.find().sort({ updatedAt: -1 });
+    delete filter.tenantId;
+    devices = await DeviceModel.find(filter).sort({ updatedAt: -1 });
   } else {
     const tenantId = resolveTenantFromRequest(req);
-    devices = await DeviceModel.find({ tenantId }).sort({ updatedAt: -1 });
+    filter.tenantId = tenantId;
+    devices = await DeviceModel.find(filter).sort({ updatedAt: -1 });
   }
   res.json(devices);
 });
@@ -156,6 +163,13 @@ devicesRouter.post('/assign', requireCompanyAdmin, async (req, res) => {
   device.tenantId = tenantId;
   device.pending = false;
   device.status = device.status === 'offline' ? 'offline' : 'online';
+  if (data.name) device.name = data.name;
+  if (data.address) {
+    device.location = { ...device.location, address: data.address || '' } as typeof device.location;
+  }
+  if (data.lat !== undefined && data.lng !== undefined) {
+    device.location = { ...device.location, lat: data.lat ?? undefined, lng: data.lng ?? undefined } as typeof device.location;
+  }
   await device.save();
 
   res.json({ status: 'assigned', device_id: device.deviceId, tenant_id: tenantId });

@@ -1,8 +1,49 @@
 import { env } from '../config/env.js';
+import { logger } from '../config/logger.js';
 import { AlertModel } from '../models/Alert.js';
 import { DeviceModel } from '../models/Device.js';
+import { SystemConfigModel } from '../models/SystemConfig.js';
 import { emitTenant } from '../realtime/socket.js';
 import { createWorkOrderFromAlert } from './workOrder.service.js';
+import { sendTelegramMessage, formatAlertMessage } from './telegram.service.js';
+
+let cachedConfig: Record<string, string> = {};
+
+const DEFAULT_CONFIG = [
+  { key: 'DEVICE_OFFLINE_SECONDS', value: '120', description: 'Segundos sin heartbeat para marcar dispositivo como offline' },
+  { key: 'CRITICAL_LEVEL_PCT', value: '20', description: 'Porcentaje minimo de nivel para alerta critica' },
+  { key: 'AUTH_JWT_EXPIRES', value: '12h', description: 'Tiempo de expiracion del token JWT' },
+  { key: 'TELEGRAM_ENABLED', value: 'false', description: 'Habilitar notificaciones por Telegram' },
+  { key: 'TELEGRAM_BOT_TOKEN', value: '', description: 'Token del bot de Telegram' },
+  { key: 'TELEGRAM_CHAT_ID', value: '', description: 'Chat ID de Telegram para recibir alertas' }
+];
+
+export async function loadConfig() {
+  try {
+    const configs = await SystemConfigModel.find().lean();
+    
+    cachedConfig = {};
+    for (const defaultCfg of DEFAULT_CONFIG) {
+      const existing = configs.find(c => c.key === defaultCfg.key);
+      cachedConfig[defaultCfg.key] = existing?.value || defaultCfg.value;
+    }
+    console.log('Config loaded:', cachedConfig);
+  } catch (e) {
+    console.error('Error loading config:', e);
+    for (const defaultCfg of DEFAULT_CONFIG) {
+      cachedConfig[defaultCfg.key] = defaultCfg.value;
+    }
+  }
+}
+
+export function getConfig(key: string, defaultValue: string): string {
+  const value = cachedConfig[key];
+  if (key === 'DEVICE_OFFLINE_SECONDS') {
+    const num = Number(value);
+    if (!num || num < 30) return defaultValue;
+  }
+  return value ?? defaultValue;
+}
 
 export async function openAlert(params: {
   tenantId: string;
@@ -18,9 +59,16 @@ export async function openAlert(params: {
   });
   if (existing) return existing;
 
+  const device = await DeviceModel.findOne({ deviceId: params.deviceId });
+  const deviceName = device?.name || params.deviceId;
+
   const alert = await AlertModel.create({ ...params, openedAt: new Date() });
   await createWorkOrderFromAlert(String(alert._id));
   emitTenant(params.tenantId, 'alerts:updated', alert);
+
+  const telegramMsg = formatAlertMessage(params.type, deviceName, params.message);
+  await sendTelegramMessage(telegramMsg).catch(e => logger.error({e}, 'Error sending telegram alert'));
+
   return alert;
 }
 
@@ -30,14 +78,22 @@ export async function resolveAlert(tenantId: string, deviceId: string, type: 'of
     { status: 'resolved', resolvedAt: new Date() },
     { new: true }
   );
-  if (alert) emitTenant(tenantId, 'alerts:updated', alert);
+  if (alert) {
+    emitTenant(tenantId, 'alerts:updated', alert);
+    
+    const device = await DeviceModel.findOne({ deviceId });
+    const deviceName = device?.name || deviceId;
+    const resolvedMsg = formatAlertMessage(type === 'offline' ? 'online' : 'warning', deviceName, 'Problema resuelto');
+    await sendTelegramMessage(resolvedMsg).catch(e => logger.error({e}, 'Error sending telegram resolve alert'));
+  }
 }
 
 export async function evaluateDeviceCriticalLevel(deviceId: string) {
   const device = await DeviceModel.findOne({ deviceId });
   if (!device || !device.tenantId) return;
 
-  if (device.levelPct <= (device.configAlertaBaja ?? env.criticalLevelPct)) {
+  const criticalPct = device.configAlertaBaja ?? Number(getConfig('CRITICAL_LEVEL_PCT', '20'));
+  if (device.levelPct <= criticalPct) {
     await openAlert({
       tenantId: device.tenantId,
       deviceId: device.deviceId,
@@ -52,24 +108,26 @@ export async function evaluateDeviceCriticalLevel(deviceId: string) {
 }
 
 export async function checkOfflineDevices() {
-  const threshold = new Date(Date.now() - env.deviceOfflineSeconds * 1000);
+  const offlineSeconds = Number(getConfig('DEVICE_OFFLINE_SECONDS', '120'));
+  console.log('Checking offline devices, threshold:', offlineSeconds, 'seconds');
+  const threshold = new Date(Date.now() - offlineSeconds * 1000);
   const offlineDevices = await DeviceModel.find({
-    $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }],
-    status: { $ne: 'offline' },
-    tenantId: { $exists: true, $ne: null }
+    $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }, { lastSeenAt: { $lt: threshold } }, { lastSeenAt: { $exists: false } }],
+    status: { $ne: 'offline' }
   });
 
   for (const d of offlineDevices) {
-    if (!d.tenantId) continue;
     d.status = 'offline';
     await d.save();
 
-    await openAlert({
-      tenantId: d.tenantId,
-      deviceId: d.deviceId,
-      type: 'offline',
-      message: `Dispositivo ${d.name} sin heartbeat` 
-    });
-    emitTenant(d.tenantId, 'devices:updated', d);
+    if (d.tenantId) {
+      await openAlert({
+        tenantId: d.tenantId,
+        deviceId: d.deviceId,
+        type: 'offline',
+        message: `Dispositivo ${d.name} sin comunicación` 
+      });
+      emitTenant(d.tenantId, 'devices:updated', d);
+    }
   }
 }

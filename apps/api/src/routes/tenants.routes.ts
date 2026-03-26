@@ -10,7 +10,9 @@ const createTenantSchema = z.object({
   email: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
-  planId: z.string().optional()
+  planId: z.string().optional(),
+  taxId: z.string().optional(),
+  ivaCondition: z.enum(['Responsable Inscripto', 'Monotributista', 'Exento', 'Consumidor Final']).optional()
 });
 
 function generateTenantId(companyName: string): string {
@@ -32,7 +34,7 @@ export const tenantsRouter = Router();
 tenantsRouter.get('/', async (req, res) => {
   const tenants = await TenantConfigModel.find()
     .populate('planId', 'name')
-    .select('_id tenantId companyName contactName email phone address active createdAt')
+    .select('_id tenantId companyName contactName email phone address active createdAt taxId ivaCondition')
     .sort({ createdAt: -1 });
   const result = tenants.map(t => ({
     _id: t._id,
@@ -45,7 +47,9 @@ tenantsRouter.get('/', async (req, res) => {
     active: t.active,
     createdAt: t.createdAt,
     planId: (t.planId as unknown as { _id: string })?._id || null,
-    planName: (t.planId as unknown as { name: string })?.name || null
+    planName: (t.planId as unknown as { name: string })?.name || null,
+    taxId: t.taxId,
+    ivaCondition: t.ivaCondition
   }));
   res.json(result);
 });
@@ -73,7 +77,9 @@ tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
     email: data.email ?? '',
     phone: data.phone ?? '',
     address: data.address ?? '',
-    planId: data.planId || null
+    planId: data.planId || null,
+    taxId: data.taxId ?? '',
+    ivaCondition: data.ivaCondition ?? 'Consumidor Final'
   });
 
   res.status(201).json({ id: String(created._id), tenantId: created.tenantId, companyName: created.companyName });
@@ -86,7 +92,9 @@ tenantsRouter.put('/:id', requireCompanyAdmin, async (req, res) => {
     contactName: data.contactName ?? '',
     email: data.email ?? '',
     phone: data.phone ?? '',
-    address: data.address ?? ''
+    address: data.address ?? '',
+    taxId: data.taxId ?? '',
+    ivaCondition: data.ivaCondition ?? 'Consumidor Final'
   };
   
   if (data.planId && data.planId.trim() !== '') {

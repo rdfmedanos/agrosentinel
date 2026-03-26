@@ -18,10 +18,13 @@ export function signAuthToken(claims: AuthClaims): string {
 
 function extractToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return null;
-  const [scheme, token] = authHeader.split(' ');
-  if (scheme !== 'Bearer' || !token) return null;
-  return token;
+  if (authHeader) {
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme === 'Bearer' && token) return token;
+  }
+  const queryToken = req.query.token;
+  if (typeof queryToken === 'string') return queryToken;
+  return null;
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

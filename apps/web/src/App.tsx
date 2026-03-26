@@ -1,8 +1,72 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { io } from 'socket.io-client';
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+function AssignMap(props: { lat: string; lng: string; onSelect: (lat: number, lng: number) => void }) {
+  const center: [number, number] = props.lat && props.lng ? [Number(props.lat), Number(props.lng)] : [-34.62, -58.43];
+  
+  return (
+    <MapContainer 
+      center={center} 
+      zoom={13} 
+      style={{ height: '100%', width: '100%' }}
+    >
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {props.lat && props.lng && (
+        <Marker position={[Number(props.lat), Number(props.lng)]} />
+      )}
+      <MapClickHandler onMapClick={(lat, lng) => props.onSelect(lat, lng)} />
+    </MapContainer>
+  );
+}
+
+function MapClickHandler(props: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e: any) => {
+      props.onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+function MapCenterUpdater(props: { lat: string; lng: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const lat = Number(props.lat);
+    const lng = Number(props.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      map.setView([lat, lng], map.getZoom());
+    }
+  }, [props.lat, props.lng, map]);
+  return null;
+}
+
+function getStatusColor(status: string) {
+  if (status === 'online') return '#28a745';
+  if (status === 'warning') return '#ffc107';
+  return '#dc3545';
+}
+
+function getStatusBadge(status: string) {
+  if (status === 'online') return 'text-bg-success';
+  if (status === 'warning') return 'text-bg-warning';
+  return 'text-bg-danger';
+}
+
+function getPumpColor(on: boolean) {
+  return on ? '#28a745' : '#dc3545';
+}
 
 type Device = {
   _id: string;
@@ -30,6 +94,8 @@ type Alert = {
   message: string;
   type: 'offline' | 'critical_level';
   status: 'open' | 'resolved';
+  openedAt?: string;
+  createdAt?: string;
 };
 
 type WorkOrder = {
@@ -53,16 +119,69 @@ type Plan = {
   name: string;
   monthlyPriceArs: number;
   maxDevices: number;
+  active?: boolean;
+  features?: string[];
 };
 
 type ArcaConfig = {
   enabled: boolean;
   mock: boolean;
+  environment: 'mock' | 'homologacion' | 'produccion';
   cuit: string;
   ptoVta: string;
   wsfeUrl: string;
+  wsaaUrl: string;
   token?: string;
   sign?: string;
+  certPath?: string;
+  certPassword?: string;
+};
+
+type ArcaDiagnostics = {
+  tenantId: string;
+  config: {
+    environment: 'mock' | 'homologacion' | 'produccion';
+    enabled: boolean;
+    mock: boolean;
+    hasCredentials: boolean;
+    hasCertConfig: boolean;
+    wsaaUrl?: string;
+    wsfeUrl?: string;
+  };
+  authSession?: {
+    uniqueId: string | null;
+    generationTime: string | null;
+    expirationTime: string | null;
+    expired: boolean;
+    service: string | null;
+    source: string | null;
+    signPreview: string | null;
+  };
+  certificate: {
+    hasPrivateKey: boolean;
+    hasCsr: boolean;
+    hasCertificate: boolean;
+    createdAt: string | null;
+    environment: string | null;
+  };
+  connection: {
+    ok: boolean;
+    message: string;
+    lastVoucher?: number;
+  };
+  credentialsAutoRefreshed?: boolean;
+  documents: {
+    total: number;
+    pending: number;
+    authorized: number;
+    withCae: number;
+    syncedPct: number;
+    byTipo?: {
+      A: { localLast: number; remoteLast: number | null; synced: boolean | null };
+      B: { localLast: number; remoteLast: number | null; synced: boolean | null };
+      C: { localLast: number; remoteLast: number | null; synced: boolean | null };
+    };
+  };
 };
 
 type AuthUser = {
@@ -86,6 +205,8 @@ type TenantClient = {
   createdAt: string;
   planId?: string;
   planName?: string;
+  taxId?: string;
+  ivaCondition?: string;
 };
 
 type AuthSession = {
@@ -126,11 +247,15 @@ const metrics = [
 const emptyArcaConfig: ArcaConfig = {
   enabled: false,
   mock: true,
+  environment: 'mock',
   cuit: '',
   ptoVta: '1',
   wsfeUrl: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+  wsaaUrl: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
   token: '',
-  sign: ''
+  sign: '',
+  certPath: '',
+  certPassword: ''
 };
 
 function authHeaders(token?: string, json = false): HeadersInit {
@@ -140,19 +265,36 @@ function authHeaders(token?: string, json = false): HeadersInit {
   return headers;
 }
 
+async function buildApiError(res: Response): Promise<Error> {
+  let detail = '';
+  try {
+    const data = await res.clone().json() as { error?: string; details?: string };
+    detail = data.details || data.error || '';
+  } catch {
+    try {
+      detail = await res.clone().text();
+    } catch {
+      detail = '';
+    }
+  }
+  const suffix = detail ? `: ${detail}` : '';
+  return new Error(`API ${res.status}${suffix}`);
+}
+
 async function getJson<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { headers: authHeaders(token) });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res.json();
 }
 
-async function putJson(path: string, body: unknown, token?: string) {
+async function putJson<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'PUT',
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
+  return res.json();
 }
 
 async function postJson(path: string, body: unknown, token?: string) {
@@ -161,7 +303,7 @@ async function postJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -171,7 +313,7 @@ async function patchJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -180,7 +322,7 @@ async function deleteJson(path: string, token?: string) {
     method: 'DELETE',
     headers: authHeaders(token)
   });
-  if (!res.ok) throw new Error('API request failed');
+  if (!res.ok) throw await buildApiError(res);
   return res;
 }
 
@@ -666,7 +808,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                           <Popup>
                             <div className="p-1">
                               <h6 className="fw-bold mb-1">{d.name}</h6>
-                              <p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p>
+                              <p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p>
                               <p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>
                             </div>
                           </Popup>
@@ -706,13 +848,13 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                                 </div>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                <span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i> 
                                   {d.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
                                 </span>
                               </td>
                               <td className="align-middle">
-                                <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span>
+                                <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span>
                               </td>
                               <td className="text-end align-middle">
                                 <div className="btn-group">
@@ -808,7 +950,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   );
 }
 
-type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices';
+type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices' | 'backup';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -817,9 +959,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [tenantId, setTenantId] = useState<string>('');
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editPlanData, setEditPlanData] = useState<{ name: string; maxDevices: number; monthlyPriceArs: number; active: boolean; features: string[] }>({ name: '', maxDevices: 0, monthlyPriceArs: 0, active: true, features: [] });
+  const [savingPlan, setSavingPlan] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<TenantClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
@@ -827,10 +971,41 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
-  const [creatingDevice, setCreatingDevice] = useState(false);
+  const [arcaDiagnostics, setArcaDiagnostics] = useState<ArcaDiagnostics | null>(null);
+  const [testingArca, setTestingArca] = useState(false);
   const [restoreClient, setRestoreClient] = useState(true);
   const [creatingUser, setCreatingUser] = useState(false);
-  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt'>('servidor');
+  const [serverTab, setServerTab] = useState<'servidor' | 'mqtt' | 'config' | 'backup'>('servidor');
+  const [facturacionTab, setFacturacionTab] = useState<'planes' | 'arca' | 'empresa' | 'certificado' | 'facturas'>('facturas');
+  const [companyInfo, setCompanyInfo] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', taxId: '', ivaCondition: 'Responsable Inscripto', province: '', city: '' });
+  const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
+  const [provinces, setProvinces] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+  const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [backupError, setBackupError] = useState('');
+  const [backupSuccess, setBackupSuccess] = useState('');
+  const [certStatus, setCertStatus] = useState<{
+    hasPrivateKey: boolean;
+    hasCsr: boolean;
+    hasCertificate: boolean;
+    environment: string | null;
+    createdAt: string | null;
+    companyName?: string;
+    taxId?: string;
+  } | null>(null);
+  const [uploadingCert, setUploadingCert] = useState(false);
+  const [certificatePemInput, setCertificatePemInput] = useState('');
+  const [devicesMapCenter, setDevicesMapCenter] = useState<[number, number] | null>(null);
+  const [allDevicesMapCenter, setAllDevicesMapCenter] = useState<[number, number] | null>(null);
   const [showMqttConfig, setShowMqttConfig] = useState(false);
   const [mqttConfig, setMqttConfig] = useState({ host: 'localhost', port: '1883', username: '', password: '', qos: '1' });
   const [showMqttPassword, setShowMqttPassword] = useState(false);
@@ -841,10 +1016,49 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [pwdError, setPwdError] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [newDevice, setNewDevice] = useState({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
   const [pendingDevices, setPendingDevices] = useState<{ device_id: string; status: string; last_seen: number; created_at?: number }[]>([]);
   const [usersList, setUsersList] = useState<{ id: string; name: string; email: string; role: string; tenantId: string }[]>([]);
   const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
+  const [assigningName, setAssigningName] = useState('');
+  const [assigningLat, setAssigningLat] = useState('');
+  const [assigningLng, setAssigningLng] = useState('');
+
+  const showSwal = useCallback((message: string, level: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const titles: Record<'success' | 'error' | 'warning' | 'info', string> = {
+      success: 'Exito',
+      error: 'Error',
+      warning: 'Atencion',
+      info: 'Info'
+    };
+    void Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: level,
+      title: titles[level],
+      text: message,
+      showConfirmButton: false,
+      timer: 4200,
+      timerProgressBar: true
+    });
+  }, []);
+
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message?: unknown) => {
+      const text = String(message ?? '');
+      const lower = text.toLowerCase();
+      let level: 'success' | 'error' | 'warning' | 'info' = 'info';
+      if (lower.includes('error') || lower.includes('fall') || lower.includes('no se pudo')) level = 'error';
+      else if (lower.includes('pendiente') || lower.includes('warning') || lower.includes('atencion')) level = 'warning';
+      else if (lower.includes('exitos') || lower.includes('guardad') || lower.includes('autoriz')) level = 'success';
+      showSwal(text, level);
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, [showSwal]);
+  const [showAssigningMap, setShowAssigningMap] = useState(false);
   const [pendingFilter, setPendingFilter] = useState<'all' | 'online' | 'offline'>('all');
   const [newUser, setNewUser] = useState({
     name: '',
@@ -863,7 +1077,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     email: '',
     phone: '',
     address: '',
-    planId: ''
+    planId: '',
+    taxId: '',
+    ivaCondition: 'Consumidor Final'
   });
   const [editClient, setEditClient] = useState({
     companyName: '',
@@ -871,7 +1087,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     email: '',
     phone: '',
     address: '',
-    planId: ''
+    planId: '',
+    taxId: '',
+    ivaCondition: 'Consumidor Final'
   });
   const [savingClient, setSavingClient] = useState(false);
   const [selectedClient, setSelectedClient] = useState<TenantClient | null>(null);
@@ -890,8 +1108,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     setChangingPwd(true);
     try {
       await postJson('/auth/change-password-first', { newPassword }, props.session.token);
+      setChangingPwd(false);
       props.onPasswordChanged();
-    } catch {
+    } catch (err) {
+      console.error('Password change error:', err);
       setPwdError('No se pudo cambiar la contrasena');
       setChangingPwd(false);
     }
@@ -963,6 +1183,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   }, [props.session.token, clients]);
 
+  useEffect(() => {
+    void loadAllDevices();
+  }, []);
+
   const loadCompanyData = useCallback(async (targetTenant: string) => {
     if (!targetTenant) return;
     const token = props.session.token;
@@ -998,6 +1222,29 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
   useEffect(() => {
     if (props.session.user.role !== 'company_admin') return;
+    void getJson<Plan[]>('/billing/plans', props.session.token).then(setPlans).catch(console.error);
+  }, [props.session.token, props.session.user.role]);
+
+  useEffect(() => {
+    setDevicesMapCenter(null);
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (serverTab === 'config') {
+      getJson<{key: string; value: string; description?: string}[]>('/config', props.session.token)
+        .then(data => {
+          console.log('Config loaded:', data);
+          setSystemConfig(data);
+        })
+        .catch(err => {
+          console.error('Error loading config:', err);
+          alert('Error al cargar configuración: ' + err.message);
+        });
+    }
+  }, [serverTab, props.session.token]);
+
+  useEffect(() => {
+    if (props.session.user.role !== 'company_admin') return;
     const token = props.session.token;
     let interval: ReturnType<typeof setInterval>;
     
@@ -1020,11 +1267,187 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   }, [props.session]);
 
   useEffect(() => {
+    if (activeSection === 'usuarios' && props.session.user.role === 'company_admin') {
+      const tid = props.session.user.tenantId;
+      void (async () => {
+        try {
+          const tenantUsers = await getJson<AuthUser[]>(`/auth/admin/users?tenantId=${tid}`, props.session.token);
+          setUsers(tenantUsers);
+        } catch (err) {
+          console.error('Error loading users:', err);
+        }
+      })();
+    }
+  }, [activeSection, props.session.user.role, props.session.user.tenantId, props.session.token]);
+
+  useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'empresa') {
+      void (async () => {
+        try {
+          const info = await getJson<typeof companyInfo>('/billing/company-info', props.session.token);
+          setCompanyInfo(info);
+          if (info.province) {
+            const citiesRes = await getJson<string[]>('/billing/cities/' + encodeURIComponent(info.province), props.session.token);
+            setCities(citiesRes);
+          }
+        } catch (err) {
+          console.error('Error loading company info:', err);
+        }
+      })();
+    }
+  }, [activeSection, facturacionTab, props.session.token]);
+
+  useEffect(() => {
+    if (provinces.length === 0) {
+      void (async () => {
+        try {
+          const provs = await getJson<string[]>('/billing/provinces', props.session.token);
+          setProvinces(provs);
+        } catch (err) {
+          console.error('Error loading provinces:', err);
+        }
+      })();
+    }
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'facturas' && props.session?.token) {
+      void (async () => {
+        try {
+          const data = await getJson<any[]>('/billing/invoices', props.session.token);
+          setInvoices(data);
+        } catch (err) {
+          console.error('Error loading invoices:', err);
+        }
+      })();
+    }
+  }, [activeSection, facturacionTab, props.session?.token]);
+
+  const certificateTenantId = props.session.user.tenantId;
+  const certificateQuery = `?tenantId=${encodeURIComponent(certificateTenantId)}`;
+
+  useEffect(() => {
+    if (activeSection !== 'facturacion' || (facturacionTab !== 'certificado' && facturacionTab !== 'arca')) return;
+    void runArcaDiagnostics();
+  }, [activeSection, facturacionTab, certificateTenantId]);
+
+  const loadCertStatus = async () => {
+    try {
+      const status = await getJson<typeof certStatus>(`/billing/certificate/status${certificateQuery}`, props.session.token);
+      setCertStatus(status);
+    } catch (err) {
+      console.error('Error loading cert status:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'facturacion' && facturacionTab === 'certificado') {
+      void loadCertStatus();
+    }
+  }, [activeSection, facturacionTab, props.session.token, certificateTenantId]);
+
+  const createInvoice = async (autoAuthorize = true) => {
+    setCreatingInvoice(true);
+    try {
+      const res = await postJson('/billing/invoices', {
+        tipo: newInvoice.tipo,
+        cliente: {
+          tipoDoc: newInvoice.clienteTipoDoc,
+          nroDoc: newInvoice.clienteNroDoc,
+          nombre: newInvoice.clienteNombre,
+          condicionIva: newInvoice.clienteCondicionIva
+        },
+        period: newInvoice.period,
+        amountArs: newInvoice.amountArs
+      }, props.session.token);
+      const invoice = await res.json();
+
+      let createdInvoice = invoice;
+      let authorizeError = '';
+      if (autoAuthorize) {
+        try {
+          const authRes = await postJson(`/billing/invoices/${invoice._id}/authorize`, {}, props.session.token);
+          const authResult = await authRes.json();
+          createdInvoice = authResult.invoice;
+        } catch (err) {
+          authorizeError = err instanceof Error ? err.message : String(err);
+        }
+      }
+
+      setInvoices([createdInvoice, ...invoices]);
+      setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+      setShowCreateInvoiceModal(false);
+      if (!autoAuthorize) {
+        alert('Factura guardada en estado pendiente');
+      } else if (authorizeError) {
+        alert(`Factura creada en estado pendiente. No se pudo autorizar en ARCA: ${authorizeError}`);
+      } else {
+        alert('Factura creada y autorizada exitosamente');
+      }
+    } catch (err) {
+      console.error('Error creating invoice:', err);
+      alert(`Error al crear factura: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
+  const authorizeSingleInvoice = async (invoiceId: string) => {
+    setProcessingInvoiceId(invoiceId);
+    try {
+      const authRes = await postJson(`/billing/invoices/${invoiceId}/authorize`, {}, props.session.token);
+      const authResult = await authRes.json();
+      setInvoices(prev => prev.map(item => item._id === invoiceId ? authResult.invoice : item));
+      alert('Factura autorizada correctamente');
+    } catch (err) {
+      console.error('Error authorizing invoice:', invoiceId, err);
+      alert(`No se pudo autorizar la factura: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setProcessingInvoiceId(null);
+    }
+  };
+
+  const deletePendingInvoice = async (invoiceId: string) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar factura pendiente?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    if (!result.isConfirmed) return;
+    setProcessingInvoiceId(invoiceId);
+    try {
+      await deleteJson(`/billing/invoices/${invoiceId}`, props.session.token);
+      setInvoices(prev => prev.filter(item => item._id !== invoiceId));
+      if (expandedInvoiceId === invoiceId) setExpandedInvoiceId(null);
+      alert('Factura pendiente eliminada');
+    } catch (err) {
+      console.error('Error deleting invoice:', invoiceId, err);
+      alert(`No se pudo eliminar la factura: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setProcessingInvoiceId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!showCreateInvoiceModal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showCreateInvoiceModal]);
+
+  useEffect(() => {
     const nav = loadNavState();
     if (nav) {
       setActiveSection(nav.section as AdminSection);
-      setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(nav.section));
-      setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor'].includes(nav.section));
+setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices'].includes(nav.section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(nav.section));
     }
   }, []);
 
@@ -1092,8 +1515,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
   const setSection = async (section: AdminSection) => {
     setActiveSection(section);
-    setOperacionOpen(['clientes', 'dispositivos', 'usuarios', 'notificaciones', 'pending-devices'].includes(section));
-    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(section));
+    setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices'].includes(section));
+    setConfigOpen(['facturacion', 'arca', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(section));
     if (section === 'clientes') {
       setSelectedClient(null);
       setRestoreClient(false);
@@ -1114,7 +1537,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       email: selectedClient.email || '',
       phone: selectedClient.phone || '',
       address: selectedClient.address || '',
-      planId: (selectedClient as TenantClient & { planId?: string }).planId || ''
+      planId: (selectedClient as TenantClient & { planId?: string }).planId || '',
+      taxId: selectedClient.taxId || '',
+      ivaCondition: selectedClient.ivaCondition || 'Consumidor Final'
     });
     setShowEditClient(true);
   };
@@ -1129,7 +1554,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
         email: editClient.email,
         phone: editClient.phone,
         address: editClient.address,
-        planId: editClient.planId || undefined
+        planId: editClient.planId || undefined,
+        taxId: editClient.taxId,
+        ivaCondition: editClient.ivaCondition
       }, props.session.token);
       setShowEditClient(false);
       void loadClients();
@@ -1142,7 +1569,9 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
           email: editClient.email,
           phone: editClient.phone,
           address: editClient.address,
-          planName: plans.find(p => p._id === editClient.planId)?.name
+          planName: plans.find(p => p._id === editClient.planId)?.name,
+          taxId: editClient.taxId,
+          ivaCondition: editClient.ivaCondition
         });
       }
     } finally {
@@ -1150,31 +1579,92 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     }
   };
 
-  const createDevice = async () => {
-    setCreatingDevice(true);
-    try {
-      await postJson('/devices', {
-        tenantId,
-        deviceId: newDevice.deviceId,
-        name: newDevice.name,
-        lat: Number(newDevice.lat),
-        lng: Number(newDevice.lng),
-        address: newDevice.address
-      }, props.session.token);
-      setNewDevice({ deviceId: '', name: '', lat: '-34.62', lng: '-58.43', address: '' });
-      await loadCompanyData(tenantId);
-    } finally {
-      setCreatingDevice(false);
-    }
-  };
-
   const saveArcaConfig = async () => {
     setSavingArca(true);
     try {
-      await putJson(`/billing/arca-config?tenantId=${tenantId}`, arcaConfig, props.session.token);
-      await loadCompanyData(tenantId);
+      await putJson(`/billing/arca-config?tenantId=${certificateTenantId}`, arcaConfig, props.session.token);
+      await loadCompanyData(certificateTenantId);
     } finally {
       setSavingArca(false);
+    }
+  };
+
+  const runArcaDiagnostics = async () => {
+    setTestingArca(true);
+    try {
+      const data = await getJson<ArcaDiagnostics>(`/billing/arca/diagnostics?tenantId=${certificateTenantId}`, props.session.token);
+      setArcaDiagnostics(data);
+    } catch (err) {
+      console.error('Error testing ARCA connection:', err);
+      alert('No se pudo obtener el diagnostico ARCA');
+    } finally {
+      setTestingArca(false);
+    }
+  };
+
+  const savePlan = async (planId: string) => {
+    setSavingPlan(true);
+    try {
+      const updated = await putJson(`/billing/plans/${planId}`, editPlanData, props.session.token) as Plan;
+      setPlans(plans.map(p => p._id === planId ? updated : p));
+      setEditingPlanId(null);
+    } catch (err) {
+      console.error('Error saving plan:', err);
+      alert('Error al guardar plan');
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const saveCompanyInfo = async () => {
+    setSavingCompanyInfo(true);
+    try {
+      const updated = await putJson('/billing/company-info', companyInfo, props.session.token);
+      setCompanyInfo(updated as typeof companyInfo);
+      alert('Datos guardados exitosamente');
+    } catch (err) {
+      console.error('Error saving company info:', err);
+      alert('Error al guardar datos');
+    } finally {
+      setSavingCompanyInfo(false);
+    }
+  };
+
+  const createBackup = async () => {
+    setCreatingBackup(true);
+    setBackupError('');
+    setBackupSuccess('');
+    try {
+      const data = await getJson<{ clients: TenantClient[]; devices: Device[] }>('/backup/export', props.session.token);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agrosentinel_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupSuccess('Backup creado exitosamente');
+    } catch (err) {
+      setBackupError('Error al crear backup');
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const restoreBackup = async (file: File) => {
+    setRestoringBackup(true);
+    setBackupError('');
+    setBackupSuccess('');
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await postJson('/backup/import', data, props.session.token);
+      setBackupSuccess('Backup restaurado exitosamente');
+      await loadCompanyData(tenantId);
+    } catch (err) {
+      setBackupError('Error al restaurar backup. Verifique el archivo.');
+    } finally {
+      setRestoringBackup(false);
     }
   };
 
@@ -1262,7 +1752,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       await deleteJson(`/devices/${selectedDevice._id}`, props.session.token);
       setShowDeviceModal(false);
       setSelectedDevice(null);
-      await loadCompanyData(tenantId);
+      await Promise.all([loadCompanyData(tenantId), loadAllDevices()]);
     } finally {
       setSavingDevice(false);
     }
@@ -1309,7 +1799,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       reportes: 'Reportes',
       actividad: 'Actividad',
       servidor: 'Servidor',
-      'pending-devices': 'Dispositivos Pendientes'
+      'pending-devices': 'Dispositivos Pendientes',
+      backup: 'Backup'
     };
     return map[activeSection];
   };
@@ -1382,7 +1873,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </li>
 
               <li className={`nav-item has-treeview ${operacionOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['clientes', 'dispositivos', 'usuarios', 'notificaciones'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['clientes', 'dispositivos', 'notificaciones'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setOperacionOpen(!operacionOpen); setConfigOpen(false); }}>
                   <i className="nav-icon fas fa-cogs"></i>
                   <p>Operacion <i className={`right fas fa-angle-left ${operacionOpen ? 'fa-rotate-90' : ''}`}></i></p>
@@ -1399,12 +1890,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <a href="#" className={`nav-link ${activeSection === 'dispositivos' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('dispositivos'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Dispositivos</p>
-                      </a>
-                    </li>
-                    <li className="nav-item">
-                      <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
-                        onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
-                        <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
                       </a>
                     </li>
                     <li className="nav-item">
@@ -1425,7 +1910,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </li>
 
               <li className={`nav-item has-treeview ${configOpen ? 'menu-open' : ''}`}>
-                <a href="#" className={`nav-link ${['facturacion', 'arca', 'reportes', 'servidor', 'mqtt'].includes(activeSection) ? 'active' : ''}`}
+                <a href="#" className={`nav-link ${['facturacion', 'reportes', 'servidor', 'mqtt', 'backup', 'usuarios'].includes(activeSection) ? 'active' : ''}`}
                   onClick={e => { e.preventDefault(); setConfigOpen(!configOpen); setOperacionOpen(false); }}>
                   <i className="nav-icon fas fa-cog"></i>
                   <p>Configuracion <i className={`right fas fa-angle-left ${configOpen ? 'fa-rotate-90' : ''}`}></i></p>
@@ -1433,15 +1918,15 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 {configOpen && (
                   <ul className="nav nav-treeview" style={{ marginLeft: '1rem' }}>
                     <li className="nav-item">
-                      <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
-                        onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
-                        <i className="far fa-circle nav-icon"></i><p>Facturacion y Planes</p>
+                      <a href="#" className={`nav-link ${activeSection === 'usuarios' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('usuarios'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Usuarios</p>
                       </a>
                     </li>
                     <li className="nav-item">
-                      <a href="#" className={`nav-link ${activeSection === 'arca' ? 'active' : ''}`}
-                        onClick={e => { e.preventDefault(); setSection('arca'); }}>
-                        <i className="far fa-circle nav-icon"></i><p>Configuracion ARCA</p>
+                      <a href="#" className={`nav-link ${activeSection === 'facturacion' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('facturacion'); }}>
+                        <i className="far fa-circle nav-icon"></i><p>Facturacion</p>
                       </a>
                     </li>
                     <li className="nav-item">
@@ -1454,6 +1939,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <a href="#" className={`nav-link ${activeSection === 'servidor' ? 'active' : ''}`}
                         onClick={e => { e.preventDefault(); setSection('servidor'); }}>
                         <i className="far fa-circle nav-icon"></i><p>Servidor</p>
+                      </a>
+                    </li>
+                    <li className="nav-item">
+                      <a href="#" className={`nav-link ${activeSection === 'backup' ? 'active' : ''}`}
+                        onClick={e => { e.preventDefault(); setSection('backup'); }}>
+                        <i className="nav-icon fas fa-database"></i><p>Backup</p>
                       </a>
                     </li>
                   </ul>
@@ -1550,7 +2041,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       </div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th><th>Direccion</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
                             {devices.map(d => (
                               <tr key={d._id} style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); openDeviceModal(d); }}>
@@ -1558,13 +2049,12 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
                                 <td>
-                                  <span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i>
+                                  <span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i>
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span>
                                 </td>
-                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></td>
-                                <td className="small">{d.location.address}</td>
+                                <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                               </tr>
                             ))}
                           </tbody>
@@ -1620,7 +2110,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                             <i className="fas fa-arrow-left mr-1"></i>Volver a Clientes
                           </button>
                         </div>
-                        <ul className="nav nav-tabs mt-3" role="tablist">
+<ul className="nav nav-tabs" role="tablist">
                           <li className="nav-item">
                             <a className={`nav-link ${clientTab === 'info' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setClientTab('info'); }}>
                               <i className="fas fa-info-circle mr-1"></i> Informacion
@@ -1666,11 +2156,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           <div className="tab-content">
                             <div className="tab-pane active show">
                               <div className="table-responsive">
-                                <div className="mb-3">
-                                  <button className="btn btn-primary btn-sm" onClick={() => setShowAddSensorModal(true)}>
-                                    <i className="fas fa-plus me-1"></i>Agregar Dispositivo
-                                  </button>
-                                </div>
                                 <table className="table table-hover table-striped">
                                   <thead>
                                     <tr>
@@ -1679,12 +2164,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       <th>Nivel</th>
                                       <th>Bomba</th>
                                       <th>Estado</th>
-                                      <th>Ultima Comunicacion</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {devices.length === 0 ? (
-                                      <tr><td colSpan={6} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
+                                      <tr><td colSpan={5} className="text-center text-muted py-3">No hay dispositivos registrados</td></tr>
                                     ) : (
                                       devices.map(d => (
                                         <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
@@ -1698,11 +2182,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                               <span className="small fw-bold">{d.levelPct}%</span>
                                             </div>
                                           </td>
-                                          <td><span className={`badge text-bg-${d.pumpOn ? 'success' : 'danger'}`}>
-                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                                          <td><span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                    <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(d.pumpOn)}}></i> 
                                     {d.pumpOn ? 'ON' : 'OFF'}
                                   </span></td>
-                                          <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
+                                          <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                                           <td className="small text-muted">{d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td>
                                         </tr>
                                       ))
@@ -1727,12 +2211,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 }
                                 const lats = deviceList.map(d => d.location.lat);
                                 const lngs = deviceList.map(d => d.location.lng);
-                                const center: [number, number] = [
+                                const defaultCenter: [number, number] = [
                                   (Math.min(...lats) + Math.max(...lats)) / 2,
                                   (Math.min(...lngs) + Math.max(...lngs)) / 2
                                 ];
+                                const mapCenter = devicesMapCenter || defaultCenter;
+                                if (!devicesMapCenter && lats.length > 0) {
+                                  setDevicesMapCenter(mapCenter);
+                                }
                                 return (
-                              <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+                              <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                 {devices.map(d => {
                                   const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
@@ -1756,7 +2244,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       openDeviceModal(d);
                                     }
                                   }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
-                                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>{hasAlert && <p className="mb-0 small text-danger"><i className="fas fa-exclamation-triangle"></i> Alerta activa</p>}<p className="mb-0 small text-muted">Click para editar, arrastra para mover</p></div></Popup>
+                                    <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p>{hasAlert && <p className="mb-0 small text-danger"><i className="fas fa-exclamation-triangle"></i> Alerta activa</p>}<p className="mb-0 small text-muted">Click para editar, arrastra para mover</p></div></Popup>
                                   </Marker>
                                 );})}
                               </MapContainer>
@@ -1772,8 +2260,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                   <div className="col-12">
                     <div className="card card-header-blue">
                       <div className="card-header d-flex justify-content-between align-items-center">
-                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-building me-2"></i>Clientes</h3>
-                        <button className="btn btn-light btn-sm" onClick={() => setShowAddClient(true)}>
+                        <h3 className="card-title text-white fw-bold mb-0 flex-grow-1"><i className="fas fa-building me-2"></i>Clientes</h3>
+                        <button className="btn btn-light btn-sm ms-auto" onClick={() => setShowAddClient(true)}>
                           <i className="fas fa-plus me-1"></i>Agregar Cliente
                         </button>
                       </div>
@@ -1797,10 +2285,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                             <thead>
                               <tr>
                                 <th>Empresa</th>
-                                <th>Contacto</th>
+                                <th>CUIT</th>
+                                <th>Cond. IVA</th>
                                 <th>Email</th>
                                 <th>Telefono</th>
-                                <th>Direccion</th>
                                 <th>Plan</th>
                               </tr>
                             </thead>
@@ -1813,10 +2301,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                 filteredClients.map(c => (
                                   <tr key={c._id} onClick={async () => { setSelectedClient(c); setTenantId(c.tenantId); setRestoreClient(true); await loadCompanyData(c.tenantId); saveNavState({ section: 'clientes', clientId: c._id }); }} style={{ cursor: 'pointer' }}>
                                     <td className="fw-bold">{c.companyName}</td>
-                                    <td>{c.contactName || '—'}</td>
+                                    <td className="small">{c.taxId || '—'}</td>
+                                    <td><span className="badge badge-secondary">{c.ivaCondition || 'Cons. Final'}</span></td>
                                     <td>{c.email || '—'}</td>
                                     <td>{c.phone || '—'}</td>
-                                    <td className="small">{c.address || '—'}</td>
                                     <td>{c.planName || '—'}</td>
                                   </tr>
                                 ))
@@ -1834,37 +2322,23 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
             {activeSection === 'dispositivos' && (
               <div className="row">
                 <div className="col-12">
-                  <div className="card">
-                    <div className="card-header">
-                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-plus-circle me-2"></i>Agregar Dispositivo</h3>
-                    </div>
-                    <div className="card-body">
-                      <div className="row">
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Device ID</label><input className="form-control" value={newDevice.deviceId} onChange={e => setNewDevice(p => ({ ...p, deviceId: e.target.value }))} placeholder="ESP32-001" /></div>
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newDevice.name} onChange={e => setNewDevice(p => ({ ...p, name: e.target.value }))} placeholder="Tanque Principal" /></div>
-                        <div className="col-md-3 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={newDevice.address} onChange={e => setNewDevice(p => ({ ...p, address: e.target.value }))} placeholder="Ruta 2 km 45" /></div>
-                        <div className="col-md-2 mb-3 d-flex align-items-end"><button className="btn btn-primary w-100 fw-bold" onClick={() => void createDevice()} disabled={creatingDevice}>{creatingDevice ? '...' : 'Vincular'}</button></div>
-                      </div>
-                    </div>
-                  </div>
                   <div className="card mt-3">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Dispositivos Registrados ({allDevices.length})</h3>
-                      <button className="btn btn-light btn-sm ml-auto" onClick={() => setShowAllDevicesModal(true)}>
+                      <button className="btn btn-light btn-sm ml-auto" onClick={() => { setAllDevicesMapCenter(null); setShowAllDevicesModal(true); }}>
                         <i className="fas fa-expand me-1"></i>Ver Todos
                       </button>
                     </div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Cliente</th><th>Direccion</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Cliente</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
                             {allDevices.map(d => (
                               <tr key={d._id} onClick={(e) => { e.stopPropagation(); openDeviceModal(d); }} style={{ cursor: 'pointer' }}>
                                 <td className="fw-bold">{d.name}</td>
                                 <td className="small text-muted">{d.deviceId}</td>
                                 <td className="small">{d.clientName || 'Unknown'}</td>
-                                <td className="small">{d.location.address}</td>
                                 <td>
                                   <div className="d-flex align-items-center">
                                     <div className="progress me-2" style={{ width: '60px', height: '6px' }}>
@@ -1873,8 +2347,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                     <span className="small fw-bold">{d.levelPct}%</span>
                                   </div>
                                 </td>
-                                <td><span className={`badge ${d.pumpOn ? 'text-bg-info' : 'text-bg-secondary'}`}>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
-                                <td><span className={`badge ${d.status === 'online' ? 'text-bg-success' : d.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{d.status}</span></td>
+                                <td><span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}><i className="fas fa-circle mr-1" style={{ fontSize: '0.6em', color: getPumpColor(d.pumpOn) }}></i>{d.pumpOn ? 'ON' : 'OFF'}</span></td>
+                                <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                               </tr>
                             ))}
                           </tbody>
@@ -1918,18 +2392,17 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 </div>
                 <div className="col-md-8">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({users.length})</h3></div>
+                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3></div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Tenant</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th></tr></thead>
                           <tbody>
-                            {users.map(u => (
+                            {usersList.map(u => (
                               <tr key={u.id}>
                                 <td className="fw-bold">{u.name}</td>
                                 <td className="small text-muted">{u.email}</td>
                                 <td><span className="badge text-bg-primary">{u.role}</span></td>
-                                <td>{u.mustChangePassword ? <span className="badge text-bg-warning"><i className="fas fa-exclamation-triangle me-1"></i>Pendiente</span> : <span className="badge text-bg-success">OK</span>}</td>
                                 <td className="small text-muted">{u.tenantId}</td>
                               </tr>
                             ))}
@@ -1944,89 +2417,796 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
 
             {activeSection === 'facturacion' && (
               <div className="row">
-                <div className="col-md-6">
-                  <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-tags me-2"></i>Planes Disponibles</h3></div>
-                    <div className="card-body p-0">
-                      <table className="table m-0">
-                        <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual</th></tr></thead>
-                        <tbody>{plans.map(p => (
-                          <tr key={p._id}>
-                            <td className="fw-bold">{p.name}</td>
-                            <td>{p.maxDevices}</td>
-                            <td className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar me-2"></i>Historial de Facturacion</h3></div>
-                    <div className="card-body p-0">
-                      <table className="table m-0">
-                        <thead><tr><th>Periodo</th><th>Monto</th><th>CAE</th><th>Estado</th></tr></thead>
-                        <tbody>{invoices.map(i => (
-                          <tr key={i._id}>
-                            <td className="fw-bold">{i.period}</td>
-                            <td>${i.amountArs.toLocaleString('es-AR')}</td>
-                            <td className="small text-muted">{i.arca?.cae || '—'}</td>
-                            <td><span className={`badge ${i.status === 'paid' ? 'text-bg-success' : i.status === 'issued' ? 'text-bg-info' : 'text-bg-secondary'}`}>{i.status}</span></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeSection === 'arca' && (
-              <div className="row">
-                <div className="col-md-8">
-                  <div className="card">
-                    <div className="card-header bg-danger">
-                      <h3 className="card-title fw-bold text-white"><i className="fas fa-shield-alt me-2"></i>Configuracion ARCA / AFIP</h3>
+                <div className="col-12">
+                  <div className="card card-primary card-outline card-tabs">
+                    <div className="card-header">
+                      <div className="d-flex justify-content-between align-items-center w-100">
+                        <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-file-invoice-dollar mr-2"></i>Facturacion y Planes</h3>
+                      </div>
+                      <ul className="nav nav-tabs" role="tablist">
+                        <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'planes' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('planes'); }}>
+                            <i className="fas fa-tags mr-1"></i> Planes
+                          </a>
+                        </li>
+                        <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'empresa' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('empresa'); }}>
+                            <i className="fas fa-building mr-1"></i> Mi Empresa
+                          </a>
+                        </li>
+                        <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'certificado' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('certificado'); }}>
+                            <i className="fas fa-shield-alt mr-1"></i> ARCA / Certificado
+                          </a>
+                        </li>
+                        <li className="nav-item">
+                          <a className={`nav-link ${facturacionTab === 'facturas' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setFacturacionTab('facturas'); }}>
+                            <i className="fas fa-file-invoice mr-1"></i> Facturas
+                          </a>
+                        </li>
+                      </ul>
                     </div>
                     <div className="card-body">
-                      <div className="row">
-                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
-                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
-                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
-                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
-                        <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
-                        <div className="col-md-6 mb-3">
-                          <div className="form-check form-switch mt-4">
-                            <input type="checkbox" className="form-check-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
-                            <label className="form-check-label fw-bold" htmlFor="arcaEnabled">Habilitar Facturacion ARCA</label>
-                          </div>
-                          <div className="form-check form-switch mt-2">
-                            <input type="checkbox" className="form-check-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
-                            <label className="form-check-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
+                      <div className="tab-content">
+                        <div className={`tab-pane ${facturacionTab === 'planes' ? 'active show' : ''}`}>
+                          <div className="table-responsive">
+                            <table className="table m-0">
+                              <thead><tr><th>Plan</th><th>Dispositivos Max.</th><th>Precio Mensual (ARS)</th><th>Activo</th></tr></thead>
+                              <tbody>{plans.map(p => (
+                                <tr key={p._id} style={{ cursor: editingPlanId !== p._id ? 'pointer' : 'default' }} onClick={() => { if (editingPlanId !== p._id) { setEditingPlanId(p._id); setEditPlanData({ name: p.name, maxDevices: p.maxDevices, monthlyPriceArs: p.monthlyPriceArs, active: !!p.active, features: p.features || [] }); } }}>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="text" className="form-control form-control-sm" value={editPlanData.name} onChange={e => setEditPlanData(d => ({ ...d, name: e.target.value }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      <span className="fw-bold">{p.name}</span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="number" className="form-control form-control-sm" value={editPlanData.maxDevices} onChange={e => setEditPlanData(d => ({ ...d, maxDevices: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      p.maxDevices
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <input type="number" className="form-control form-control-sm" value={editPlanData.monthlyPriceArs} onChange={e => setEditPlanData(d => ({ ...d, monthlyPriceArs: Number(e.target.value) }))} onClick={e => e.stopPropagation()} />
+                                    ) : (
+                                      <span className="text-primary fw-bold">${p.monthlyPriceArs.toLocaleString('es-AR')}</span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {editingPlanId === p._id ? (
+                                      <div className="d-flex gap-1">
+                                        <button className="btn btn-success btn-sm" onClick={e => { e.stopPropagation(); void savePlan(p._id); }} disabled={savingPlan}>Guardar</button>
+                                        <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setEditingPlanId(null); }}>Cancelar</button>
+                                      </div>
+                                    ) : (
+                                      <span className={`badge ${p.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{p.active ? 'Si' : 'No'}</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}</tbody>
+                            </table>
                           </div>
                         </div>
-                        <div className="col-12">
-                          <button className="btn btn-danger fw-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuracion'}</button>
+                        <div className={`tab-pane ${facturacionTab === 'arca' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-warning">
+                                <i className="fas fa-exclamation-triangle mr-2"></i>
+                                Configuracion de ARCA / AFIP para facturacion electronica
+                              </div>
+                              <div className="card mb-3 border-info">
+                                <div className="card-header d-flex justify-content-between align-items-center">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !certificateTenantId}>
+                                    {testingArca ? 'Probando...' : 'Probar conexion'}
+                                  </button>
+                                </div>
+                                <div className="card-body small">
+                                  {arcaDiagnostics ? (
+                                    <>
+                                      <p className="mb-1"><strong>Estado conexion:</strong> <span className={`badge ${arcaDiagnostics.connection.ok ? 'text-bg-success' : 'text-bg-danger'}`}>{arcaDiagnostics.connection.ok ? 'Conectado' : 'Con errores'}</span></p>
+                                      <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
+                                      {arcaDiagnostics.connection.message.includes('coe.alreadyAuthenticated') ? (
+                                        <div className="alert alert-warning py-2 px-3 mt-2 mb-2">
+                                          <strong>Sesion WSAA ya activa.</strong> Cargue Token/Sign vigentes (por ejemplo desde Odoo) o espere el vencimiento del TA para regenerarlos automaticamente.
+                                        </div>
+                                      ) : null}
+                                      <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
+                                      <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
+                                      {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
+                                      {arcaDiagnostics.authSession ? (
+                                        <>
+                                          <p className="mb-1"><strong>Unique ID:</strong> {arcaDiagnostics.authSession.uniqueId || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Generation Time:</strong> {arcaDiagnostics.authSession.generationTime ? new Date(arcaDiagnostics.authSession.generationTime).toLocaleString('es-AR') : 'N/D'}</p>
+                                          <p className="mb-1"><strong>Expiration Time:</strong> {arcaDiagnostics.authSession.expirationTime ? new Date(arcaDiagnostics.authSession.expirationTime).toLocaleString('es-AR') : 'N/D'} {arcaDiagnostics.authSession.expired ? <span className="badge text-bg-danger ms-1">Expirado</span> : null}</p>
+                                          <p className="mb-1"><strong>Sign:</strong> {arcaDiagnostics.authSession.signPreview || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Servicio:</strong> {arcaDiagnostics.authSession.service || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP Login URL:</strong> {arcaDiagnostics.config.wsaaUrl || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP WS URL:</strong> {arcaDiagnostics.config.wsfeUrl ? (arcaDiagnostics.config.wsfeUrl.includes('?') ? arcaDiagnostics.config.wsfeUrl : `${arcaDiagnostics.config.wsfeUrl}?WSDL`) : 'N/D'}</p>
+                                        </>
+                                      ) : null}
+                                      <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
+                                      <hr className="my-2" />
+                                      <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>
+                                      <p className="mb-1"><strong>Autorizados con CAE:</strong> {arcaDiagnostics.documents.withCae}</p>
+                                      <p className="mb-1"><strong>Pendientes:</strong> {arcaDiagnostics.documents.pending}</p>
+                                      <p className="mb-0"><strong>Sincronizacion:</strong> <span className={`badge ${arcaDiagnostics.documents.syncedPct >= 80 ? 'text-bg-success' : arcaDiagnostics.documents.syncedPct >= 50 ? 'text-bg-warning' : 'text-bg-danger'}`}>{arcaDiagnostics.documents.syncedPct}%</span></p>
+                                      {arcaDiagnostics.documents.byTipo ? (
+                                        <>
+                                          <hr className="my-2" />
+                                          <p className="mb-1"><strong>Sync por tipo:</strong></p>
+                                          <p className="mb-1">A: local {arcaDiagnostics.documents.byTipo.A.localLast} / ARCA {arcaDiagnostics.documents.byTipo.A.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.A.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.A.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.A.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.A.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-1">B: local {arcaDiagnostics.documents.byTipo.B.localLast} / ARCA {arcaDiagnostics.documents.byTipo.B.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.B.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.B.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.B.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.B.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-0">C: local {arcaDiagnostics.documents.byTipo.C.localLast} / ARCA {arcaDiagnostics.documents.byTipo.C.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.C.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.C.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.C.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.C.synced ? 'OK' : 'Atrasado'}</span></p>
+                                        </>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <p className="mb-0 text-muted">Ejecute la prueba para validar conexion, certificado y sincronizacion de comprobantes.</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="row">
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Punto de Venta</label><input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">WSFE URL</label><input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Token</label><input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Sign</label><input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} /></div>
+                                <div className="col-md-6 mb-3">
+                                  <div className="form-check form-switch mt-4">
+                                    <input type="checkbox" className="form-check-input" id="arcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                                    <label className="form-check-label fw-bold" htmlFor="arcaEnabled">Habilitar Facturacion ARCA</label>
+                                  </div>
+                                  <div className="form-check form-switch mt-2">
+                                    <input type="checkbox" className="form-check-input" id="arcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked }))} />
+                                    <label className="form-check-label" htmlFor="arcaMock">Modo Mock (pruebas)</label>
+                                  </div>
+                                </div>
+                                <div className="col-12">
+                                  <button className="btn btn-danger fw-bold" onClick={() => void saveArcaConfig()} disabled={savingArca}>{savingArca ? 'Guardando...' : 'Guardar Configuracion'}</button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
+                                  <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
+                                  <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'text-bg-success' : 'text-bg-secondary'}`}>{arcaConfig.enabled ? 'Si' : 'No'}</span></p>
+                                  <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'text-bg-warning' : 'text-bg-success'}`}>{arcaConfig.mock ? 'Si' : 'No'}</span></p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`tab-pane ${facturacionTab === 'empresa' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-info">
+                                <i className="fas fa-building mr-2"></i>
+                                Datos fiscales y de contacto de su empresa para facturacion electronica
+                              </div>
+                              <div className="row">
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Razon Social</label><input className="form-control" value={companyInfo.companyName} onChange={e => setCompanyInfo(p => ({ ...p, companyName: e.target.value }))} placeholder="Mi Empresa S.A." /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">CUIT</label><input className="form-control" value={companyInfo.taxId} onChange={e => setCompanyInfo(p => ({ ...p, taxId: e.target.value }))} placeholder="30712345678" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Condicion IVA</label><select className="form-control" value={companyInfo.ivaCondition} onChange={e => setCompanyInfo(p => ({ ...p, ivaCondition: e.target.value }))}><option>Responsable Inscripto</option><option>Monotributista</option><option>Exento</option><option>Consumidor Final</option></select></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Provincia</label>
+                                  <select className="form-control" value={companyInfo.province} onChange={async e => {
+                                    const prov = e.target.value;
+                                    setCompanyInfo(p => ({ ...p, province: prov, city: '' }));
+                                    if (prov) {
+                                      try {
+                                        const citiesRes = await getJson<string[]>('/billing/cities/' + encodeURIComponent(prov), props.session.token);
+                                        setCities(citiesRes);
+                                      } catch { setCities([]); }
+                                    } else { setCities([]); }
+                                  }}>
+                                    <option value="">Seleccionar provincia...</option>
+                                    {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                                  </select>
+                                </div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Ciudad</label>
+                                  <select className="form-control" value={companyInfo.city} onChange={e => setCompanyInfo(p => ({ ...p, city: e.target.value }))}>
+                                    <option value="">Seleccionar ciudad...</option>
+                                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Persona de Contacto</label><input className="form-control" value={companyInfo.contactName} onChange={e => setCompanyInfo(p => ({ ...p, contactName: e.target.value }))} placeholder="Juan Perez" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={companyInfo.email} onChange={e => setCompanyInfo(p => ({ ...p, email: e.target.value }))} placeholder="contacto@empresa.com" /></div>
+                                <div className="col-md-6 mb-3"><label className="form-label small fw-bold">Telefono</label><input className="form-control" value={companyInfo.phone} onChange={e => setCompanyInfo(p => ({ ...p, phone: e.target.value }))} placeholder="+54 11 1234-5678" /></div>
+                                <div className="col-md-12 mb-3"><label className="form-label small fw-bold">Direccion</label><input className="form-control" value={companyInfo.address} onChange={e => setCompanyInfo(p => ({ ...p, address: e.target.value }))} placeholder="Av. Rivadavia 1234, CABA" /></div>
+                                <div className="col-12">
+                                  <button className="btn btn-primary fw-bold" onClick={() => void saveCompanyInfo()} disabled={savingCompanyInfo}>Guardar Datos</button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Datos Actuales</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-1"><strong>Empresa:</strong> {companyInfo.companyName || '—'}</p>
+                                  <p className="mb-1"><strong>CUIT:</strong> {companyInfo.taxId || '—'}</p>
+                                  <p className="mb-1"><strong>IVA:</strong> {companyInfo.ivaCondition || '—'}</p>
+                                  <p className="mb-1"><strong>Provincia:</strong> {companyInfo.province || '—'}</p>
+                                  <p className="mb-1"><strong>Ciudad:</strong> {companyInfo.city || '—'}</p>
+                                  <p className="mb-1"><strong>Contacto:</strong> {companyInfo.contactName || '—'}</p>
+                                  <p className="mb-1"><strong>Email:</strong> {companyInfo.email || '—'}</p>
+                                  <p className="mb-0"><strong>Telefono:</strong> {companyInfo.phone || '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`tab-pane ${facturacionTab === 'certificado' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-md-8">
+                              <div className="alert alert-info">
+                                <i className="fas fa-key mr-2"></i>
+                                Generador de Certificados ARCA - Necesario para facturacion electronica real
+                              </div>
+
+                              <div className="card mb-3 border-info">
+                                <div className="card-header d-flex justify-content-between align-items-center">
+                                  <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !certificateTenantId}>
+                                    {testingArca ? 'Probando...' : 'Probar conexion'}
+                                  </button>
+                                </div>
+                                <div className="card-body small">
+                                  {arcaDiagnostics ? (
+                                    <>
+                                      <p className="mb-1"><strong>Estado conexion:</strong> <span className={`badge ${arcaDiagnostics.connection.ok ? 'text-bg-success' : 'text-bg-danger'}`}>{arcaDiagnostics.connection.ok ? 'Conectado' : 'Con errores'}</span></p>
+                                      <p className="mb-1"><strong>Detalle:</strong> {arcaDiagnostics.connection.message}</p>
+                                      <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
+                                      <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
+                                      {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
+                                      {arcaDiagnostics.authSession ? (
+                                        <>
+                                          <p className="mb-1"><strong>Unique ID:</strong> {arcaDiagnostics.authSession.uniqueId || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Generation Time:</strong> {arcaDiagnostics.authSession.generationTime ? new Date(arcaDiagnostics.authSession.generationTime).toLocaleString('es-AR') : 'N/D'}</p>
+                                          <p className="mb-1"><strong>Expiration Time:</strong> {arcaDiagnostics.authSession.expirationTime ? new Date(arcaDiagnostics.authSession.expirationTime).toLocaleString('es-AR') : 'N/D'} {arcaDiagnostics.authSession.expired ? <span className="badge text-bg-danger ms-1">Expirado</span> : null}</p>
+                                          <p className="mb-1"><strong>Sign:</strong> {arcaDiagnostics.authSession.signPreview || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Servicio:</strong> {arcaDiagnostics.authSession.service || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP Login URL:</strong> {arcaDiagnostics.config.wsaaUrl || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP WS URL:</strong> {arcaDiagnostics.config.wsfeUrl ? (arcaDiagnostics.config.wsfeUrl.includes('?') ? arcaDiagnostics.config.wsfeUrl : `${arcaDiagnostics.config.wsfeUrl}?WSDL`) : 'N/D'}</p>
+                                        </>
+                                      ) : null}
+                                      <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
+                                      <hr className="my-2" />
+                                      <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>
+                                      <p className="mb-1"><strong>Autorizados con CAE:</strong> {arcaDiagnostics.documents.withCae}</p>
+                                      <p className="mb-1"><strong>Pendientes:</strong> {arcaDiagnostics.documents.pending}</p>
+                                      <p className="mb-0"><strong>Sincronizacion:</strong> <span className={`badge ${arcaDiagnostics.documents.syncedPct >= 80 ? 'text-bg-success' : arcaDiagnostics.documents.syncedPct >= 50 ? 'text-bg-warning' : 'text-bg-danger'}`}>{arcaDiagnostics.documents.syncedPct}%</span></p>
+                                      {arcaDiagnostics.documents.byTipo ? (
+                                        <>
+                                          <hr className="my-2" />
+                                          <p className="mb-1"><strong>Sync por tipo:</strong></p>
+                                          <p className="mb-1">A: local {arcaDiagnostics.documents.byTipo.A.localLast} / ARCA {arcaDiagnostics.documents.byTipo.A.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.A.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.A.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.A.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.A.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-1">B: local {arcaDiagnostics.documents.byTipo.B.localLast} / ARCA {arcaDiagnostics.documents.byTipo.B.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.B.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.B.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.B.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.B.synced ? 'OK' : 'Atrasado'}</span></p>
+                                          <p className="mb-0">C: local {arcaDiagnostics.documents.byTipo.C.localLast} / ARCA {arcaDiagnostics.documents.byTipo.C.remoteLast ?? 'N/D'} <span className={`badge ${arcaDiagnostics.documents.byTipo.C.synced === null ? 'text-bg-secondary' : arcaDiagnostics.documents.byTipo.C.synced ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.documents.byTipo.C.synced === null ? 'N/D' : arcaDiagnostics.documents.byTipo.C.synced ? 'OK' : 'Atrasado'}</span></p>
+                                        </>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <p className="mb-0 text-muted">Ejecute la prueba para validar conexion, certificado y sincronizacion de comprobantes.</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="card mb-3">
+                                <div className="card-header bg-secondary text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-sliders-h mr-1"></i>Configuracion ARCA desde interfaz</h5>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small">Estos campos reemplazan la configuracion manual de variables ARCA en el archivo .env para este cliente.</p>
+                                  <div className="row">
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">Entorno</label>
+                                      <select
+                                        className="form-control"
+                                        value={arcaConfig.environment}
+                                        onChange={e => {
+                                          const environment = e.target.value as ArcaConfig['environment'];
+                                          setArcaConfig(p => ({
+                                            ...p,
+                                            environment,
+                                            mock: environment === 'mock' ? true : p.mock
+                                          }));
+                                        }}
+                                      >
+                                        <option value="mock">Mock</option>
+                                        <option value="homologacion">Homologacion</option>
+                                        <option value="produccion">Produccion</option>
+                                      </select>
+                                    </div>
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">CUIT</label>
+                                      <input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" />
+                                    </div>
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">Punto de Venta</label>
+                                      <input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">WSAA URL</label>
+                                      <input className="form-control" value={arcaConfig.wsaaUrl} onChange={e => setArcaConfig(p => ({ ...p, wsaaUrl: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">WSFE URL</label>
+                                      <input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA Token</label>
+                                      <input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} placeholder="Token WSAA" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA Sign</label>
+                                      <input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} placeholder="Sign WSAA" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA_CERT_PATH</label>
+                                      <input className="form-control" value={arcaConfig.certPath || ''} onChange={e => setArcaConfig(p => ({ ...p, certPath: e.target.value }))} placeholder="/ruta/certificado.p12" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA_CERT_PASSWORD</label>
+                                      <input type="password" className="form-control" value={arcaConfig.certPassword || ''} onChange={e => setArcaConfig(p => ({ ...p, certPassword: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <div className="form-check form-switch mt-4">
+                                        <input type="checkbox" className="form-check-input" id="certArcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                                        <label className="form-check-label fw-bold" htmlFor="certArcaEnabled">Habilitar ARCA</label>
+                                      </div>
+                                      <div className="form-check form-switch mt-2">
+                                        <input type="checkbox" className="form-check-input" id="certArcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked, environment: e.target.checked ? 'mock' : (p.environment === 'mock' ? 'homologacion' : p.environment) }))} />
+                                        <label className="form-check-label" htmlFor="certArcaMock">Modo mock</label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button className="btn btn-secondary" onClick={() => void saveArcaConfig()} disabled={savingArca}>
+                                    {savingArca ? 'Guardando...' : 'Guardar configuracion ARCA'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3">
+                                <div className="card-header bg-primary text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-cogs mr-1"></i>Paso 1: Generar Clave Privada y CSR</h5>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small">Complete los datos de su empresa para generar el CSR (Certificate Signing Request)</p>
+                                  <div className="row">
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Razon Social *</label>
+                                      <input type="text" className="form-control" id="csrCompanyName" placeholder="Mi Empresa S.A." defaultValue={companyInfo.companyName} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">CUIT *</label>
+                                      <input type="text" className="form-control" id="csrTaxId" placeholder="30712345678" defaultValue={companyInfo.taxId} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Provincia *</label>
+                                      <input type="text" className="form-control" id="csrProvince" placeholder="Buenos Aires" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Ciudad *</label>
+                                      <input type="text" className="form-control" id="csrCity" placeholder="Ciudad de Buenos Aires" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">Entorno *</label>
+                                      <select className="form-control" id="csrEnvironment">
+                                        <option value="homologacion">Homologacion (Testing)</option>
+                                        <option value="produccion">Produccion (Real)</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <button className="btn btn-primary" id="btnGenerateCsr" onClick={async () => {
+                                    const companyName = (document.getElementById('csrCompanyName') as HTMLInputElement).value;
+                                    const taxId = (document.getElementById('csrTaxId') as HTMLInputElement).value;
+                                    const province = (document.getElementById('csrProvince') as HTMLInputElement).value;
+                                    const city = (document.getElementById('csrCity') as HTMLInputElement).value;
+                                    const environment = (document.getElementById('csrEnvironment') as HTMLSelectElement).value;
+
+                                    if (!companyName || !taxId || !province || !city) {
+                                      alert('Complete todos los campos');
+                                      return;
+                                    }
+
+                                    const btn = document.getElementById('btnGenerateCsr') as HTMLButtonElement;
+                                    btn.disabled = true;
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+
+                                    try {
+                                      const res = await postJson(`/billing/certificate/generate${certificateQuery}`, {
+                                        companyName, taxId, province, city, environment
+                                      }, props.session.token);
+                                      if (res.ok) {
+                                        alert('CSR generado correctamente');
+                                        await loadCertStatus();
+                                      } else {
+                                        const err = await res.json();
+                                        alert('Error: ' + (err.error || 'Error desconocido'));
+                                      }
+                                    } catch (err) {
+                                      alert('Error al generar CSR');
+                                    } finally {
+                                      btn.disabled = false;
+                                      btn.innerHTML = '<i class="fas fa-key"></i> Generar Key + CSR';
+                                    }
+                                  }}>
+                                    <i className="fas fa-key mr-1"></i> Generar Key + CSR
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="csrSection" style={{ display: certStatus?.hasCsr ? 'block' : 'none' }}>
+                                <div className="card-header bg-success text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-download mr-1"></i>Paso 2: Descargar CSR y Obtener Certificado de ARCA</h5>
+                                </div>
+                                <div className="card-body">
+                                  <div className="alert alert-warning">
+                                    <i className="fas fa-exclamation-triangle mr-2"></i>
+                                    <strong>Importante:</strong> Descargue el archivo CSR y subalo a ARCA para obtener el certificado firmado.
+                                  </div>
+                                  <div className="row">
+                                    <div className="col-md-6 mb-3">
+                                      <button className="btn btn-success btn-block w-100" id="btnDownloadKey" onClick={() => {
+                                        window.open(`${API_URL}/billing/certificate/download/key${certificateQuery}&token=${props.session.token}`, '_blank');
+                                      }}>
+                                        <i className="fas fa-key mr-1"></i> Descargar Clave Privada (.key)
+                                      </button>
+                                      <small className="text-muted d-block mt-1">Guarde este archivo en un lugar seguro</small>
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <button className="btn btn-info btn-block w-100" id="btnDownloadCsr" onClick={() => {
+                                        window.open(`${API_URL}/billing/certificate/download/csr${certificateQuery}&token=${props.session.token}`, '_blank');
+                                      }}>
+                                        <i className="fas fa-file-alt mr-1"></i> Descargar CSR (.csr)
+                                      </button>
+                                      <small className="text-muted d-block mt-1">Este archivo se sube a ARCA</small>
+                                    </div>
+                                  </div>
+                                  <hr />
+                                  <h6><i className="fas fa-arrow-right mr-1"></i> Instrucciones para obtener el certificado de ARCA:</h6>
+                                  <ol className="text-muted small">
+                                    <li>Ingrese a <a href="https://www.afip.gob.ar/ws/" target="_blank">https://www.afip.gob.ar/ws/</a></li>
+                                    <li>Vaya a "Administracion de Certificados Digitales"</li>
+                                    <li>Seleccione "Crear nuevo certificado para Web Services"</li>
+                                    <li>Suba el archivo <strong>request.csr</strong> descargado</li>
+                                    <li>Siga las instrucciones de ARCA y descargue el certificado firmado (<strong>.crt</strong>)</li>
+                                  </ol>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="uploadCrtSection" style={{ display: certStatus?.hasCsr || certStatus?.hasCertificate ? 'block' : 'none' }}>
+                                <div className="card-header bg-info text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-upload mr-1"></i>Paso 3: Subir Certificado Firmado por ARCA</h5>
+                                </div>
+                                <div className="card-body">
+                                  <div className="mb-3">
+                                    {certStatus?.environment === 'produccion' ? (
+                                      <>
+                                        <label className="form-label small fw-bold">Certificado Firmado (.crt)</label>
+                                        <div className="input-group">
+                                          <input type="file" className="form-control" accept=".crt,.cer,.pem" id="certCrtFile"
+                                            onChange={async (e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+                                              const formData = new FormData();
+                                              formData.append('certificate', file);
+                                              setUploadingCert(true);
+                                              try {
+                                                  const res = await fetch(`${API_URL}/billing/certificate/upload-crt${certificateQuery}`, {
+                                                    method: 'POST',
+                                                    headers: { Authorization: `Bearer ${props.session.token}` },
+                                                    body: formData
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok) {
+                                                  alert('Certificado cargado y validado correctamente');
+                                                  await loadCertStatus();
+                                                } else {
+                                                  alert('Error: ' + (data.error || 'Error al cargar certificado'));
+                                                }
+                                              } catch {
+                                                alert('Error al cargar certificado');
+                                              } finally {
+                                                setUploadingCert(false);
+                                                (document.getElementById('certCrtFile') as HTMLInputElement).value = '';
+                                              }
+                                            }}
+                                            disabled={uploadingCert}
+                                          />
+                                        </div>
+                                        <small className="text-muted">Archivo .crt, .cer o .pem firmado por ARCA</small>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <label className="form-label small fw-bold">Certificado PEM (Homologacion)</label>
+                                        <textarea
+                                          className="form-control"
+                                          rows={8}
+                                          placeholder="Pegue aqui el certificado completo en formato PEM (incluyendo BEGIN CERTIFICATE y END CERTIFICATE)"
+                                          value={certificatePemInput}
+                                          onChange={e => setCertificatePemInput(e.target.value)}
+                                          disabled={uploadingCert}
+                                        />
+                                        <small className="text-muted d-block mt-1">Copie y pegue el certificado devuelto por ARCA en homologacion</small>
+                                        <button className="btn btn-info mt-2" disabled={uploadingCert || !certificatePemInput.trim()} onClick={async () => {
+                                          setUploadingCert(true);
+                                          try {
+                                              const res = await fetch(`${API_URL}/billing/certificate/upload-crt${certificateQuery}`, {
+                                                method: 'POST',
+                                                headers: {
+                                                  'Content-Type': 'application/json',
+                                                Authorization: `Bearer ${props.session.token}`
+                                              },
+                                              body: JSON.stringify({ certificatePem: certificatePemInput })
+                                            });
+                                            const data = await res.json();
+                                            if (res.ok) {
+                                              alert('Certificado cargado y validado correctamente');
+                                              setCertificatePemInput('');
+                                              await loadCertStatus();
+                                            } else {
+                                              alert('Error: ' + (data.error || 'Error al cargar certificado'));
+                                            }
+                                          } catch {
+                                            alert('Error al cargar certificado');
+                                          } finally {
+                                            setUploadingCert(false);
+                                          }
+                                        }}>
+                                          <i className="fas fa-paste mr-1"></i> Pegar y Validar Certificado
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="card mb-3" id="generateP12Section" style={{ display: certStatus?.hasCertificate ? 'block' : 'none' }}>
+                                <div className="card-header bg-warning">
+                                  <h5 className="card-title mb-0"><i className="fas fa-file-archive mr-1"></i>Paso 4: Generar Archivo P12 (Opcional)</h5>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small">Genere el archivo .p12 necesario para algunos Web Services de AFIP</p>
+                                  <div className="row">
+                                    <div className="col-md-8 mb-3">
+                                      <label className="form-label small fw-bold">Contrasena para P12</label>
+                                      <input type="password" className="form-control" id="p12Password" placeholder="Minimo 6 caracteres" />
+                                    </div>
+                                    <div className="col-md-4 mb-3 d-flex align-items-end">
+                                      <button className="btn btn-warning w-100" onClick={async () => {
+                                        const password = (document.getElementById('p12Password') as HTMLInputElement).value;
+                                        if (!password || password.length < 6) {
+                                          alert('La contrasena debe tener al menos 6 caracteres');
+                                          return;
+                                        }
+                                        try {
+                                            const res = await fetch(`${API_URL}/billing/certificate/generate-p12${certificateQuery}`, {
+                                              method: 'POST',
+                                              headers: { 
+                                                'Content-Type': 'application/json',
+                                              Authorization: `Bearer ${props.session.token}`
+                                            },
+                                            body: JSON.stringify({ password })
+                                          });
+                                          if (res.ok) {
+                                            const blob = await res.blob();
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'certificate.p12';
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            alert('Archivo P12 descargado');
+                                          } else {
+                                            alert('Error al generar P12');
+                                          }
+                                        } catch {
+                                          alert('Error al generar P12');
+                                        }
+                                      }}>
+                                        <i className="fas fa-download mr-1"></i> Descargar P12
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="card" id="certStatusCard" style={{ display: certStatus?.hasPrivateKey || certStatus?.hasCsr || certStatus?.hasCertificate ? 'block' : 'none' }}>
+                                <div className="card-header bg-success text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-check-circle mr-1"></i> Estado del Certificado</h5>
+                                </div>
+                                <div className="card-body" id="certStatusBody">
+                                  {certStatus ? (
+                                    <>
+                                      <div className="row">
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.hasPrivateKey ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Clave Privada</strong></p>
+                                          <small>{certStatus.hasPrivateKey ? 'Generada' : 'No disponible'}</small>
+                                        </div>
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.hasCertificate ? 'fa-check-circle text-success' : 'fa-clock text-warning'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Certificado ARCA</strong></p>
+                                          <small>{certStatus.hasCertificate ? 'Cargado' : 'Pendiente'}</small>
+                                        </div>
+                                        <div className="col-md-4 text-center">
+                                          <i className={`fas ${certStatus.environment === 'produccion' ? 'fa-rocket text-primary' : 'fa-flask text-info'} fa-2x mb-2`}></i>
+                                          <p className="mb-0"><strong>Entorno</strong></p>
+                                          <small>{certStatus.environment === 'produccion' ? 'Produccion' : 'Homologacion'}</small>
+                                        </div>
+                                      </div>
+                                      {certStatus.createdAt ? (
+                                        <p className="mt-2 mb-0 text-muted small">Generado: {new Date(certStatus.createdAt).toLocaleString('es-AR')}</p>
+                                      ) : null}
+                                    </>
+                                  ) : null}
+                                </div>
+                                <div className="card-footer">
+                                  <button className="btn btn-danger btn-sm" onClick={async () => {
+                                    if (!confirm('¿Eliminar todos los certificados? Esta accion no se puede deshacer.')) return;
+                                    try {
+                                      await deleteJson(`/billing/certificate${certificateQuery}`, props.session.token);
+                                      alert('Certificados eliminados');
+                                      await loadCertStatus();
+                                    } catch {
+                                      alert('Error al eliminar certificados');
+                                    }
+                                  }}>
+                                    <i className="fas fa-trash mr-1"></i> Eliminar Todo
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-md-4">
+                              <div className="card bg-light">
+                                <div className="card-header"><h4 className="card-title small fw-bold mb-0"><i className="fas fa-info-circle mr-1"></i>Informacion</h4></div>
+                                <div className="card-body small">
+                                  <p className="mb-2"><strong>Proceso de obtencion de certificado:</strong></p>
+                                  <ol className="mb-2 ps-3">
+                                    <li><strong>Genere</strong> la clave privada y el CSR</li>
+                                    <li><strong>Descargue</strong> el archivo request.csr</li>
+                                    <li><strong>Suba</strong> el CSR a ARCA</li>
+                                    <li><strong>Descargue</strong> el certificado firmado</li>
+                                    <li><strong>Suba</strong> el certificado a esta plataforma</li>
+                                    <li><strong>Genere</strong> el archivo P12 si es necesario</li>
+                                  </ol>
+                                  <hr />
+                                  <p className="mb-2"><strong>Archivos generados:</strong></p>
+                                  <ul className="ps-3">
+                                    <li><code>private.key</code> - Clave privada RSA 2048 bits</li>
+                                    <li><code>request.csr</code> - Certificate Signing Request</li>
+                                    <li><code>certificate.crt</code> - Certificado firmado por ARCA</li>
+                                    <li><code>certificate.p12</code> - Archivo PKCS#12 (opcional)</li>
+                                  </ul>
+                                  <hr />
+                                  <p className="mb-0"><strong>Modo Mock:</strong> Puede usar el modo mock para pruebas sin certificado.</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`tab-pane ${facturacionTab === 'facturas' ? 'active show' : ''}`}>
+                          <div className="row">
+                            <div className="col-12">
+                              <div className="alert alert-info mb-3">
+                                <i className="fas fa-file-invoice mr-2"></i>
+                                Gestion de facturas electronicas ARCA
+                              </div>
+                            </div>
+                            <div className="col-12">
+                              <div className="card">
+                                <div className="card-header">
+                                  <div className="d-flex justify-content-between align-items-center">
+                                    <h4 className="card-title small fw-bold mb-0"><i className="fas fa-list mr-1"></i>Facturas ({invoices.length})</h4>
+                                    <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                                      <button className="btn btn-light btn-sm" onClick={() => setShowCreateInvoiceModal(true)}>
+                                        <i className="fas fa-plus me-1"></i>Nueva Factura
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="card-body p-0">
+                                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    <table className="table table-sm m-0">
+                                      <thead className="thead-light">
+                                        <tr>
+                                          <th style={{width: '40px'}}></th>
+                                          <th>Periodo</th>
+                                          <th>Tipo</th>
+                                          <th>Cliente</th>
+                                          <th>Monto</th>
+                                          <th>CAE</th>
+                                          <th>Estado</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {invoices.length === 0 ? (
+                                          <tr><td colSpan={7} className="text-center text-muted py-3">No hay facturas registradas</td></tr>
+                                        ) : (
+                                          invoices.flatMap(inv => {
+                                            const expanded = expandedInvoiceId === inv._id;
+                                            const isPending = inv.estado === 'pendiente';
+                                            const isProcessing = processingInvoiceId === inv._id;
+                                            return [
+                                              <tr key={inv._id} style={{ cursor: 'pointer' }} onClick={() => setExpandedInvoiceId(expanded ? null : inv._id)}>
+                                                <td className="text-center text-muted"><i className={`fas ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i></td>
+                                                <td className="small">{inv.period || '-'}</td>
+                                                <td><span className="badge text-bg-secondary">Factura {inv.tipo || 'B'}</span></td>
+                                                <td className="small">{inv.cliente?.nombre || inv.clienteNombre || '-'}</td>
+                                                <td className="fw-bold text-primary">${(inv.amountArs || 0).toLocaleString('es-AR')}</td>
+                                                <td className="small">{inv.cae || '-'}</td>
+                                                <td>
+                                                  <span className={`badge ${inv.estado === 'autorizado' ? 'text-bg-success' : inv.estado === 'paid' ? 'text-bg-info' : 'text-bg-warning'}`}>
+                                                    {inv.estado === 'autorizado' ? 'Autorizada' : inv.estado === 'paid' ? 'Pagada' : inv.estado || 'Borrador'}
+                                                  </span>
+                                                </td>
+                                              </tr>,
+                                              expanded ? (
+                                                <tr key={`${inv._id}-expanded`}>
+                                                  <td colSpan={7} className="bg-light">
+                                                    <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: '8px' }}>
+                                                      <div className="small text-muted">
+                                                        <strong>ID:</strong> {inv._id} | <strong>Punto de venta:</strong> {inv.puntoVenta || '-'} | <strong>Numero:</strong> {inv.numero || '-'}
+                                                      </div>
+                                                      <div className="d-flex align-items-center" style={{ gap: '8px' }}>
+                                                        <a
+                                                          href={`${API_URL}/billing/invoices/${inv._id}/pdf?token=${props.session.token}`}
+                                                          target="_blank"
+                                                          className="btn btn-sm btn-outline-primary"
+                                                          title="Ver PDF"
+                                                          onClick={e => e.stopPropagation()}
+                                                        >
+                                                          <i className="fas fa-file-pdf me-1"></i>PDF
+                                                        </a>
+                                                        {isPending ? (
+                                                          <button
+                                                            className="btn btn-sm btn-outline-success"
+                                                            onClick={e => {
+                                                              e.stopPropagation();
+                                                              void authorizeSingleInvoice(inv._id);
+                                                            }}
+                                                            disabled={isProcessing}
+                                                          >
+                                                            {isProcessing ? 'Procesando...' : 'Autorizar'}
+                                                          </button>
+                                                        ) : null}
+                                                        {isPending ? (
+                                                          <button
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            onClick={e => {
+                                                              e.stopPropagation();
+                                                              void deletePendingInvoice(inv._id);
+                                                            }}
+                                                            disabled={isProcessing}
+                                                          >
+                                                            Eliminar pendiente
+                                                          </button>
+                                                        ) : null}
+                                                      </div>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              ) : null
+                                            ].filter(Boolean) as JSX.Element[];
+                                          })
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-key me-2"></i>Mi Contrasena</h3></div>
-                    <div className="card-body">
-                      <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
-                    </div>
-                  </div>
-                  <div className="card mt-3">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-info-circle me-2"></i>Datos Actuales</h3></div>
-                    <div className="card-body small">
-                      <p className="mb-1"><strong>CUIT:</strong> {arcaConfig.cuit || '—'}</p>
-                      <p className="mb-1"><strong>Pto. Vta:</strong> {arcaConfig.ptoVta}</p>
-                      <p className="mb-1"><strong>Habilitado:</strong> <span className={`badge ${arcaConfig.enabled ? 'text-bg-success' : 'text-bg-secondary'}`}>{arcaConfig.enabled ? 'Si' : 'No'}</span></p>
-                      <p className="mb-0"><strong>Modo Mock:</strong> <span className={`badge ${arcaConfig.mock ? 'text-bg-warning' : 'text-bg-success'}`}>{arcaConfig.mock ? 'Si' : 'No'}</span></p>
                     </div>
                   </div>
                 </div>
@@ -2037,23 +3217,49 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               <div className="row">
                 <div className="col-12">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0 flex-grow-1"><i className="fas fa-bell me-2"></i>Notificaciones y Alertas ({alerts.length})</h3>
+                      <div className="ms-auto d-flex gap-2">
+                        <button className="btn btn-sm btn-light" onClick={async () => {
+                          if (!confirm('¿Probar notificación de Telegram?')) return;
+                          try {
+                            await postJson('/alerts/test-telegram', { message: '🧪 Prueba de AgroSentinel - Notificaciones funcionando correctamente' }, props.session.token);
+                            alert('Mensaje de prueba enviado a Telegram');
+                          } catch { alert('Error al enviar mensaje de prueba'); }
+                        }}>
+                          <i className="fab fa-telegram mr-1"></i>Probar Telegram
+                        </button>
+                        <button className="btn btn-sm btn-light" onClick={async () => {
+                          if (!confirm('¿Limpiar todas las alertas resueltas?')) return;
+                          try {
+                            for (const a of alerts.filter(al => al.status === 'resolved')) {
+                              await deleteJson(`/alerts/${a._id}`, props.session.token);
+                            }
+                            setAlerts(alerts.filter(a => a.status === 'open'));
+                          } catch { alert('Error al limpiar alertas'); }
+                        }}>
+                          <i className="fas fa-trash mr-1"></i>Limpiar Resueltas
+                        </button>
+                      </div>
+                    </div>
                     <div className="card-body p-0">
                       {alerts.length === 0 ? (
                         <p className="text-center text-muted p-4">Sin notificaciones registradas</p>
                       ) : (
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
-                          <tbody>{alerts.map(a => (
+                          <thead><tr><th>Dispositivo</th><th>Tipo</th><th>Mensaje</th><th>Estado</th><th>Fecha</th></tr></thead>
+                          <tbody>{alerts.slice(0, 100).map(a => (
                             <tr key={a._id}>
                               <td className="fw-bold">{a.deviceId}</td>
                               <td><span className={`badge ${a.type === 'critical_level' ? 'text-bg-danger' : 'text-bg-secondary'}`}>{a.type}</span></td>
                               <td>{a.message}</td>
                               <td><span className={`badge ${a.status === 'open' ? 'text-bg-danger' : 'text-bg-success'}`}>{a.status}</span></td>
+                              <td className="small text-muted">{a.openedAt ? new Date(a.openedAt).toLocaleString('es-AR') : '-'}</td>
                             </tr>
                           ))}</tbody>
                         </table>
                       )}
+                      {alerts.length > 100 && <div className="text-center text-muted p-2 small">Mostrando las últimas 100 de {alerts.length}</div>}
                     </div>
                   </div>
                 </div>
@@ -2138,7 +3344,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                     <div className="card-body p-0">
                       <div className="card card-primary card-outline card-tabs">
                         <div className="card-header p-0 border-bottom-0">
-                          <ul className="nav nav-tabs" role="tablist">
+                      <ul className="nav nav-tabs mt-3 px-3" role="tablist">
                             <li className="nav-item">
                               <a className={`nav-link ${serverTab === 'servidor' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('servidor'); }}>
                                 <i className="fas fa-server mr-1"></i> Servidor
@@ -2147,6 +3353,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                             <li className="nav-item">
                               <a className={`nav-link ${serverTab === 'mqtt' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('mqtt'); }}>
                                 <i className="fas fa-wifi mr-1"></i> MQTT
+                              </a>
+                            </li>
+                            <li className="nav-item">
+                              <a className={`nav-link ${serverTab === 'config' ? 'active' : ''}`} href="#" onClick={e => { e.preventDefault(); setServerTab('config'); }}>
+                                <i className="fas fa-cogs mr-1"></i> Config
                               </a>
                             </li>
                           </ul>
@@ -2192,6 +3403,65 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                               </table>
                             </div>
                           )}
+                          {serverTab === 'config' && (
+                            <div>
+                              <div className="alert alert-info mb-3">
+                                <i className="fas fa-info-circle mr-2"></i>
+                                Configuracion del sistema. Algunos cambios requieren reiniciar el servidor.
+                              </div>
+                              {systemConfig.length === 0 ? (
+                                <p className="text-muted">Cargando configuración...</p>
+                              ) : (
+                                <table className="table table-sm table-bordered">
+                                  <thead className="thead-dark">
+                                    <tr><th>Parametro</th><th>Valor</th><th style={{width: 40}}></th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {systemConfig.map(cfg => (
+                                      <tr key={cfg.key}>
+                                        <td>
+                                          <strong>{cfg.key}</strong>
+                                          {cfg.description && <div className="small text-muted">{cfg.description}</div>}
+                                        </td>
+                                        <td>
+                                          {(cfg.key === 'TELEGRAM_BOT_TOKEN' || cfg.key === 'TELEGRAM_CHAT_ID') && cfg.value ? (
+                                            <input type="password" className="form-control form-control-sm" value={cfg.value} 
+                                              onChange={e => {
+                                                setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c));
+                                              }} />
+                                          ) : cfg.key === 'TELEGRAM_ENABLED' ? (
+                                            <select className="form-control form-control-sm" value={cfg.value}
+                                              onChange={e => setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c))}>
+                                              <option value="false">false</option>
+                                              <option value="true">true</option>
+                                            </select>
+                                          ) : (
+                                            <input type="text" className="form-control form-control-sm" value={cfg.value}
+                                              onChange={e => setSystemConfig(prev => prev.map(c => c.key === cfg.key ? { ...c, value: e.target.value } : c))} />
+                                          )}
+                                        </td>
+                                        <td><span className="badge bg-info" title={cfg.description || cfg.key}>?</span></td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                              <button className="btn btn-primary" disabled={savingConfig} onClick={async () => {
+                                setSavingConfig(true);
+                                try {
+                                  for (const cfg of systemConfig) {
+                                    await putJson(`/config/${cfg.key}`, { value: cfg.value }, props.session.token);
+                                  }
+                                  alert('Configuración guardada. Reinicie el servidor para aplicar cambios.');
+                                } catch (err) {
+                                  alert('Error al guardar configuración');
+                                }
+                                setSavingConfig(false);
+                              }}>
+                                <i className="fas fa-save mr-1"></i>{savingConfig ? 'Guardando...' : 'Guardar Configuración'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2205,10 +3475,10 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 <div className="col-12">
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-white fw-bold mb-0">
+                      <h3 className="card-title text-white fw-bold mb-0 flex-grow-1">
                         <i className="fas fa-clock me-2"></i>Dispositivos Pendientes de Aprobacion ({pendingDevices.length})
                       </h3>
-                      <div>
+                      <div className="ms-auto">
                         <div className="btn-group" role="group">
                           <button type="button" className={`btn btn-sm ${pendingFilter === 'all' ? 'btn-light' : 'btn-outline-light'}`} onClick={() => setPendingFilter('all')}>Todos</button>
                           <button type="button" className={`btn btn-sm ${pendingFilter === 'online' ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setPendingFilter('online')}>Online</button>
@@ -2226,24 +3496,37 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       ) : (
                         <div className="table-responsive">
                           <table className="table table-hover m-0">
-                            <thead><tr><th>Device ID</th><th>Estado</th><th>Ultima Conexion</th><th>Asignar a Cliente</th><th>Accion</th></tr></thead>
+                            <thead><tr><th>Device ID</th><th>Estado</th><th>Ultima Conexion</th><th>Nombre</th><th>Ubicacion</th><th>Cliente</th><th>Accion</th></tr></thead>
                             <tbody>
                               {pendingDevices.filter(d => pendingFilter === 'all' || d.status === pendingFilter).map(d => (
                                 <tr key={d.device_id}>
                                   <td className="fw-bold">{d.device_id}</td>
                                   <td>
-                                    <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>
-                                      <i className={`fas fa-circle me-1 ${d.status === 'online' ? 'fa-spin' : ''}`}></i>
+                                    <span className={`badge ${getStatusBadge(d.status)}`}>
+                                      <i className={`fas fa-circle me-1`} style={{ color: getStatusColor(d.status) }}></i>
                                       {d.status}
                                     </span>
                                   </td>
                                   <td className="small text-muted">
                                     {d.last_seen ? new Date(d.last_seen).toLocaleString('es-AR') : 'N/A'}
                                   </td>
-                                  <td style={{ minWidth: '200px' }}>
+                                  <td style={{ minWidth: '150px' }}>
+                                    <input type="text" className="form-control form-control-sm" placeholder="Nombre del dispositivo"
+                                      value={assigningDevice === d.device_id ? assigningName : ''}
+                                      onChange={e => { setAssigningDevice(d.device_id); setAssigningName(e.target.value); }}
+                                    />
+                                  </td>
+                                  <td style={{ minWidth: '180px' }}>
+                                    <button className="btn btn-outline-primary btn-sm w-100" 
+                                      onClick={() => { setAssigningDevice(d.device_id); setShowAssigningMap(true); }}>
+                                      <i className="fas fa-map-marker-alt mr-1"></i>
+                                      {assigningDevice === d.device_id && assigningLat && assigningLng ? 'Ubicado' : 'Seleccionar en mapa'}
+                                    </button>
+                                  </td>
+                                  <td style={{ minWidth: '180px' }}>
                                     <select className="form-control form-control-sm" value={assigningDevice === d.device_id ? selectedUserId : ''} 
                                       onChange={e => { setAssigningDevice(d.device_id); setSelectedUserId(e.target.value); }}>
-                                      <option value="">Seleccionar cliente...</option>
+                                      <option value="">Seleccionar...</option>
                                       {clients.map(c => (
                                         <option key={c.tenantId} value={c.tenantId}>{c.companyName}</option>
                                       ))}
@@ -2254,10 +3537,19 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                                       disabled={!selectedUserId || assigningDevice !== d.device_id}
                                       onClick={async () => {
                                         try {
-                                          await postJson('/devices/assign', { device_id: d.device_id, tenant_id: selectedUserId }, props.session.token);
+                                          await postJson('/devices/assign', { 
+                                            device_id: d.device_id, 
+                                            tenant_id: selectedUserId,
+                                            name: assigningName || undefined,
+                                            lat: assigningLat ? Number(assigningLat) : undefined,
+                                            lng: assigningLng ? Number(assigningLng) : undefined
+                                          }, props.session.token);
                                           setPendingDevices(p => p.filter(x => x.device_id !== d.device_id));
                                           setAssigningDevice(null);
                                           setSelectedUserId('');
+                                          setAssigningName('');
+                                          setAssigningLat('');
+                                          setAssigningLng('');
                                         } catch (err) {
                                           alert('Error al asignar dispositivo');
                                         }
@@ -2277,9 +3569,194 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
               </div>
             )}
 
+            {showAssigningMap && (
+            <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <div className="modal-dialog modal-lg modal-dialog-centered">
+                <div className="modal-content">
+                  <div className="modal-header bg-primary">
+                    <h4 className="modal-title"><i className="fas fa-map-marker-alt mr-2"></i>Seleccionar Ubicacion</h4>
+                    <button type="button" className="close text-white" onClick={() => setShowAssigningMap(false)}>&times;</button>
+                  </div>
+                  <div className="modal-body p-0" style={{ height: '450px' }}>
+                    <AssignMap 
+                      lat={assigningLat} 
+                      lng={assigningLng} 
+                      onSelect={(lat, lng) => {
+                        setAssigningLat(lat.toString());
+                        setAssigningLng(lng.toString());
+                      }} 
+                    />
+                  </div>
+                  <div className="modal-footer">
+                    <div className="mr-auto text-muted small">
+                      Lat: {assigningLat || '—'} | Lng: {assigningLng || '—'}
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowAssigningMap(false)}>Cerrar</button>
+                    <button type="button" className="btn btn-primary" onClick={() => setShowAssigningMap(false)}>Confirmar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {activeSection === 'backup' && (
+              <div className="row">
+                <div className="col-12">
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-database me-2"></i>Backup y Restauracion</h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6">
+                          <div className="card card-primary">
+                            <div className="card-header">
+                              <h5 className="card-title mb-0"><i className="fas fa-download mr-2"></i>Exportar Datos</h5>
+                            </div>
+                            <div className="card-body">
+                              <p className="text-muted">Exporta todos los clientes y dispositivos a un archivo JSON.</p>
+                              <button className="btn btn-primary" onClick={() => void createBackup()} disabled={creatingBackup}>
+                                {creatingBackup ? <><i className="fas fa-spinner fa-spin mr-1"></i>Generando...</> : <><i className="fas fa-download mr-1"></i>Descargar Backup</>}
+                              </button>
+                              {backupSuccess && <div className="alert alert-success mt-3 mb-0">{backupSuccess}</div>}
+                              {backupError && <div className="alert alert-danger mt-3 mb-0">{backupError}</div>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="card card-warning">
+                            <div className="card-header">
+                              <h5 className="card-title mb-0"><i className="fas fa-upload mr-2"></i>Importar Datos</h5>
+                            </div>
+                            <div className="card-body">
+                              <p className="text-muted">Restaura clientes y dispositivos desde un archivo JSON de backup.</p>
+                              <input 
+                                type="file" 
+                                accept=".json" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) void restoreBackup(file);
+                                }} 
+                                disabled={restoringBackup}
+                              />
+                              {restoringBackup && <div className="mt-2"><i className="fas fa-spinner fa-spin mr-1"></i>Restaurando...</div>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="alert alert-warning mt-3">
+                        <i className="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>Nota:</strong> La restauración no eliminará datos existentes, solo agregará o actualizará los del backup.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
+
+      <div className={`modal fade ${showCreateInvoiceModal ? 'show' : ''}`} style={{ display: showCreateInvoiceModal ? 'block' : 'none', overflowY: 'auto', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal-dialog modal-lg" style={{ margin: '30px auto' }}>
+          <div className="modal-content" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-file-invoice mr-2"></i>Nueva Factura</h4>
+              <button type="button" className="close text-white" onClick={() => setShowCreateInvoiceModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ overflowY: 'auto' }}>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Cliente</label>
+                <select className="form-control" value={newInvoice.tenantId} onChange={e => {
+                  const client = clients.find(c => c.tenantId === e.target.value);
+                  if (client) {
+                    const plan = plans.find(p => p._id === client.planId);
+                    const ivaCondition = client.ivaCondition || 'Consumidor Final';
+                    let tipoComprobante = 'B';
+                    if (ivaCondition === 'Responsable Inscripto') {
+                      tipoComprobante = 'A';
+                    }
+                    setNewInvoice({
+                      tenantId: client.tenantId,
+                      tipo: tipoComprobante,
+                      clienteNombre: client.companyName,
+                      clienteTipoDoc: 80,
+                      clienteNroDoc: client.taxId || '',
+                      clienteCondicionIva: ivaCondition,
+                      amountArs: plan ? plan.monthlyPriceArs : 0,
+                      period: newInvoice.period
+                    });
+                  }
+                }}>
+                  <option value="">Seleccionar cliente...</option>
+                  {clients.map(c => (
+                    <option key={c.tenantId} value={c.tenantId}>
+                      {c.companyName} {c.planName ? `(${c.planName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Tipo de Comprobante</label>
+                <select className="form-control" value={newInvoice.tipo} onChange={e => setNewInvoice(p => ({ ...p, tipo: e.target.value }))}>
+                  <option value="A">Factura A</option>
+                  <option value="B">Factura B</option>
+                  <option value="C">Factura C</option>
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Nombre / Razon Social</label>
+                <input className="form-control" value={newInvoice.clienteNombre} onChange={e => setNewInvoice(p => ({ ...p, clienteNombre: e.target.value }))} placeholder="Consumidor Final" />
+              </div>
+              <div className="row">
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Tipo Doc</label>
+                  <select className="form-control" value={newInvoice.clienteTipoDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteTipoDoc: Number(e.target.value) }))}>
+                    <option value={99}>99 - Sin identificar</option>
+                    <option value={80}>80 - CUIT</option>
+                    <option value={86}>86 - CUIL</option>
+                    <option value={96}>96 - DNI</option>
+                  </select>
+                </div>
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Nro. Documento</label>
+                  <input className="form-control" value={newInvoice.clienteNroDoc} onChange={e => setNewInvoice(p => ({ ...p, clienteNroDoc: e.target.value }))} placeholder="0" />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-bold">Condicion IVA</label>
+                <select className="form-control" value={newInvoice.clienteCondicionIva} onChange={e => setNewInvoice(p => ({ ...p, clienteCondicionIva: e.target.value }))}>
+                  <option>Consumidor Final</option>
+                  <option>Responsable Inscripto</option>
+                  <option>Monotributista</option>
+                  <option>Exento</option>
+                </select>
+              </div>
+              <div className="row">
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Periodo</label>
+                  <input className="form-control" type="month" value={newInvoice.period} onChange={e => setNewInvoice(p => ({ ...p, period: e.target.value }))} />
+                </div>
+                <div className="col-6 mb-3">
+                  <label className="form-label small fw-bold">Monto (ARS)</label>
+                  <input className="form-control" type="number" value={newInvoice.amountArs} onChange={e => setNewInvoice(p => ({ ...p, amountArs: Number(e.target.value) }))} placeholder="0" />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ position: 'sticky', bottom: 0, backgroundColor: '#fff', borderTop: '1px solid #dee2e6', zIndex: 2 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCreateInvoiceModal(false)}>Cancelar</button>
+              <button className="btn btn-outline-primary" onClick={() => void createInvoice(false)} disabled={creatingInvoice || !newInvoice.amountArs}>
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Guardando...</> : <><i className="fas fa-save mr-1"></i>Guardar sin autorizar</>}
+              </button>
+              <button className="btn btn-primary" onClick={() => void createInvoice(true)} disabled={creatingInvoice || !newInvoice.amountArs}>
+                {creatingInvoice ? <><i className="fas fa-spinner fa-spin mr-1"></i>Creando...</> : <><i className="fas fa-check mr-1"></i>Crear y Autorizar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showCreateInvoiceModal && <div className="modal-backdrop fade show" onClick={() => setShowCreateInvoiceModal(false)}></div>}
 
       <div className={`modal fade ${showAddClient ? 'show' : ''}`} style={{ display: showAddClient ? 'block' : 'none' }}>
         <div className="modal-dialog">
@@ -2321,6 +3798,24 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                   onChange={e => setNewClient(p => ({ ...p, address: e.target.value }))}
                   placeholder="Ruta 2 km 45, Pcia. de Buenos Aires" />
               </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">CUIT</label>
+                  <input className="form-control" value={newClient.taxId}
+                    onChange={e => setNewClient(p => ({ ...p, taxId: e.target.value }))}
+                    placeholder="30712345678" />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Condicion IVA</label>
+                  <select className="form-control" value={newClient.ivaCondition}
+                    onChange={e => setNewClient(p => ({ ...p, ivaCondition: e.target.value }))}>
+                    <option>Consumidor Final</option>
+                    <option>Responsable Inscripto</option>
+                    <option>Monotributista</option>
+                    <option>Exento</option>
+                  </select>
+                </div>
+              </div>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Plan</label>
                 <select className="form-control" value={newClient.planId}
@@ -2343,11 +3838,13 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       email: newClient.email,
                       phone: newClient.phone,
                       address: newClient.address,
-                      planId: newClient.planId || undefined
+                      planId: newClient.planId || undefined,
+                      taxId: newClient.taxId,
+                      ivaCondition: newClient.ivaCondition
                     }, props.session.token);
                     const data = await res.json() as { tenantId: string };
                     setShowAddClient(false);
-                    setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '' });
+                    setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '', taxId: '', ivaCondition: 'Consumidor Final' });
                     setTenantId(data.tenantId);
                     void loadClients();
                   } catch {
@@ -2399,6 +3896,24 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 <input className="form-control" value={editClient.address}
                   onChange={e => setEditClient(p => ({ ...p, address: e.target.value }))} />
               </div>
+              <div className="row">
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">CUIT</label>
+                  <input className="form-control" value={editClient.taxId}
+                    onChange={e => setEditClient(p => ({ ...p, taxId: e.target.value }))}
+                    placeholder="30712345678" />
+                </div>
+                <div className="col-md-6 mb-3">
+                  <label className="form-label small fw-bold">Condicion IVA</label>
+                  <select className="form-control" value={editClient.ivaCondition}
+                    onChange={e => setEditClient(p => ({ ...p, ivaCondition: e.target.value }))}>
+                    <option>Consumidor Final</option>
+                    <option>Responsable Inscripto</option>
+                    <option>Monotributista</option>
+                    <option>Exento</option>
+                  </select>
+                </div>
+              </div>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Plan</label>
                 <select className="form-control" value={editClient.planId}
@@ -2437,20 +3952,44 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                         <tr><td className="text-muted fw-bold">Nombre:</td><td className="fw-bold">{selectedDevice.name}</td></tr>
                         <tr><td className="text-muted fw-bold">Nivel:</td><td><span className="badge text-bg-success">{selectedDevice.levelPct}%</span></td></tr>
                         <tr><td className="text-muted fw-bold">Reserva:</td><td>{selectedDevice.reserveLiters} litros</td></tr>
-                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge text-bg-${selectedDevice.pumpOn ? 'success' : 'danger'}`}>
-                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle'}}></i> 
+                        <tr><td className="text-muted fw-bold">Bomba:</td><td><span className={`badge ${selectedDevice.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
+                                  <i className="fas fa-circle" style={{fontSize: '0.6em', marginRight: '4px', verticalAlign: 'middle', color: getPumpColor(selectedDevice.pumpOn)}}></i> 
                                   {selectedDevice.pumpOn ? 'ENCENDIDA' : 'APAGADA'}
                                 </span></td></tr>
-                        <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${selectedDevice.status === 'online' ? 'text-bg-success' : selectedDevice.status === 'warning' ? 'text-bg-warning' : 'text-bg-danger'}`}>{selectedDevice.status}</span></td></tr>
+                        <tr><td className="text-muted fw-bold">Estado:</td><td><span className={`badge ${getStatusBadge(selectedDevice.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(selectedDevice.status) }}></i>{selectedDevice.status}</span></td></tr>
                         <tr><td className="text-muted fw-bold">Ultima Comunicacion:</td><td className="small">{selectedDevice.lastHeartbeatAt ? new Date(selectedDevice.lastHeartbeatAt).toLocaleString('es-AR') : '—'}</td></tr>
                       </table>
                     </div>
                     <div className="col-md-6">
-                      <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion</h5>
+                      <h5 className="text-primary"><i className="fas fa-map-marker-alt mr-1"></i>Ubicacion (haz clic para seleccionar)</h5>
+                      <div className="mb-3" style={{ height: '280px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #dee2e6' }}>
+                        <MapContainer 
+                          center={!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) ? [Number(editDevice.lat), Number(editDevice.lng)] : [-34.62, -58.43]} 
+                          zoom={13} 
+                          style={{ height: '100%', width: '100%' }}
+                        >
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <MapCenterUpdater lat={editDevice.lat} lng={editDevice.lng} />
+                          {!isNaN(Number(editDevice.lat)) && !isNaN(Number(editDevice.lng)) && (
+                            <Marker position={[Number(editDevice.lat), Number(editDevice.lng)]} />
+                          )}
+                          <MapClickHandler onMapClick={(lat, lng) => setEditDevice(p => ({ ...p, lat: lat.toString(), lng: lng.toString() }))} />
+                        </MapContainer>
+                      </div>
+                      <div className="d-flex gap-2 mb-2">
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => {
+                          if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition((pos) => {
+                              setEditDevice(p => ({ ...p, lat: pos.coords.latitude.toString(), lng: pos.coords.longitude.toString() }));
+                            });
+                          }
+                        }}>
+                          <i className="fas fa-crosshairs mr-1"></i> Mi ubicacion
+                        </button>
+                      </div>
                       <table className="table table-sm table-borderless">
-                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{selectedDevice.location.lat}</td></tr>
-                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{selectedDevice.location.lng}</td></tr>
-                        <tr><td className="text-muted fw-bold">Direccion:</td><td>{selectedDevice.location.address || '—'}</td></tr>
+                        <tr><td className="text-muted fw-bold">Latitud:</td><td>{editDevice.lat || '—'}</td></tr>
+                        <tr><td className="text-muted fw-bold">Longitud:</td><td>{editDevice.lng || '—'}</td></tr>
                       </table>
                       <div className="alert alert-warning py-2 small mt-3">
                         <i className="fas fa-clock mr-1"></i>
@@ -2473,10 +4012,6 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                           <option key={c._id} value={c.tenantId}>{c.companyName}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label small fw-bold">Direccion</label>
-                      <input className="form-control" value={editDevice.address} onChange={e => setEditDevice(p => ({ ...p, address: e.target.value }))} />
                     </div>
                     <div className="col-md-6 mb-3">
                       <label className="form-label small fw-bold">Latitud</label>
@@ -2598,12 +4133,16 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                 }
                 const lats = validDevices.map(d => d.location.lat);
                 const lngs = validDevices.map(d => d.location.lng);
-                const center: [number, number] = [
+                const defaultCenter: [number, number] = [
                   lats.length > 0 ? (Math.min(...lats) + Math.max(...lats)) / 2 : -34.6,
                   lngs.length > 0 ? (Math.min(...lngs) + Math.max(...lngs)) / 2 : -58.4
                 ];
+                const mapCenter = allDevicesMapCenter || defaultCenter;
+                if (!allDevicesMapCenter && lats.length > 0) {
+                  setAllDevicesMapCenter(mapCenter);
+                }
                 return (
-                  <MapContainer key={Date.now()} center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
+                  <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
                     {validDevices.map(d => {
                       const color = markerColor(d.status, d.levelPct, false);
@@ -2611,7 +4150,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
                       <Marker key={d._id} position={[d.location.lat, d.location.lng]} eventHandlers={{
                         click: () => { setShowAllDevicesModal(false); openDeviceModal(d); }
                       }} icon={L.divIcon({ className: 'custom-marker', html: `<div style="background-color:${color};width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);cursor:pointer;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] })}>
-                        <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${d.status === 'online' ? 'text-bg-success' : 'text-bg-danger'}`}>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p></div></Popup>
+                        <Popup><div className="p-1"><h6 className="fw-bold mb-1">{d.name}</h6><p className="mb-0 small">Cliente: <strong>{d.clientName}</strong></p><p className="mb-0 small">Estado: <span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></p><p className="mb-0 small">Nivel: <strong>{d.levelPct}%</strong></p></div></Popup>
                       </Marker>
                     );})}
                   </MapContainer>
@@ -2711,7 +4250,12 @@ export function App() {
   useEffect(() => {
     const current = loadStoredSession();
     if (!current?.token) return;
-    void getJson<AuthUser>('/auth/me', current.token).catch(() => {
+    void getJson<AuthUser>('/auth/me', current.token).then(fresh => {
+      if (fresh) {
+        setSession({ token: current.token, user: fresh });
+        saveSession({ token: current.token, user: fresh });
+      }
+    }).catch(() => {
       setSession(null);
       saveSession(null);
     });
