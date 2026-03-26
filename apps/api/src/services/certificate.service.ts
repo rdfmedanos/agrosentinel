@@ -37,13 +37,12 @@ export function generatePrivateKey(): string {
 }
 
 export function generateCSR(privateKeyPem: string, csrData: CsrData): string {
-  const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
-  
+  const privateKey = forge.pki.privateKeyFromPem(privateKeyPem) as forge.pki.rsa.PrivateKey;
+
   const csr = forge.pki.createCertificationRequest();
-  const keypair = forge.pki.rsa.generateKeyPair(2048);
-  csr.publicKey = keypair.publicKey;
-  
-  csr.setAttributes([
+  csr.publicKey = forge.pki.setRsaPublicKey(privateKey.n, privateKey.e);
+
+  csr.setSubject([
     {
       name: 'countryName',
       value: 'AR'
@@ -65,9 +64,13 @@ export function generateCSR(privateKeyPem: string, csrData: CsrData): string {
       value: `AFIP ${csrData.taxId} - ${csrData.companyName}`
     }
   ]);
-  
-  csr.sign(privateKey);
-  
+
+  csr.sign(privateKey, forge.md.sha256.create());
+
+  if (!csr.verify()) {
+    throw new Error('El CSR generado es invalido');
+  }
+
   const csrPem = forge.pki.certificationRequestToPem(csr);
   return csrPem;
 }

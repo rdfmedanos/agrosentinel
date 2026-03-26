@@ -675,10 +675,13 @@ billingRouter.delete('/arca/cert', requireCompanyAdmin, async (req, res) => {
 // ============ GENERADOR DE CERTIFICADOS ARCA ============
 
 const csrDataSchema = z.object({
-  companyName: z.string().min(1),
-  taxId: z.string().min(11).max(11),
-  province: z.string().min(1),
-  city: z.string().min(1),
+  companyName: z.string().trim().min(1),
+  taxId: z.preprocess(
+    value => typeof value === 'string' ? value.replace(/\D/g, '') : value,
+    z.string().length(11, 'El CUIT debe tener 11 digitos')
+  ),
+  province: z.string().trim().min(1),
+  city: z.string().trim().min(1),
   environment: z.enum(['homologacion', 'produccion'])
 });
 
@@ -708,6 +711,10 @@ billingRouter.post('/certificate/generate', requireCompanyAdmin, async (req, res
       csrPreview: csr.substring(0, 100) + '...'
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.issues[0]?.message || 'Datos invalidos para generar el CSR' });
+      return;
+    }
     console.error('Error generating certificate:', error);
     res.status(500).json({ error: 'Error al generar certificado' });
   }
