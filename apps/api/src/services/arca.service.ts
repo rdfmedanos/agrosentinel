@@ -29,6 +29,15 @@ export type EffectiveArcaConfig = {
   certPassword?: string;
 };
 
+export type ArcaTokenInfo = {
+  uniqueId: string | null;
+  generationTime: string | null;
+  expirationTime: string | null;
+  service: string | null;
+  source: 'sso' | 'loginTicketResponse' | 'unknown';
+  rawXml?: string;
+};
+
 export type ArcaInvoiceRequest = {
   amountArs: number;
   period: string;
@@ -89,6 +98,82 @@ function decodeXmlEntities(value: string): string {
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
+}
+
+function parseEpochSeconds(value: string | null): string | null {
+  if (!value) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(n * 1000).toISOString();
+}
+
+function parseTagValue(xml: string, tag: string): string | null {
+  return extractTag(xml, tag);
+}
+
+export function getArcaTokenInfo(token?: string): ArcaTokenInfo | null {
+  if (!token || !token.trim()) return null;
+  let xml = '';
+  try {
+    xml = Buffer.from(token, 'base64').toString('utf8');
+  } catch {
+    return {
+      uniqueId: null,
+      generationTime: null,
+      expirationTime: null,
+      service: null,
+      source: 'unknown'
+    };
+  }
+
+  const trimmed = xml.trim();
+  if (!trimmed.startsWith('<')) {
+    return {
+      uniqueId: null,
+      generationTime: null,
+      expirationTime: null,
+      service: null,
+      source: 'unknown'
+    };
+  }
+
+  const uniqueIdAttr = trimmed.match(/unique_id="([^"]+)"/i)?.[1] || null;
+  const genAttr = trimmed.match(/gen_time="([^"]+)"/i)?.[1] || null;
+  const expAttr = trimmed.match(/exp_time="([^"]+)"/i)?.[1] || null;
+  const ssoService = trimmed.match(/service="([^"]+)"/i)?.[1] || null;
+
+  if (uniqueIdAttr || genAttr || expAttr || trimmed.includes('<sso')) {
+    return {
+      uniqueId: uniqueIdAttr,
+      generationTime: parseEpochSeconds(genAttr),
+      expirationTime: parseEpochSeconds(expAttr),
+      service: ssoService,
+      source: 'sso',
+      rawXml: trimmed
+    };
+  }
+
+  const generationTime = parseTagValue(trimmed, 'generationTime');
+  const expirationTime = parseTagValue(trimmed, 'expirationTime');
+  const uniqueId = parseTagValue(trimmed, 'uniqueId');
+  const service = parseTagValue(trimmed, 'service');
+
+  return {
+    uniqueId,
+    generationTime,
+    expirationTime,
+    service,
+    source: 'loginTicketResponse',
+    rawXml: trimmed
+  };
+}
+
+export function isArcaTokenExpired(token?: string): boolean {
+  const info = getArcaTokenInfo(token);
+  if (!info?.expirationTime) return false;
+  const exp = new Date(info.expirationTime).getTime();
+  if (!Number.isFinite(exp)) return false;
+  return Date.now() >= exp;
 }
 
 function buildLoginTicketRequest(service: string): string {
@@ -447,7 +532,12 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
 }
 
 export async function authorizeInvoiceWithArca(tenantId: string, req: ArcaInvoiceRequest): Promise<ArcaInvoiceResult> {
-  const config = await getEffectiveArcaConfig(tenantId);
+  let config = await getEffectiveArcaConfig(tenantId);
+  const expired = isArcaTokenExpired(config.token);
+  if (!config.mock && config.environment !== 'mock' && (!config.token || !config.sign || expired)) {
+    await refreshArcaCredentials(tenantId);
+    config = await getEffectiveArcaConfig(tenantId);
+  }
   if (config.mock || config.environment === 'mock') {
     return {
       ...authorizeInvoiceMock(req),

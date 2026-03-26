@@ -143,6 +143,17 @@ type ArcaDiagnostics = {
     mock: boolean;
     hasCredentials: boolean;
     hasCertConfig: boolean;
+    wsaaUrl?: string;
+    wsfeUrl?: string;
+  };
+  authSession?: {
+    uniqueId: string | null;
+    generationTime: string | null;
+    expirationTime: string | null;
+    expired: boolean;
+    service: string | null;
+    source: string | null;
+    signPreview: string | null;
   };
   certificate: {
     hasPrivateKey: boolean;
@@ -2383,6 +2394,17 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                       <p className="mb-1"><strong>Ultimo comprobante ARCA:</strong> {arcaDiagnostics.connection.lastVoucher ?? 'N/D'}</p>
                                       <p className="mb-1"><strong>Credenciales:</strong> <span className={`badge ${arcaDiagnostics.config.hasCredentials ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.config.hasCredentials ? 'OK' : 'Faltantes'}</span></p>
                                       {arcaDiagnostics.credentialsAutoRefreshed ? <p className="mb-1 text-success"><strong>Credenciales:</strong> generadas automaticamente desde certificado.</p> : null}
+                                      {arcaDiagnostics.authSession ? (
+                                        <>
+                                          <p className="mb-1"><strong>Unique ID:</strong> {arcaDiagnostics.authSession.uniqueId || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Generation Time:</strong> {arcaDiagnostics.authSession.generationTime ? new Date(arcaDiagnostics.authSession.generationTime).toLocaleString('es-AR') : 'N/D'}</p>
+                                          <p className="mb-1"><strong>Expiration Time:</strong> {arcaDiagnostics.authSession.expirationTime ? new Date(arcaDiagnostics.authSession.expirationTime).toLocaleString('es-AR') : 'N/D'} {arcaDiagnostics.authSession.expired ? <span className="badge text-bg-danger ms-1">Expirado</span> : null}</p>
+                                          <p className="mb-1"><strong>Sign:</strong> {arcaDiagnostics.authSession.signPreview || 'N/D'}</p>
+                                          <p className="mb-1"><strong>Servicio:</strong> {arcaDiagnostics.authSession.service || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP Login URL:</strong> {arcaDiagnostics.config.wsaaUrl || 'N/D'}</p>
+                                          <p className="mb-1"><strong>AFIP WS URL:</strong> {arcaDiagnostics.config.wsfeUrl ? (arcaDiagnostics.config.wsfeUrl.includes('?') ? arcaDiagnostics.config.wsfeUrl : `${arcaDiagnostics.config.wsfeUrl}?WSDL`) : 'N/D'}</p>
+                                        </>
+                                      ) : null}
                                       <p className="mb-1"><strong>Certificado cargado:</strong> <span className={`badge ${arcaDiagnostics.certificate.hasCertificate ? 'text-bg-success' : 'text-bg-warning'}`}>{arcaDiagnostics.certificate.hasCertificate ? 'Sincronizado' : 'Pendiente'}</span></p>
                                       <hr className="my-2" />
                                       <p className="mb-1"><strong>Documentos locales:</strong> {arcaDiagnostics.documents.total}</p>

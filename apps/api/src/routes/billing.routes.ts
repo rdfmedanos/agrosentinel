@@ -5,7 +5,7 @@ import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
-import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection, refreshArcaCredentials, getLastAuthorizedVoucher } from '../services/arca.service.js';
+import { getArcaEnvironment, getEffectiveArcaConfig, setArcaEnvironment, authorizeInvoiceMock, authorizeInvoiceWithArca, probeArcaConnection, refreshArcaCredentials, getLastAuthorizedVoucher, getArcaTokenInfo, isArcaTokenExpired } from '../services/arca.service.js';
 import { generateMonthlyInvoices } from '../services/billing.service.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import {
@@ -89,6 +89,9 @@ billingRouter.get('/arca/status', requireCompanyAdmin, async (req, res) => {
     } else if (!config.token || !config.sign) {
       status.status = 'warning';
       status.message = 'Faltan credenciales (TOKEN/SIGN) - use Probar conexion para generarlas automaticamente';
+    } else if (isArcaTokenExpired(config.token)) {
+      status.status = 'warning';
+      status.message = 'Token WSAA expirado - use Probar conexion para renovarlo';
     } else {
       status.status = 'ok';
       status.message = 'Configuración lista para conectar';
@@ -137,7 +140,7 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
     const certData = loadCertificateData(tenantId);
 
     let credentialsAutoRefreshed = false;
-    if (!config.mock && config.environment !== 'mock' && (!config.token || !config.sign)) {
+    if (!config.mock && config.environment !== 'mock' && (!config.token || !config.sign || isArcaTokenExpired(config.token))) {
       try {
         await refreshArcaCredentials(tenantId);
         config = await getEffectiveArcaConfig(tenantId);
@@ -178,6 +181,7 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
     }
 
     const connection = await probeArcaConnection(config);
+    const tokenInfo = getArcaTokenInfo(config.token);
     const syncPct = totalInvoices > 0 ? Math.round((invoicesWithCae / totalInvoices) * 100) : 100;
 
     res.json({
@@ -187,7 +191,18 @@ billingRouter.get('/arca/diagnostics', requireCompanyAdmin, async (req, res) => 
         enabled: config.enabled,
         mock: config.mock,
         hasCredentials: !!(config.token && config.sign),
-        hasCertConfig: !!(config.certPath && config.certPassword)
+        hasCertConfig: !!(config.certPath && config.certPassword),
+        wsaaUrl: config.wsaaUrl,
+        wsfeUrl: config.wsfeUrl
+      },
+      authSession: {
+        uniqueId: tokenInfo?.uniqueId || null,
+        generationTime: tokenInfo?.generationTime || null,
+        expirationTime: tokenInfo?.expirationTime || null,
+        expired: isArcaTokenExpired(config.token),
+        service: tokenInfo?.service || null,
+        source: tokenInfo?.source || null,
+        signPreview: config.sign ? `${config.sign.slice(0, 18)}...` : null
       },
       certificate: {
         hasPrivateKey: !!certData?.privateKey,
