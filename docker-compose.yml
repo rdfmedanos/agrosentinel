@@ -28,6 +28,8 @@ services:
       - mosquitto
     ports:
       - "4000:4000"
+    volumes:
+      - api_certs:/app/certs
 
   web:
     build:
@@ -56,3 +58,4 @@ services:
 volumes:
   mongo_data:
   mosquitto_data:
+  api_certs:
