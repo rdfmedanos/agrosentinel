@@ -55,6 +55,6 @@ const invoiceSchema = new Schema(
   { timestamps: true }
 );
 
-invoiceSchema.index({ tenantId: 1, tipo: 1, puntoVenta: 1, numero: 1 }, { unique: true });
+invoiceSchema.index({ tenantId: 1, tipo: 1, puntoVenta: 1, numero: 1, environment: 1 }, { unique: true });
 
 export const InvoiceModel = model('Invoice', invoiceSchema);
