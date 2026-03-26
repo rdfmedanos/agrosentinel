@@ -323,8 +323,14 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
 
   doc.font('Helvetica').fontSize(11).fillColor('#222222').text(`Plazo de pago: ${condicionPago}`, leftMargin + 10, y + 208);
 
-  const qrY = doc.page.height - 175;
-  const qrX = contentRight - 132;
+  const footerY = doc.page.height - 195;
+  const footerH = 180;
+  const qrSize = 120;
+  const qrX = leftMargin + 14;
+  const qrY = footerY + 14;
+
+  doc.rect(leftMargin, footerY, pageWidth, footerH).lineWidth(0.8).stroke('#444444');
+
   if (invoice.cae) {
     try {
       const qrData = {
@@ -344,22 +350,20 @@ export async function generateInvoicePDF(invoice: InvoiceData, sellerInfo?: Invo
       };
 
       const qrBuffer = await generateQRCode(qrData);
-      doc.image(qrBuffer, qrX, qrY, { width: 120 });
+      doc.image(qrBuffer, qrX, qrY, { width: qrSize });
     } catch (qrError) {
       console.error('Error generating QR:', qrError);
-      doc.rect(qrX, qrY, 120, 120).stroke('#777777');
+      doc.rect(qrX, qrY, qrSize, qrSize).stroke('#777777');
     }
   }
-  doc.font('Helvetica-Bold').fontSize(8).text('Comprobante autorizado por AFIP', qrX - 18, qrY + 124, { width: 156, align: 'center' });
 
-  const footerY = doc.page.height - 60;
-  doc.rect(leftMargin, footerY, pageWidth, 52).lineWidth(0.8).stroke('#444444');
-  doc.font('Helvetica').fontSize(9).fillColor('#111111');
-  doc.text(`CAE: ${sanitizeText(invoice.cae || '-')}`, leftMargin + 8, footerY + 9);
-  doc.text(`Fecha Vencimiento CAE: ${fechaVencimientoCAE}`, leftMargin + 8, footerY + 30);
-  doc.font('Helvetica-Bold').text('Codigo QR AFIP', leftMargin + 260, footerY + 9);
-  doc.font('Helvetica').fontSize(7).fillColor('#333333');
-  doc.text('Comprobante electronico autorizado por AFIP. Esta Administracion Federal no se responsabiliza por los datos ingresados en el detalle de la operacion.', leftMargin + 260, footerY + 29, { width: 270 });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#111111').text('Comprobante autorizado por AFIP', qrX, qrY + qrSize + 8, { width: qrSize, align: 'center' });
+
+  const footerTextX = qrX + qrSize + 26;
+  const footerTextW = contentRight - footerTextX - 12;
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#111111');
+  doc.text(`CAE: ${sanitizeText(invoice.cae || '-')}`, footerTextX, footerY + 34, { width: footerTextW });
+  doc.text(`Fecha Vencimiento CAE: ${fechaVencimientoCAE || '-'}`, footerTextX, footerY + 62, { width: footerTextW });
 
   return doc;
 }
