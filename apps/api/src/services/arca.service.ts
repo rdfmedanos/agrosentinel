@@ -2,6 +2,11 @@ import { randomInt } from 'node:crypto';
 import { env, type ArcaEnvironment } from '../config/env.js';
 import { TenantConfigModel } from '../models/TenantConfig.js';
 
+function getCurrentArcaEnvironment(): ArcaEnvironment {
+  const runtime = process.env.ARCA_ENVIRONMENT as ArcaEnvironment | undefined;
+  return runtime || env.arcaEnvironment;
+}
+
 export type ArcaAuth = {
   token: string;
   sign: string;
@@ -235,8 +240,19 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
   const tenantConfig = await TenantConfigModel.findOne({ tenantId });
   
   const arcaConfig = tenantConfig?.arca;
-  const isMock = !arcaConfig?.enabled || arcaConfig?.mock || env.arcaEnvironment === 'mock';
-  const environment = isMock ? 'mock' : (env.arcaEnvironment as ArcaEnvironment);
+  const currentEnvironment = getCurrentArcaEnvironment();
+  const tenantEnvironment: ArcaEnvironment | undefined =
+    arcaConfig?.environment === 'prod'
+      ? 'produccion'
+      : arcaConfig?.environment === 'homo'
+        ? 'homologacion'
+        : arcaConfig?.environment === 'mock'
+          ? 'mock'
+          : undefined;
+  const selectedEnvironment = tenantEnvironment || currentEnvironment;
+  const isMock = !arcaConfig?.enabled || arcaConfig?.mock || selectedEnvironment === 'mock';
+  const environment = isMock ? 'mock' : selectedEnvironment;
+  const urls = getUrls(environment);
   
   return {
     environment,
@@ -244,12 +260,12 @@ export async function getEffectiveArcaConfig(tenantId: string): Promise<Effectiv
     mock: isMock,
     cuit: arcaConfig?.cuit || env.arcaCuit,
     ptoVta: arcaConfig?.ptoVta || env.arcaPtoVta,
-    wsfeUrl: getUrls(environment).wsfeUrl,
-    wsaaUrl: getUrls(environment).wsaaUrl,
+    wsfeUrl: arcaConfig?.wsfeUrl || urls.wsfeUrl,
+    wsaaUrl: arcaConfig?.wsaaUrl || urls.wsaaUrl,
     token: arcaConfig?.token || env.arcaToken,
     sign: arcaConfig?.sign || env.arcaSign,
-    certPath: env.arcaCertPath,
-    certPassword: env.arcaCertPassword
+    certPath: arcaConfig?.certPath || env.arcaCertPath,
+    certPassword: arcaConfig?.certPassword || env.arcaCertPassword
   };
 }
 
@@ -265,7 +281,7 @@ export async function authorizeInvoiceWithArca(tenantId: string, req: ArcaInvoic
 }
 
 export function getArcaEnvironment(): ArcaEnvironment {
-  return env.arcaEnvironment;
+  return getCurrentArcaEnvironment();
 }
 
 export function setArcaEnvironment(env: ArcaEnvironment): void {

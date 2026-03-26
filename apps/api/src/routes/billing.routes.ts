@@ -148,9 +148,13 @@ const arcaConfigSchema = z.object({
   mock: z.boolean(),
   cuit: z.string().min(11).max(11),
   ptoVta: z.string().min(1),
+  wsfeUrl: z.string().trim().min(1),
+  wsaaUrl: z.string().trim().min(1),
   token: z.string().optional().default(''),
   sign: z.string().optional().default(''),
-  certPassword: z.string().optional().default('')
+  certPath: z.string().optional().default(''),
+  certPassword: z.string().optional().default(''),
+  environment: z.enum(['mock', 'homologacion', 'produccion']).optional().default('mock')
 });
 
 billingRouter.put('/arca-config', async (req, res) => {
@@ -165,10 +169,13 @@ billingRouter.put('/arca-config', async (req, res) => {
       'arca.mock': data.mock,
       'arca.cuit': data.cuit,
       'arca.ptoVta': data.ptoVta,
+      'arca.wsfeUrl': data.wsfeUrl,
+      'arca.wsaaUrl': data.wsaaUrl,
       'arca.token': data.token || '',
       'arca.sign': data.sign || '',
+      'arca.certPath': data.certPath || '',
       'arca.certPassword': data.certPassword || '',
-      'arca.environment': getArcaEnvironment() === 'produccion' ? 'prod' : 'homo'
+      'arca.environment': data.environment === 'produccion' ? 'prod' : data.environment === 'homologacion' ? 'homo' : 'mock'
     },
     { upsert: true, new: true }
   );

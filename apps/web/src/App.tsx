@@ -124,11 +124,15 @@ type Plan = {
 type ArcaConfig = {
   enabled: boolean;
   mock: boolean;
+  environment: 'mock' | 'homologacion' | 'produccion';
   cuit: string;
   ptoVta: string;
   wsfeUrl: string;
+  wsaaUrl: string;
   token?: string;
   sign?: string;
+  certPath?: string;
+  certPassword?: string;
 };
 
 type AuthUser = {
@@ -194,11 +198,15 @@ const metrics = [
 const emptyArcaConfig: ArcaConfig = {
   enabled: false,
   mock: true,
+  environment: 'mock',
   cuit: '',
   ptoVta: '1',
   wsfeUrl: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+  wsaaUrl: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
   token: '',
-  sign: ''
+  sign: '',
+  certPath: '',
+  certPassword: ''
 };
 
 function authHeaders(token?: string, json = false): HeadersInit {
@@ -2398,6 +2406,81 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="alert alert-info">
                                 <i className="fas fa-key mr-2"></i>
                                 Generador de Certificados ARCA - Necesario para facturacion electronica real
+                              </div>
+
+                              <div className="card mb-3">
+                                <div className="card-header bg-secondary text-white">
+                                  <h5 className="card-title mb-0"><i className="fas fa-sliders-h mr-1"></i>Configuracion ARCA desde interfaz</h5>
+                                </div>
+                                <div className="card-body">
+                                  <p className="text-muted small">Estos campos reemplazan la configuracion manual de variables ARCA en el archivo .env para este cliente.</p>
+                                  <div className="row">
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">Entorno</label>
+                                      <select
+                                        className="form-control"
+                                        value={arcaConfig.environment}
+                                        onChange={e => {
+                                          const environment = e.target.value as ArcaConfig['environment'];
+                                          setArcaConfig(p => ({
+                                            ...p,
+                                            environment,
+                                            mock: environment === 'mock' ? true : p.mock
+                                          }));
+                                        }}
+                                      >
+                                        <option value="mock">Mock</option>
+                                        <option value="homologacion">Homologacion</option>
+                                        <option value="produccion">Produccion</option>
+                                      </select>
+                                    </div>
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">CUIT</label>
+                                      <input className="form-control" value={arcaConfig.cuit} onChange={e => setArcaConfig(p => ({ ...p, cuit: e.target.value }))} placeholder="30712345678" />
+                                    </div>
+                                    <div className="col-md-4 mb-3">
+                                      <label className="form-label small fw-bold">Punto de Venta</label>
+                                      <input className="form-control" value={arcaConfig.ptoVta} onChange={e => setArcaConfig(p => ({ ...p, ptoVta: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">WSAA URL</label>
+                                      <input className="form-control" value={arcaConfig.wsaaUrl} onChange={e => setArcaConfig(p => ({ ...p, wsaaUrl: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">WSFE URL</label>
+                                      <input className="form-control" value={arcaConfig.wsfeUrl} onChange={e => setArcaConfig(p => ({ ...p, wsfeUrl: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA Token</label>
+                                      <input className="form-control" value={arcaConfig.token || ''} onChange={e => setArcaConfig(p => ({ ...p, token: e.target.value }))} placeholder="Token WSAA" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA Sign</label>
+                                      <input className="form-control" value={arcaConfig.sign || ''} onChange={e => setArcaConfig(p => ({ ...p, sign: e.target.value }))} placeholder="Sign WSAA" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA_CERT_PATH</label>
+                                      <input className="form-control" value={arcaConfig.certPath || ''} onChange={e => setArcaConfig(p => ({ ...p, certPath: e.target.value }))} placeholder="/ruta/certificado.p12" />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <label className="form-label small fw-bold">ARCA_CERT_PASSWORD</label>
+                                      <input type="password" className="form-control" value={arcaConfig.certPassword || ''} onChange={e => setArcaConfig(p => ({ ...p, certPassword: e.target.value }))} />
+                                    </div>
+                                    <div className="col-md-6 mb-3">
+                                      <div className="form-check form-switch mt-4">
+                                        <input type="checkbox" className="form-check-input" id="certArcaEnabled" checked={arcaConfig.enabled} onChange={e => setArcaConfig(p => ({ ...p, enabled: e.target.checked }))} />
+                                        <label className="form-check-label fw-bold" htmlFor="certArcaEnabled">Habilitar ARCA</label>
+                                      </div>
+                                      <div className="form-check form-switch mt-2">
+                                        <input type="checkbox" className="form-check-input" id="certArcaMock" checked={arcaConfig.mock} onChange={e => setArcaConfig(p => ({ ...p, mock: e.target.checked, environment: e.target.checked ? 'mock' : (p.environment === 'mock' ? 'homologacion' : p.environment) }))} />
+                                        <label className="form-check-label" htmlFor="certArcaMock">Modo mock</label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button className="btn btn-secondary" onClick={() => void saveArcaConfig()} disabled={savingArca}>
+                                    {savingArca ? 'Guardando...' : 'Guardar configuracion ARCA'}
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="card mb-3">

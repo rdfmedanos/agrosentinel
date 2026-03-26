@@ -29,7 +29,7 @@ const tenantConfigSchema = new Schema(
       sign: { type: String, default: '' },
       certPath: { type: String, default: '' },
       certPassword: { type: String, default: '' },
-      environment: { type: String, enum: ['homo', 'prod'], default: 'homo' }
+      environment: { type: String, enum: ['mock', 'homo', 'prod'], default: 'mock' }
     }
   },
   { timestamps: true }
