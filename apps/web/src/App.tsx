@@ -3237,8 +3237,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             showCancelButton: true,
                             confirmButtonText: 'Sí, limpiar',
                             cancelButtonText: 'Cancelar',
-                            confirmButtonColor: '#7066e0',
-                            cancelButtonColor: '#6e7881'
+                            confirmButtonColor: '#dc3545',
+                            cancelButtonColor: '#6c757d'
                           });
                           if (!result.isConfirmed) return;
                           try {
