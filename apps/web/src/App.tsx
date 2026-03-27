@@ -3230,7 +3230,17 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           <i className="fab fa-telegram mr-1"></i>Probar Telegram
                         </button>
                         <button className="btn btn-sm btn-light" onClick={async () => {
-                          if (!confirm('¿Limpiar todas las alertas resueltas?')) return;
+                          const result = await Swal.fire({
+                            title: '¿Limpiar alertas resueltas?',
+                            text: 'Esta acción eliminará todas las alertas que ya fueron resueltas. Esta acción no se puede deshacer.',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Sí, limpiar',
+                            cancelButtonText: 'Cancelar'
+                          });
+                          if (!result.isConfirmed) return;
                           try {
                             for (const a of alerts.filter(al => al.status === 'resolved')) {
                               await deleteJson(`/alerts/${a._id}`, props.session.token);
