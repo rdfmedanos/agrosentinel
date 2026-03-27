@@ -954,6 +954,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices' | 'backup';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
+  const { showToast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operacionOpen, setOperacionOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
