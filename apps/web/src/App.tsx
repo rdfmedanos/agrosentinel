@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import Swal from 'sweetalert2';
+import { useToast } from './Toast';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -3230,23 +3231,13 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           <i className="fab fa-telegram mr-1"></i>Probar Telegram
                         </button>
                         <button className="btn btn-sm btn-light" onClick={async () => {
-                          const result = await Swal.fire({
-                            title: '¿Limpiar alertas resueltas?',
-                            text: 'Esta acción no se puede deshacer.',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonText: 'Sí, limpiar',
-                            cancelButtonText: 'Cancelar',
-                            confirmButtonColor: '#dc3545',
-                            cancelButtonColor: '#6c757d'
-                          });
-                          if (!result.isConfirmed) return;
                           try {
                             for (const a of alerts.filter(al => al.status === 'resolved')) {
                               await deleteJson(`/alerts/${a._id}`, props.session.token);
                             }
                             setAlerts(alerts.filter(a => a.status === 'open'));
-                          } catch { alert('Error al limpiar alertas'); }
+                            showToast('Alertas resueltas limpiadas correctamente', 'success');
+                          } catch { showToast('Error al limpiar alertas', 'error'); }
                         }}>
                           <i className="fas fa-trash mr-1"></i>Limpiar Resueltas
                         </button>
@@ -4246,6 +4237,7 @@ export function App() {
   const isClientPanel = path.startsWith('/panel') || path.startsWith('/panel-cliente');
   const isCompanyPanel = path.startsWith('/admin-empresa') || path.startsWith('/empresa');
   const [session, setSession] = useState<AuthSession | null>(() => loadStoredSession());
+  const { showToast } = useToast();
 
   const login = (next: AuthSession) => {
     setSession(next);
