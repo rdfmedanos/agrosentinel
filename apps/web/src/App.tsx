@@ -3235,10 +3235,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                             text: 'Esta acción no se puede deshacer.',
                             icon: 'warning',
                             showCancelButton: true,
-                            confirmButtonText: 'Limpiar',
+                            confirmButtonText: 'Sí, limpiar',
                             cancelButtonText: 'Cancelar',
-                            confirmButtonColor: '#dc3545',
-                            cancelButtonColor: '#6c757d'
+                            confirmButtonColor: '#7066e0',
+                            cancelButtonColor: '#6e7881'
                           });
                           if (!result.isConfirmed) return;
                           try {
