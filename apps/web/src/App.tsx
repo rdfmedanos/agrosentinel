@@ -3232,13 +3232,13 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                         <button className="btn btn-sm btn-light" onClick={async () => {
                           const result = await Swal.fire({
                             title: '¿Limpiar alertas resueltas?',
-                            text: 'Esta acción eliminará todas las alertas que ya fueron resueltas. Esta acción no se puede deshacer.',
+                            text: 'Esta acción no se puede deshacer.',
                             icon: 'warning',
                             showCancelButton: true,
-                            confirmButtonColor: '#3085d6',
-                            cancelButtonColor: '#d33',
-                            confirmButtonText: 'Sí, limpiar',
-                            cancelButtonText: 'Cancelar'
+                            confirmButtonText: 'Limpiar',
+                            cancelButtonText: 'Cancelar',
+                            confirmButtonColor: '#dc3545',
+                            cancelButtonColor: '#6c757d'
                           });
                           if (!result.isConfirmed) return;
                           try {
