@@ -954,7 +954,6 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 type AdminSection = 'dashboard' | 'clientes' | 'dispositivos' | 'usuarios' | 'facturacion' | 'arca' | 'notificaciones' | 'reportes' | 'actividad' | 'servidor' | 'pending-devices' | 'backup';
 
 function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; onPasswordChanged: () => void }) {
-  const { showToast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [operacionOpen, setOperacionOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
@@ -3237,8 +3236,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               await deleteJson(`/alerts/${a._id}`, props.session.token);
                             }
                             setAlerts(alerts.filter(a => a.status === 'open'));
-                            showToast('Alertas resueltas limpiadas correctamente', 'success');
-                          } catch { showToast('Error al limpiar alertas', 'error'); }
+                            showSwal('Alertas resueltas limpiadas correctamente', 'success');
+                          } catch { showSwal('Error al limpiar alertas', 'error'); }
                         }}>
                           <i className="fas fa-trash mr-1"></i>Limpiar Resueltas
                         </button>
