@@ -3232,12 +3232,33 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                         </button>
                         <button className="btn btn-sm btn-light" onClick={async () => {
                           try {
-                            for (const a of alerts.filter(al => al.status === 'resolved')) {
+                            const resolvedAlerts = alerts.filter(al => al.status === 'resolved');
+                            for (const a of resolvedAlerts) {
                               await deleteJson(`/alerts/${a._id}`, props.session.token);
                             }
                             setAlerts(alerts.filter(a => a.status === 'open'));
-                            showSwal('Alertas resueltas limpiadas correctamente', 'success');
-                          } catch { showSwal('Error al limpiar alertas', 'error'); }
+                            void Swal.fire({
+                              toast: true,
+                              position: 'top-end',
+                              icon: 'success',
+                              title: 'Exito',
+                              text: 'Alertas resueltas limpiadas correctamente',
+                              showConfirmButton: false,
+                              timer: 4200,
+                              timerProgressBar: true
+                            });
+                          } catch (err) {
+                            void Swal.fire({
+                              toast: true,
+                              position: 'top-end',
+                              icon: 'error',
+                              title: 'Error',
+                              text: 'Error al limpiar alertas',
+                              showConfirmButton: false,
+                              timer: 4200,
+                              timerProgressBar: true
+                            });
+                          }
                         }}>
                           <i className="fas fa-trash mr-1"></i>Limpiar Resueltas
                         </button>
