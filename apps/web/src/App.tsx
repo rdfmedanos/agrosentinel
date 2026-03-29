@@ -2396,7 +2396,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th><th style={{ width: '100px' }}>Acciones</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th></tr></thead>
                           <tbody>
                             {usersList.map(u => (
                               <tr key={u.id} style={{ cursor: 'pointer' }} onClick={() => openEditUserModal({ ...u, role: u.role as 'owner' | 'operator' | 'technician' })}>
@@ -2404,11 +2404,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 <td className="small text-muted">{u.email}</td>
                                 <td><span className="badge text-bg-primary">{u.role}</span></td>
                                 <td className="small text-muted">{u.tenantId}</td>
-                                <td onClick={e => e.stopPropagation()}>
-                                  <button className="btn btn-sm btn-outline-danger" onClick={() => deleteUser(u.id)} title="Eliminar">
-                                    <i className="fas fa-trash"></i>
-                                  </button>
-                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -4293,9 +4288,12 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 </>
               )}
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setShowEditUserModal(false)}>Cancelar</button>
-              <button className="btn btn-primary fw-bold" onClick={() => void saveUserEdit()}>Guardar Cambios</button>
+            <div className="modal-footer d-flex justify-content-between">
+              <button type="button" className="btn btn-danger fw-bold" onClick={() => { if (editingUser) deleteUser(editingUser.id); }}>Eliminar Usuario</button>
+              <div>
+                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowEditUserModal(false)}>Cancelar</button>
+                <button className="btn btn-primary fw-bold" onClick={() => void saveUserEdit()}>Guardar Cambios</button>
+              </div>
             </div>
           </div>
         </div>
