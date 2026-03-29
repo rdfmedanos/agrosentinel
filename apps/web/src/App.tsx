@@ -2367,12 +2367,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
               <div className="row">
                 <div className="col-md-4">
                   <div className="card">
-                    <div className="card-header d-flex justify-content-between align-items-center">
-                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-plus me-2"></i>Crear Usuario</h3>
-                      <button className="btn btn-sm btn-light fw-bold" onClick={() => setShowCreateUserModal(true)}><i className="fas fa-plus me-1"></i>Nuevo</button>
-                    </div>
-                  </div>
-                  <div className="card mt-3">
                     <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-key me-2"></i>Resetear Contrasena</h3></div>
                     <div className="card-body">
                       <div className="mb-3"><label className="form-label small fw-bold">Usuario</label>
@@ -2387,7 +2381,10 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 </div>
                 <div className="col-md-8">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3>
+                      <button className="btn btn-sm btn-primary fw-bold" onClick={() => setShowCreateUserModal(true)}><i className="fas fa-plus me-1"></i>Crear Usuario</button>
+                    </div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
