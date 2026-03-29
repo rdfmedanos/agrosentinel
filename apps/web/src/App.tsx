@@ -4291,7 +4291,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
             <div className="modal-footer d-flex justify-content-between">
               <button type="button" className="btn btn-danger fw-bold" onClick={() => { if (editingUser) deleteUser(editingUser.id); }}>Eliminar Usuario</button>
               <div>
-                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowEditUserModal(false)}>Cancelar</button>
+                <button type="button" className="btn btn-secondary me-3" onClick={() => setShowEditUserModal(false)}>Cancelar</button>
                 <button className="btn btn-primary fw-bold" onClick={() => void saveUserEdit()}>Guardar Cambios</button>
               </div>
             </div>
