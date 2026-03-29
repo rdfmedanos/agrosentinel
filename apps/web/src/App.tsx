@@ -2383,7 +2383,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3>
-                      <button className="btn btn-sm btn-light fw-bold" onClick={() => setShowCreateUserModal(true)}><i className="fas fa-plus me-1"></i>Crear Usuario</button>
+                      <button className="btn btn-sm btn-light fw-bold ms-auto" onClick={() => setShowCreateUserModal(true)}><i className="fas fa-plus me-1"></i>Crear Usuario</button>
                     </div>
                     <div className="card-body p-0">
                       <div className="table-responsive">
