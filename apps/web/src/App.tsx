@@ -1068,8 +1068,11 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     password: 'Cliente123!'
   });
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-  const [resetPassword, setResetPassword] = useState('');
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<{ id: string; name: string; email: string; role: 'owner' | 'operator' | 'technician'; tenantId: string } | null>(null);
+  const [editUserPassword, setEditUserPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
   const [showAddClient, setShowAddClient] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
@@ -1686,10 +1689,29 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
     }
   };
 
-  const resetUserPassword = async () => {
-    if (!selectedUserId || !resetPassword) return;
-    await postJson('/auth/admin/reset-password', { userId: selectedUserId, newPassword: resetPassword }, props.session.token);
-    setResetPassword('');
+  const openEditUserModal = (user: { id: string; name: string; email: string; role: 'owner' | 'operator' | 'technician'; tenantId: string }) => {
+    setEditingUser(user);
+    setEditUserPassword('');
+    setShowEditUserModal(true);
+  };
+
+  const saveUserEdit = async () => {
+    if (!editingUser) return;
+    await postJson('/auth/admin/update-user', {
+      userId: editingUser.id,
+      name: editingUser.name,
+      email: editingUser.email,
+      role: editingUser.role,
+      ...(editUserPassword ? { password: editUserPassword } : {})
+    }, props.session.token);
+    setShowEditUserModal(false);
+    setEditingUser(null);
+    await loadCompanyData(tenantId);
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+    await postJson('/auth/admin/delete-user', { userId }, props.session.token);
     await loadCompanyData(tenantId);
   };
 
@@ -2365,21 +2387,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
 
             {activeSection === 'usuarios' && (
               <div className="row">
-                <div className="col-md-4">
-                  <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-key me-2"></i>Resetear Contrasena</h3></div>
-                    <div className="card-body">
-                      <div className="mb-3"><label className="form-label small fw-bold">Usuario</label>
-                        <select className="form-control" value={selectedUserId} onChange={e => setSelectedUserId(e.target.value)}>
-                          <option value="">Seleccionar...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                        </select>
-                      </div>
-                      <div className="mb-3"><label className="form-label small fw-bold">Nueva Contrasena</label><input className="form-control" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="Nueva contrasena" /></div>
-                      <button className="btn btn-warning w-100 fw-bold" onClick={() => void resetUserPassword()} disabled={!selectedUserId || !resetPassword}>Resetear</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-8">
+                <div className="col-12">
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center">
                       <h3 className="card-title text-white fw-bold mb-0 flex-grow-1"><i className="fas fa-users me-2"></i>Usuarios ({usersList.length})</h3>
@@ -2388,14 +2396,19 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card-body p-0">
                       <div className="table-responsive">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Tenant</th><th style={{ width: '100px' }}>Acciones</th></tr></thead>
                           <tbody>
                             {usersList.map(u => (
-                              <tr key={u.id}>
+                              <tr key={u.id} style={{ cursor: 'pointer' }} onClick={() => openEditUserModal({ ...u, role: u.role as 'owner' | 'operator' | 'technician' })}>
                                 <td className="fw-bold">{u.name}</td>
                                 <td className="small text-muted">{u.email}</td>
                                 <td><span className="badge text-bg-primary">{u.role}</span></td>
                                 <td className="small text-muted">{u.tenantId}</td>
+                                <td onClick={e => e.stopPropagation()}>
+                                  <button className="btn btn-sm btn-outline-danger" onClick={() => deleteUser(u.id)} title="Eliminar">
+                                    <i className="fas fa-trash"></i>
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -4258,6 +4271,36 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         </div>
       </div>
       {showCreateUserModal && <div className="modal-backdrop fade show" onClick={() => setShowCreateUserModal(false)}></div>}
+
+      <div className={`modal fade ${showEditUserModal ? 'show' : ''}`} style={{ display: showEditUserModal ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-user-edit mr-2"></i>Editar Usuario</h4>
+              <button type="button" className="close text-white" onClick={() => setShowEditUserModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {editingUser && (
+                <>
+                  <div className="mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={editingUser.name} onChange={e => setEditingUser(p => p ? { ...p, name: e.target.value } : null)} /></div>
+                  <div className="mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={editingUser.email} onChange={e => setEditingUser(p => p ? { ...p, email: e.target.value } : null)} /></div>
+                  <div className="mb-3"><label className="form-label small fw-bold">Rol</label>
+                    <select className="form-control" value={editingUser.role} onChange={e => setEditingUser(p => p ? { ...p, role: e.target.value as 'owner' | 'operator' | 'technician' } : null)}>
+                      <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
+                    </select>
+                  </div>
+                  <div className="mb-3"><label className="form-label small fw-bold">Nueva Contrasena <span className="text-muted">(opcional)</span></label><input className="form-control" value={editUserPassword} onChange={e => setEditUserPassword(e.target.value)} placeholder="Dejar vacio para mantener la actual" /></div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowEditUserModal(false)}>Cancelar</button>
+              <button className="btn btn-primary fw-bold" onClick={() => void saveUserEdit()}>Guardar Cambios</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showEditUserModal && <div className="modal-backdrop fade show" onClick={() => setShowEditUserModal(false)}></div>}
 
       <footer className="main-footer">
         <div className="float-end d-none d-sm-inline-block">
