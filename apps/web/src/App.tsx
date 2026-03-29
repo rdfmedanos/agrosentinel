@@ -1067,6 +1067,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
     role: 'owner' as 'owner' | 'operator' | 'technician',
     password: 'Cliente123!'
   });
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [showAddClient, setShowAddClient] = useState(false);
@@ -1678,6 +1679,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         props.session.token
       );
       setNewUser({ name: '', email: '', role: 'owner', password: 'Cliente123!' });
+      setShowCreateUserModal(false);
       await loadCompanyData(tenantId);
     } finally {
       setCreatingUser(false);
@@ -2365,17 +2367,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
               <div className="row">
                 <div className="col-md-4">
                   <div className="card">
-                    <div className="card-header"><h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-plus me-2"></i>Crear Usuario</h3></div>
-                    <div className="card-body">
-                      <div className="mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder="Juan Perez" /></div>
-                      <div className="mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="juan@cliente.com" /></div>
-                      <div className="mb-3"><label className="form-label small fw-bold">Rol</label>
-                        <select className="form-control" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'owner' | 'operator' | 'technician' }))}>
-                          <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
-                        </select>
-                      </div>
-                      <div className="mb-3"><label className="form-label small fw-bold">Contrasena</label><input className="form-control" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} /></div>
-                      <button className="btn btn-primary w-100 fw-bold" onClick={() => void createUser()} disabled={creatingUser}>{creatingUser ? '...' : 'Crear Usuario'}</button>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-plus me-2"></i>Crear Usuario</h3>
+                      <button className="btn btn-sm btn-light fw-bold" onClick={() => setShowCreateUserModal(true)}><i className="fas fa-plus me-1"></i>Nuevo</button>
                     </div>
                   </div>
                   <div className="card mt-3">
@@ -4241,6 +4235,32 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         </div>
       </div>
       {showMqttConfig && <div className="modal-backdrop fade show" onClick={() => setShowMqttConfig(false)}></div>}
+
+      <div className={`modal fade ${showCreateUserModal ? 'show' : ''}`} style={{ display: showCreateUserModal ? 'block' : 'none' }}>
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header bg-primary">
+              <h4 className="modal-title"><i className="fas fa-user-plus mr-2"></i>Crear Usuario</h4>
+              <button type="button" className="close text-white" onClick={() => setShowCreateUserModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3"><label className="form-label small fw-bold">Nombre</label><input className="form-control" value={newUser.name} onChange={e => setNewUser(p => ({ ...p, name: e.target.value }))} placeholder="Juan Perez" /></div>
+              <div className="mb-3"><label className="form-label small fw-bold">Email</label><input className="form-control" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="juan@cliente.com" /></div>
+              <div className="mb-3"><label className="form-label small fw-bold">Rol</label>
+                <select className="form-control" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'owner' | 'operator' | 'technician' }))}>
+                  <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
+                </select>
+              </div>
+              <div className="mb-3"><label className="form-label small fw-bold">Contrasena</label><input className="form-control" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} /></div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCreateUserModal(false)}>Cancelar</button>
+              <button className="btn btn-primary fw-bold" onClick={() => void createUser()} disabled={creatingUser}>{creatingUser ? '...' : 'Crear Usuario'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showCreateUserModal && <div className="modal-backdrop fade show" onClick={() => setShowCreateUserModal(false)}></div>}
 
       <footer className="main-footer">
         <div className="float-end d-none d-sm-inline-block">
