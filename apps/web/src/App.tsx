@@ -4105,8 +4105,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       taxId: newClient.taxId,
                       ivaCondition: newClient.ivaCondition
                     }, props.session.token);
-                    const data = await res.json() as { tenantId: string; clientEmail: string; clientPassword: string };
-                    setCreatedClientCredentials({ email: data.clientEmail, password: data.clientPassword, tenantId: data.tenantId });
+                    const data = await res.json() as { tenantId: string; clientUsername: string; clientPassword: string };
+                    setCreatedClientCredentials({ email: data.clientUsername, password: data.clientPassword, tenantId: data.tenantId });
                     setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '', taxId: '', ivaCondition: 'Consumidor Final' });
                     setTenantId(data.tenantId);
                     void loadClients();
