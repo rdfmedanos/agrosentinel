@@ -195,9 +195,22 @@ tenantsRouter.post('/:id/reset-password', requireCompanyAdmin, async (req, res) 
     return;
   }
 
-  const user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
+  let user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
   if (!user) {
-    res.status(404).json({ error: 'El cliente no tiene usuario asociado. Crea un usuario desde la seccion de Usuarios.' });
+    user = await UserModel.findOne({ tenantId: tenant.tenantId });
+  }
+  if (!user) {
+    const newPassword = crypto.randomBytes(6).toString('hex');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user = await UserModel.create({
+      name: tenant.contactName || tenant.companyName,
+      email: (tenant.email || `${tenant.tenantId}@agrosentinel.local`).toLowerCase().trim(),
+      role: 'owner',
+      tenantId: tenant.tenantId,
+      passwordHash,
+      mustChangePassword: true
+    });
+    res.json({ email: user.email, newPassword });
     return;
   }
 
