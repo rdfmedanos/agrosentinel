@@ -1309,6 +1309,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [showAddClient, setShowAddClient] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
+  const [createdClientCredentials, setCreatedClientCredentials] = useState<{email: string; password: string; tenantId: string} | null>(null);
   const [newClient, setNewClient] = useState({
     companyName: '',
     contactName: '',
@@ -4104,8 +4105,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       taxId: newClient.taxId,
                       ivaCondition: newClient.ivaCondition
                     }, props.session.token);
-                    const data = await res.json() as { tenantId: string };
-                    setShowAddClient(false);
+                    const data = await res.json() as { tenantId: string; clientEmail: string; clientPassword: string };
+                    setCreatedClientCredentials({ email: data.clientEmail, password: data.clientPassword, tenantId: data.tenantId });
                     setNewClient({ companyName: '', contactName: '', email: '', phone: '', address: '', planId: '', taxId: '', ivaCondition: 'Consumidor Final' });
                     setTenantId(data.tenantId);
                     void loadClients();
@@ -4122,6 +4123,34 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
         </div>
       </div>
       {showAddClient && <div className="modal-backdrop fade show" onClick={() => setShowAddClient(false)}></div>}
+
+      {createdClientCredentials && (
+        <>
+          <div className="modal fade show" style={{ display: 'block' }}>
+            <div className="modal-dialog">
+              <div className="modal-content">
+                <div className="modal-header bg-success">
+                  <h4 className="modal-title"><i className="fas fa-check-circle mr-2"></i>Cliente Creado</h4>
+                  <button type="button" className="close text-white" onClick={() => setCreatedClientCredentials(null)}>&times;</button>
+                </div>
+                <div className="modal-body">
+                  <p className="text-muted">Se han generado las credenciales de acceso para el cliente:</p>
+                  <div className="alert alert-info">
+                    <div className="mb-2"><strong>Usuario:</strong> <span className="text-monospace">{createdClientCredentials.email}</span></div>
+                    <div className="mb-2"><strong>Contrasena:</strong> <span className="text-monospace">{createdClientCredentials.password}</span></div>
+                    <div><strong>ID:</strong> <span className="text-monospace">{createdClientCredentials.tenantId}</span></div>
+                  </div>
+                  <p className="small text-muted">El cliente debera cambiar la contrasena en su primer ingreso.</p>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-primary" onClick={() => setCreatedClientCredentials(null)}>Aceptar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show"></div>
+        </>
+      )}
 
       <div className={`modal fade ${showEditClient ? 'show' : ''}`} style={{ display: showEditClient ? 'block' : 'none' }}>
         <div className="modal-dialog">
@@ -4185,11 +4214,25 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 </select>
               </div>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-default" onClick={() => setShowEditClient(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>
-                {savingClient ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
+            <div className="modal-footer d-flex justify-content-between">
+              <button type="button" className="btn btn-warning" onClick={async () => {
+                if (!confirm('Esto generara una nueva contrasena para el cliente. Continuar?')) return;
+                try {
+                  const res = await postJson(`/tenants/${selectedClient?._id}/reset-password`, {}, props.session.token);
+                  const data = await res.json() as { email: string; newPassword: string };
+                  setCreatedClientCredentials({ email: data.email, password: data.newPassword, tenantId: selectedClient?.tenantId || '' });
+                } catch {
+                  alert('Error al regenerar contrasena');
+                }
+              }}>
+                <i className="fas fa-key mr-1"></i>Generar Nueva Contrasena
               </button>
+              <div>
+                <button type="button" className="btn btn-default mr-2" onClick={() => setShowEditClient(false)}>Cancelar</button>
+                <button type="button" className="btn btn-primary" onClick={() => void saveClient()} disabled={savingClient || !editClient.companyName || !editClient.email}>
+                  {savingClient ? 'Guardando...' : <><i className="fas fa-save mr-1"></i>Guardar Cambios</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

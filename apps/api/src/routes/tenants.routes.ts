@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Types } from 'mongoose';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { TenantConfigModel } from '../models/TenantConfig.js';
+import { UserModel } from '../models/User.js';
 import { requireCompanyAdmin, requireAuth } from '../auth/auth.js';
 
 const createTenantSchema = z.object({
@@ -82,7 +85,25 @@ tenantsRouter.post('/', requireCompanyAdmin, async (req, res) => {
     ivaCondition: data.ivaCondition ?? 'Consumidor Final'
   });
 
-  res.status(201).json({ id: String(created._id), tenantId: created.tenantId, companyName: created.companyName });
+  const generatedPassword = crypto.randomBytes(6).toString('hex');
+  const passwordHash = await bcrypt.hash(generatedPassword, 10);
+  
+  const clientUser = await UserModel.create({
+    name: data.contactName || data.companyName,
+    email: (data.email || `${tenantId}@agrosentinel.local`).toLowerCase().trim(),
+    role: 'owner',
+    tenantId: created.tenantId,
+    passwordHash,
+    mustChangePassword: true
+  });
+
+  res.status(201).json({ 
+    id: String(created._id), 
+    tenantId: created.tenantId, 
+    companyName: created.companyName,
+    clientEmail: clientUser.email,
+    clientPassword: generatedPassword
+  });
 });
 
 tenantsRouter.put('/:id', requireCompanyAdmin, async (req, res) => {
@@ -164,6 +185,27 @@ tenantsRouter.put('/me', requireAuth, async (req, res) => {
     taxId: updated.taxId,
     ivaCondition: updated.ivaCondition
   });
+});
+
+tenantsRouter.post('/:id/reset-password', requireCompanyAdmin, async (req, res) => {
+  const tenant = await TenantConfigModel.findById(req.params.id);
+  if (!tenant) {
+    res.status(404).json({ error: 'Cliente no encontrado' });
+    return;
+  }
+
+  const user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
+  if (!user) {
+    res.status(404).json({ error: 'Usuario del cliente no encontrado' });
+    return;
+  }
+
+  const newPassword = crypto.randomBytes(6).toString('hex');
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.mustChangePassword = true;
+  await user.save();
+
+  res.json({ email: user.email, newPassword });
 });
 
 tenantsRouter.get('/me', requireAuth, async (req, res) => {
