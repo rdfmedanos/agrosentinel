@@ -2244,6 +2244,14 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                   <tr><td className="text-muted">Telefono:</td><td>{selectedClient.phone || '—'}</td></tr>
                                   <tr><td className="text-muted">Direccion:</td><td>{selectedClient.address || '—'}</td></tr>
                                   <tr><td className="text-muted">Plan:</td><td>{selectedClient.planName || '—'}</td></tr>
+                                  <tr>
+                                    <td className="text-muted">Portal Cliente:</td>
+                                    <td>
+                                      <a href={`/panel-cliente?tenant=${selectedClient.tenantId}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-primary">
+                                        <i className="fas fa-external-link-alt mr-1"></i>Abrir portal
+                                      </a>
+                                    </td>
+                                  </tr>
                                 </tbody>
                               </table>
                             </div>
