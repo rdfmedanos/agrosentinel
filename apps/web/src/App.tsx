@@ -4216,13 +4216,22 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
             </div>
             <div className="modal-footer d-flex justify-content-between">
               <button type="button" className="btn btn-warning" onClick={async () => {
+                if (!selectedClient?._id) {
+                  alert('Selecciona un cliente primero');
+                  return;
+                }
                 if (!confirm('Esto generara una nueva contrasena para el cliente. Continuar?')) return;
                 try {
-                  const res = await postJson(`/tenants/${selectedClient?._id}/reset-password`, {}, props.session.token);
+                  const res = await postJson(`/tenants/${selectedClient._id}/reset-password`, {}, props.session.token);
+                  if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.error || 'Error al regenerar contrasena');
+                    return;
+                  }
                   const data = await res.json() as { email: string; newPassword: string };
-                  setCreatedClientCredentials({ email: data.email, password: data.newPassword, tenantId: selectedClient?.tenantId || '' });
-                } catch {
-                  alert('Error al regenerar contrasena');
+                  setCreatedClientCredentials({ email: data.email, password: data.newPassword, tenantId: selectedClient.tenantId });
+                } catch (e) {
+                  alert('Error al regenerar contrasena: ' + (e as Error).message);
                 }
               }}>
                 <i className="fas fa-key mr-1"></i>Generar Nueva Contrasena
