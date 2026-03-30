@@ -619,6 +619,8 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [arcaConfig, setArcaConfig] = useState<ArcaConfig>(emptyArcaConfig);
   const [savingArca, setSavingArca] = useState(false);
+  const [clientData, setClientData] = useState<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string} | null>(null);
+  const [savingClientData, setSavingClientData] = useState(false);
 
   const stats = useMemo(() => {
     const online = devices.filter(d => d.status === 'online').length;
@@ -643,6 +645,9 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
 
       const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
       setArcaConfig(arca);
+
+      const tenant = await getJson<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string}>('/tenants/me', token);
+      setClientData(tenant);
     } catch (err) {
       console.error('Error loading client data:', err);
     }
@@ -689,6 +694,17 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       await loadAll();
     } finally {
       setSavingArca(false);
+    }
+  };
+
+  const saveClientData = async () => {
+    if (!clientData) return;
+    setSavingClientData(true);
+    try {
+      const updated = await putJson<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string}>('/tenants/me', clientData, props.session.token);
+      setClientData(updated);
+    } finally {
+      setSavingClientData(false);
     }
   };
 
@@ -936,6 +952,62 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                 <div className="card mt-3">
                   <div className="card-body p-3">
                     <PasswordSection token={props.session.token} mustChangePassword={props.session.user.mustChangePassword} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="row mt-4">
+              <div className="col-12">
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-circle me-2"></i>Mis Datos</h3>
+                  </div>
+                  <div className="card-body">
+                    {clientData && (
+                      <div className="row">
+                        <div className="col-md-6">
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Razon Social / Nombre</label>
+                            <input className="form-control" value={clientData.companyName} onChange={e => setClientData(d => d ? { ...d, companyName: e.target.value } : null)} />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Nombre de Contacto</label>
+                            <input className="form-control" value={clientData.contactName} onChange={e => setClientData(d => d ? { ...d, contactName: e.target.value } : null)} />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Email</label>
+                            <input className="form-control" type="email" value={clientData.email} onChange={e => setClientData(d => d ? { ...d, email: e.target.value } : null)} />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Telefono</label>
+                            <input className="form-control" value={clientData.phone} onChange={e => setClientData(d => d ? { ...d, phone: e.target.value } : null)} />
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Direccion</label>
+                            <input className="form-control" value={clientData.address} onChange={e => setClientData(d => d ? { ...d, address: e.target.value } : null)} />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">CUIT / CUIL</label>
+                            <input className="form-control" value={clientData.taxId} onChange={e => setClientData(d => d ? { ...d, taxId: e.target.value } : null)} />
+                          </div>
+                          <div className="mb-3">
+                            <label className="form-label fw-bold">Condicion ante IVA</label>
+                            <select className="form-control" value={clientData.ivaCondition} onChange={e => setClientData(d => d ? { ...d, ivaCondition: e.target.value } : null)}>
+                              <option value="Consumidor Final">Consumidor Final</option>
+                              <option value="Responsable Inscripto">Responsable Inscripto</option>
+                              <option value="Monotributista">Monotributista</option>
+                              <option value="Exento">Exento</option>
+                            </select>
+                          </div>
+                          <button className="btn btn-primary mt-3" onClick={() => void saveClientData()} disabled={savingClientData}>
+                            {savingClientData ? 'Guardando...' : 'Guardar Cambios'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
