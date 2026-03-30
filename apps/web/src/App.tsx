@@ -112,6 +112,8 @@ type Invoice = {
   period: string;
   amountArs: number;
   status: 'draft' | 'issued' | 'paid';
+  tipo: 'A' | 'B' | 'C' | 'M';
+  estado: 'borrador' | 'pendiente' | 'autorizado' | 'rechazado' | 'anulado';
   arca?: { cae?: string; cbteNro?: number };
 };
 
@@ -1097,13 +1099,16 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                   </div>
                   <div className="card-body p-0">
                     <table className="table table-sm m-0">
-                      <thead><tr><th>Periodo</th><th>Monto</th><th>Estado</th></tr></thead>
+                      <thead><tr><th>Periodo</th><th>Monto</th><th>Tipo</th><th>Estado</th></tr></thead>
                       <tbody>
-                        {invoices.map(inv => (
+                        {invoices.length === 0 ? (
+                          <tr><td colSpan={4} className="text-center text-muted py-3">No hay facturas</td></tr>
+                        ) : invoices.map(inv => (
                           <tr key={inv._id}>
                             <td>{inv.period}</td>
                             <td>${inv.amountArs.toLocaleString('es-AR')}</td>
-                            <td><span className={`badge ${inv.status === 'paid' ? 'text-bg-success' : 'text-bg-warning'}`}>{inv.status}</span></td>
+                            <td>Factura {inv.tipo}</td>
+                            <td><span className={`badge ${inv.estado === 'autorizado' ? 'text-bg-success' : inv.estado === 'pendiente' ? 'text-bg-warning' : 'text-bg-danger'}`}>{inv.estado}</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -4136,8 +4141,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                 <div className="modal-body">
                   <p className="text-muted">Se han generado las credenciales de acceso para el cliente:</p>
                   <div className="alert alert-info">
-                    <div className="mb-2"><strong>Usuario:</strong> <span className="text-monospace">{createdClientCredentials.email}</span></div>
-                    <div className="mb-2"><strong>Contrasena:</strong> <span className="text-monospace">{createdClientCredentials.password}</span></div>
+                    <div className="mb-2"><strong>Usuario:</strong> <span className="text-monospace">{createdClientCredentials.email || '(sin email)'}</span></div>
+                    <div className="mb-2"><strong>Contrasena:</strong> <span className="text-monospace">{createdClientCredentials.password || '(error)'}</span></div>
                     <div><strong>ID:</strong> <span className="text-monospace">{createdClientCredentials.tenantId}</span></div>
                   </div>
                   <p className="small text-muted">El cliente debera cambiar la contrasena en su primer ingreso.</p>
