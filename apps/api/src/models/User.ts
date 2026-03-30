@@ -10,7 +10,9 @@ const userSchema = new Schema(
     tenantId: { type: String, required: true },
     planId: { type: Schema.Types.ObjectId, ref: 'Plan' },
     passwordHash: { type: String, required: true },
-    mustChangePassword: { type: Boolean, default: false }
+    mustChangePassword: { type: Boolean, default: false },
+    resetToken: { type: String },
+    resetTokenExpires: { type: Date }
   },
   { timestamps: true }
 );

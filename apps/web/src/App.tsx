@@ -499,6 +499,102 @@ function LoginPanel(props: {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const [resetToken, setResetToken] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const email = params.get('email');
+    if (token && email) {
+      setResetToken(token);
+      setResetEmail(decodeURIComponent(email));
+    }
+  }, []);
+
+  const handleResetPassword = async () => {
+    if (newPassword !== confirmPassword) {
+      setResetError('Las contrasenas no coinciden');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setResetError('La contrasena debe tener al menos 8 caracteres');
+      return;
+    }
+    setResetLoading(true);
+    setResetError('');
+    try {
+      await postJson('/auth/reset-password', { token: resetToken, email: resetEmail, newPassword });
+      setResetSuccess(true);
+    } catch {
+      setResetError('Token invalido o expirado');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  if (resetToken && !resetSuccess) {
+    return (
+      <main className="login-page">
+        <div className="login-box">
+          <div className="card card-outline card-primary">
+            <div className="card-header text-center">
+              <h1 className="h3 mb-0 font-weight-bold">AgroSentinel</h1>
+              <p className="text-muted small mb-0 mt-1">Nueva contrasena</p>
+            </div>
+            <div className="card-body">
+              <p className="text-muted small">Ingresa tu nueva contrasena.</p>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Nueva contrasena</label>
+                <input type="password" className="form-control" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimo 8 caracteres" />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Confirmar contrasena</label>
+                <input type="password" className="form-control" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repite tu contrasena" />
+              </div>
+              {resetError && <div className="alert alert-danger py-2 small">{resetError}</div>}
+              <div className="row">
+                <div className="col-12">
+                  <button type="button" className="btn btn-primary btn-block" onClick={() => void handleResetPassword()} disabled={resetLoading || !newPassword || !confirmPassword}>
+                    {resetLoading ? 'Guardando...' : 'Guardar contrasena'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (resetSuccess) {
+    return (
+      <main className="login-page">
+        <div className="login-box">
+          <div className="card card-outline card-primary">
+            <div className="card-header text-center">
+              <h1 className="h3 mb-0 font-weight-bold">AgroSentinel</h1>
+            </div>
+            <div className="card-body text-center">
+              <i className="fas fa-check-circle text-success fa-3x mb-3"></i>
+              <p className="mb-3">Tu contrasena ha sido actualizada correctamente.</p>
+              <a href="/" className="btn btn-primary">Ir al login</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const submit = async () => {
     setError('');
@@ -517,6 +613,66 @@ function LoginPanel(props: {
       setLoading(false);
     }
   };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      await postJson('/auth/forgot-password', { email: forgotEmail });
+      setForgotSent(true);
+    } catch {
+      setError('No se pudo procesar la solicitud');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  if (showForgotPassword) {
+    return (
+      <main className="login-page">
+        <div className="login-box">
+          <div className="card card-outline card-primary">
+            <div className="card-header text-center">
+              <h1 className="h3 mb-0 font-weight-bold">AgroSentinel</h1>
+              <p className="text-muted small mb-0 mt-1">Recuperar contrasena</p>
+            </div>
+            <div className="card-body">
+              {forgotSent ? (
+                <div className="text-center">
+                  <i className="fas fa-check-circle text-success fa-3x mb-3"></i>
+                  <p>Se ha enviado un enlace de recuperacion a tu email.</p>
+                  <button className="btn btn-link" onClick={() => { setShowForgotPassword(false); setForgotSent(false); setForgotEmail(''); }}>
+                    Volver al login
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-muted small">Ingresa tu email y te enviaremos un enlace para recuperar tu contrasena.</p>
+                  <div className="mb-3">
+                    <label className="form-label small fw-semibold">Email</label>
+                    <input type="email" className="form-control" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="tu@email.com" />
+                  </div>
+                  {error && <div className="alert alert-danger py-2 small">{error}</div>}
+                  <div className="row">
+                    <div className="col-12">
+                      <button type="button" className="btn btn-primary btn-block" onClick={() => void handleForgotPassword()} disabled={forgotLoading || !forgotEmail}>
+                        {forgotLoading ? 'Enviando...' : 'Enviar enlace'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-center">
+                    <button className="btn btn-link" onClick={() => { setShowForgotPassword(false); setError(''); }}>
+                      <i className="fas fa-arrow-left mr-1"></i>Volver al login
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="login-page">
@@ -550,6 +706,11 @@ function LoginPanel(props: {
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </button>
               </div>
+            </div>
+            <div className="mt-3 text-center">
+              <button className="btn btn-link" onClick={() => setShowForgotPassword(true)}>
+                <i className="fas fa-lock mr-1"></i>Olvidaste tu contrasena?
+              </button>
             </div>
           </div>
         </div>

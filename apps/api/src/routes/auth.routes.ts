@@ -1,8 +1,45 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireCompanyAdmin, signAuthToken } from '../auth/auth.js';
 import { UserModel } from '../models/User.js';
+import { env } from '../config/env.js';
+
+async function sendPasswordResetEmail(email: string, resetToken: string) {
+  const resetUrl = `${env.appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+  
+  if (env.smtpHost && env.smtpUser && env.smtpPass) {
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: env.smtpHost,
+      port: env.smtpPort,
+      secure: env.smtpPort === 465,
+      auth: {
+        user: env.smtpUser,
+        pass: env.smtpPass
+      }
+    });
+    
+    await transporter.sendMail({
+      from: env.emailFrom,
+      to: email,
+      subject: 'Recuperar contraseña - AgroSentinel',
+      html: `
+        <h2>Recuperar contraseña</h2>
+        <p>Has solicitado recuperar tu contraseña en AgroSentinel.</p>
+        <p>Haz clic en el siguiente enlace para crear una nueva contraseña:</p>
+        <a href="${resetUrl}" style="padding: 10px 20px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Recuperar contraseña</a>
+        <p>O copia y pega este enlace en tu navegador:</p>
+        <p>${resetUrl}</p>
+        <p>Este enlace expire en 1 hora.</p>
+        <p>Si no solicitaste esto, ignora este correo.</p>
+      `
+    });
+  } else {
+    console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
+  }
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -165,4 +202,50 @@ authRouter.post('/admin/reset-password', requireAuth, requireCompanyAdmin, async
   user.mustChangePassword = true;
   await user.save();
   res.json({ status: 'ok' });
+});
+
+authRouter.post('/forgot-password', async (req, res) => {
+  const { email } = z.object({ email: z.string().email() }).parse(req.body);
+  
+  const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+  if (!user) {
+    res.json({ message: 'Si el correo existe, recibirás un enlace para recuperar tu contraseña' });
+    return;
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  user.resetToken = resetToken;
+  user.resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
+  await user.save();
+
+  await sendPasswordResetEmail(user.email, resetToken);
+  
+  res.json({ message: 'Si el correo existe, recibirás un enlace para recuperar tu contraseña' });
+});
+
+authRouter.post('/reset-password', async (req, res) => {
+  const { token, email, newPassword } = z.object({
+    token: z.string().min(1),
+    email: z.string().email(),
+    newPassword: z.string().min(8)
+  }).parse(req.body);
+
+  const user = await UserModel.findOne({ 
+    email: email.toLowerCase().trim(),
+    resetToken: token,
+    resetTokenExpires: { $gt: new Date() }
+  });
+
+  if (!user) {
+    res.status(400).json({ error: 'Token invalido o expirado' });
+    return;
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.resetToken = undefined;
+  user.resetTokenExpires = undefined;
+  user.mustChangePassword = false;
+  await user.save();
+
+  res.json({ message: 'Contrasena actualizada correctamente' });
 });

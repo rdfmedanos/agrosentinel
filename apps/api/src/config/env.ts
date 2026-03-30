@@ -40,5 +40,13 @@ export const env = {
   arcaSign: process.env.ARCA_SIGN,
   
   authJwtSecret: process.env.AUTH_JWT_SECRET ?? 'change_this_secret',
-  authJwtExpires: process.env.AUTH_JWT_EXPIRES ?? '12h'
+  authJwtExpires: process.env.AUTH_JWT_EXPIRES ?? '12h',
+  
+  // Email Configuration
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  emailFrom: process.env.EMAIL_FROM ?? 'noreply@agrosentinel.com',
+  appUrl: process.env.APP_URL ?? 'http://localhost:5173'
 };
