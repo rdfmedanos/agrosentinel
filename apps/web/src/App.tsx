@@ -189,7 +189,7 @@ type AuthUser = {
   id: string;
   name: string;
   email: string;
-  role: 'owner' | 'operator' | 'technician' | 'company_admin';
+  role: 'owner' | 'operator' | 'technician' | 'company_admin' | 'client';
   tenantId: string;
   mustChangePassword: boolean;
 };
@@ -4675,7 +4675,7 @@ export function App() {
       return (
         <LoginPanel
           title="Ingreso panel cliente"
-          allowedRoles={['owner', 'operator', 'technician']}
+          allowedRoles={['owner', 'operator', 'technician', 'client']}
           onAuthenticated={login}
         />
       );
@@ -4684,7 +4684,7 @@ export function App() {
       return (
         <LoginPanel
           title="Este acceso es solo para usuarios de cliente"
-          allowedRoles={['owner', 'operator', 'technician']}
+          allowedRoles={['owner', 'operator', 'technician', 'client']}
           onAuthenticated={login}
         />
       );
