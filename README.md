@@ -1,6 +1,6 @@
 # AgroSentinel
 
-Plataforma SaaS IoT para monitoreo de tanques de agua con ESP32.
+Plataforma SaaS IoT para monitoreo de tanques de agua con ESP8266/ESP32.
 
 Control de aguadas rurales.
 
@@ -26,9 +26,15 @@ agrosentinel/
   apps/
     api/        # API REST + MQTT + Socket.IO + cron jobs
     web/        # Dashboard React
+  docs/
+    firmware/   # Firmware ESP8266 para sensores de nivel
   infra/
     mosquitto/
     nginx/
+  scripts/
+    install_server.sh   # Instalacion automatica en VPS
+    update_server.sh   # Actualizacion en VPS
+  MANUAL_SERVIDOR.md   # Guia completa de despliegue
   docker-compose.yml
 ```
 
@@ -148,8 +154,9 @@ docker compose up -d --build
 ```
 
 ### 3) Servicios
-- Landing + panel cliente: `http://IP_VPS` (y panel en `/panel-cliente`)
-- Administracion empresa: `http://IP_VPS:8080`
+- Landing + panel cliente + admin empresa: `http://IP_VPS:8080`
+  - Panel cliente: `/panel-cliente`
+  - Admin empresa: `/admin-empresa`
 - API: `http://IP_VPS:4000/api/health`
 - MQTT: `IP_VPS:1883`
 
@@ -185,6 +192,13 @@ Para produccion fiscal en VPS:
 
 ## Endpoints de prueba rapida
 
+### Login
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@agrosentinel.com","password":"Empresa123!"}'
+```
+
 ### Crear dispositivo
 ```bash
 curl -X POST http://localhost:4000/api/devices \
@@ -205,6 +219,49 @@ curl -X POST http://localhost:4000/api/devices/ESP32-NORTE-001/command \
   -H "Content-Type: application/json" \
   -d '{"cmd":"pump_off"}'
 ```
+
+## Notificaciones Telegram
+
+Configura alertas via Telegram en `.env`:
+
+```env
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=tu_token_aqui
+TELEGRAM_CHAT_ID=tu_chat_id
+```
+
+Para obtener credentials:
+1. Busca `@BotFather` en Telegram y usa `/newbot`
+2. Agrega el bot y enviale un mensaje
+3. Visita `https://api.telegram.org/bot<TOKEN>/getUpdates` para obtener el Chat ID
+
+Notificaciones enviadas:
+- Dispositivo Offline/Online
+- Nivel Crítico alcanzado
+- Alertas generales
+
+## Scripts de instalacion (VPS)
+
+El proyecto incluye scripts para desplegar en servidor:
+
+- `install_server.sh` - Instalacion automatica de Docker, dependencias y configuracion
+- `update_server.sh` - Actualizacion del servidor
+
+Consultar `MANUAL_SERVIDOR.md` para instrucciones detalladas.
+
+## Backup
+
+Comandos para respaldar datos en produccion:
+
+```bash
+# Backup MongoDB
+docker run --rm -v agrosentinel_mongo_data:/data/db -v $(pwd):/backup alpine tar czf /backup/mongo_data_$(date +%F).tar.gz -C /data/db .
+
+# Backup certificados ARCA
+docker run --rm -v agrosentinel_api_certs:/data -v $(pwd):/backup alpine tar czf /backup/api_certs_$(date +%F).tar.gz -C /data .
+```
+
+Guarda siempre `.env` y `infra/mosquitto/mosquitto.conf`.
 
 ## Escalabilidad
 
