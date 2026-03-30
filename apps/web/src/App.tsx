@@ -4284,6 +4284,15 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       <option value="owner">Owner</option><option value="operator">Operator</option><option value="technician">Technician</option>
                     </select>
                   </div>
+                  {editingUser.role === 'owner' && (
+                    <div className="alert alert-info mb-3">
+                      <i className="fas fa-info-circle mr-1"></i> <strong>Acceso del cliente al panel:</strong><br/>
+                      <span className="small text-muted">Usuario: {editingUser.email}</span><br/>
+                      <a href={`/panel-cliente?tenant=${editingUser.tenantId}`} target="_blank" rel="noopener noreferrer" className="small">
+                        <i className="fas fa-external-link-alt mr-1"></i>Abrir panel cliente
+                      </a>
+                    </div>
+                  )}
                   <div className="mb-3"><label className="form-label small fw-bold">Nueva Contrasena <span className="text-muted">(opcional)</span></label><input className="form-control" value={editUserPassword} onChange={e => setEditUserPassword(e.target.value)} placeholder="Dejar vacio para mantener la actual" /></div>
                 </>
               )}
