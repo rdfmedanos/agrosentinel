@@ -204,6 +204,24 @@ authRouter.post('/admin/reset-password', requireAuth, requireCompanyAdmin, async
   res.json({ status: 'ok' });
 });
 
+authRouter.post('/admin/delete-user', requireAuth, requireCompanyAdmin, async (req, res) => {
+  const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
+  
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    res.status(404).json({ error: 'Usuario no encontrado' });
+    return;
+  }
+
+  if (user.role === 'owner') {
+    res.status(400).json({ error: 'No se puede eliminar el usuario propietario' });
+    return;
+  }
+
+  await UserModel.findByIdAndDelete(userId);
+  res.json({ status: 'ok' });
+});
+
 authRouter.post('/forgot-password', async (req, res) => {
   const { email } = z.object({ email: z.string().email() }).parse(req.body);
   
