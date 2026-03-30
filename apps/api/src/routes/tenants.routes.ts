@@ -134,20 +134,6 @@ tenantsRouter.put('/:id', requireCompanyAdmin, async (req, res) => {
     return;
   }
 
-  const existingUser = await UserModel.findOne({ tenantId: updated.tenantId, role: 'owner' });
-  if (!existingUser) {
-    const newPassword = crypto.randomBytes(6).toString('hex');
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await UserModel.create({
-      name: updated.contactName || updated.companyName,
-      email: (updated.email || `${updated.tenantId}@agrosentinel.local`).toLowerCase().trim(),
-      role: 'owner',
-      tenantId: updated.tenantId,
-      passwordHash,
-      mustChangePassword: true
-    });
-  }
-
   res.json(updated);
 });
 
@@ -211,7 +197,7 @@ tenantsRouter.post('/:id/reset-password', requireCompanyAdmin, async (req, res) 
 
   const user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
   if (!user) {
-    res.status(404).json({ error: 'El cliente no tiene usuario asociado. Se creara al guardar los datos del cliente.' });
+    res.status(404).json({ error: 'El cliente no tiene usuario asociado. Crea un usuario desde la seccion de Usuarios.' });
     return;
   }
 
