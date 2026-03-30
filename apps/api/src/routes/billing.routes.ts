@@ -317,7 +317,8 @@ const createInvoiceSchema = z.object({
     direccion: z.string().optional().default('')
   }),
   period: z.string().min(1),
-  amountArs: z.number().min(0)
+  amountArs: z.number().min(0),
+  clientTenantId: z.string().optional()
 });
 
 billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
@@ -350,8 +351,9 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
     console.log('[INVOICE] Next invoice number:', nextNumero);
     
     console.log('[INVOICE] Creating invoice in database...');
+    const invoiceTenantId = data.clientTenantId || tenantId;
     const invoice = await InvoiceModel.create({
-      tenantId,
+      tenantId: invoiceTenantId,
       userId: req.auth?.sub,
       period: data.period,
       amountArs: data.amountArs,

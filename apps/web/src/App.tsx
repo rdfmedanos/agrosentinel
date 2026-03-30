@@ -1225,7 +1225,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
-  const [newInvoice, setNewInvoice] = useState({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+  const [newInvoice, setNewInvoice] = useState({ tenantId: '', clientTenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
   const [systemConfig, setSystemConfig] = useState<{key: string; value: string; description?: string}[]>([]);
   const [savingConfig, setSavingConfig] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -1602,7 +1602,8 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
           condicionIva: newInvoice.clienteCondicionIva
         },
         period: newInvoice.period,
-        amountArs: newInvoice.amountArs
+        amountArs: newInvoice.amountArs,
+        clientTenantId: newInvoice.clientTenantId || undefined
       }, props.session.token);
       const invoice = await res.json();
 
@@ -1619,7 +1620,7 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
       }
 
       setInvoices([createdInvoice, ...invoices]);
-      setNewInvoice({ tenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
+      setNewInvoice({ tenantId: '', clientTenantId: '', tipo: 'B', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final', amountArs: 0, period: new Date().toISOString().slice(0, 7) });
       setShowCreateInvoiceModal(false);
       if (!autoAuthorize) {
         alert('Factura guardada en estado pendiente');
@@ -3947,6 +3948,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     }
                     setNewInvoice({
                       tenantId: client.tenantId,
+                      clientTenantId: '',
                       tipo: tipoComprobante,
                       clienteNombre: client.companyName,
                       clienteTipoDoc: 80,
