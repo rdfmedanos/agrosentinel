@@ -3937,7 +3937,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
             <div className="modal-body" style={{ overflowY: 'auto' }}>
               <div className="mb-3">
                 <label className="form-label small fw-bold">Cliente</label>
-                <select className="form-control" value={newInvoice.tenantId} onChange={e => {
+                <select className="form-control" value={newInvoice.clientTenantId} onChange={e => {
                   const client = clients.find(c => c.tenantId === e.target.value);
                   if (client) {
                     const plan = plans.find(p => p._id === client.planId);
@@ -3947,8 +3947,8 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       tipoComprobante = 'A';
                     }
                     setNewInvoice({
-                      tenantId: client.tenantId,
-                      clientTenantId: '',
+                      tenantId: props.session.user.tenantId,
+                      clientTenantId: client.tenantId,
                       tipo: tipoComprobante,
                       clienteNombre: client.companyName,
                       clienteTipoDoc: 80,
@@ -3957,9 +3957,11 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                       amountArs: plan ? plan.monthlyPriceArs : 0,
                       period: newInvoice.period
                     });
+                  } else {
+                    setNewInvoice(p => ({ ...p, clientTenantId: '', clienteNombre: 'Consumidor Final', clienteTipoDoc: 99, clienteNroDoc: '0', clienteCondicionIva: 'Consumidor Final' }));
                   }
                 }}>
-                  <option value="">Seleccionar cliente...</option>
+                  <option value="">Consumidor Final</option>
                   {clients.map(c => (
                     <option key={c.tenantId} value={c.tenantId}>
                       {c.companyName} {c.planName ? `(${c.planName})` : ''}
