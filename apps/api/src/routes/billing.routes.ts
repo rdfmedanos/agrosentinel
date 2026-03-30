@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireCompanyAdmin, resolveTenantFromRequest } from '../auth/auth.js';
+import { requireAuth, requireCompanyAdmin, resolveTenantFromRequest } from '../auth/auth.js';
 import { CompanyInfoModel } from '../models/CompanyInfo.js';
 import { InvoiceModel } from '../models/Invoice.js';
 import { PlanModel } from '../models/Plan.js';
@@ -286,7 +286,7 @@ billingRouter.put('/arca-config', async (req, res) => {
 
 // ============ FACTURAS ============
 
-billingRouter.get('/invoices', async (req, res) => {
+billingRouter.get('/invoices', requireAuth, async (req, res) => {
   const tenantId = resolveTenantFromRequest(req);
   const { status, tipo } = req.query;
   
@@ -298,7 +298,7 @@ billingRouter.get('/invoices', async (req, res) => {
   res.json(invoices);
 });
 
-billingRouter.get('/invoices/:id', async (req, res) => {
+billingRouter.get('/invoices/:id', requireAuth, async (req, res) => {
   const invoice = await InvoiceModel.findById(req.params.id);
   if (!invoice) {
     res.status(404).json({ error: 'Factura no encontrada' });
