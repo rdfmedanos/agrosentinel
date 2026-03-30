@@ -207,14 +207,14 @@ authRouter.post('/admin/reset-password', requireAuth, requireCompanyAdmin, async
 authRouter.post('/admin/delete-user', requireAuth, requireCompanyAdmin, async (req, res) => {
   const { userId } = z.object({ userId: z.string().min(1) }).parse(req.body);
   
-  const user = await UserModel.findById(userId);
-  if (!user) {
-    res.status(404).json({ error: 'Usuario no encontrado' });
+  if (userId === req.auth?.sub) {
+    res.status(400).json({ error: 'No puedes eliminar tu propio usuario' });
     return;
   }
 
-  if (user.role === 'owner') {
-    res.status(400).json({ error: 'No se puede eliminar el usuario propietario' });
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    res.status(404).json({ error: 'Usuario no encontrado' });
     return;
   }
 
