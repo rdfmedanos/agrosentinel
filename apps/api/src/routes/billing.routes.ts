@@ -344,14 +344,14 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
     const ptoVta = Number(config.ptoVta) || 1;
     const environment = config.environment || 'mock';
     
-    console.log('[INVOICE] Finding last invoice for tenant:', tenantId, 'tipo:', data.tipo, 'ptoVta:', ptoVta);
-    const lastInvoice = await InvoiceModel.findOne({ tenantId, tipo: data.tipo, puntoVenta: ptoVta, environment })
+    const invoiceTenantId = data.clientTenantId || tenantId;
+    console.log('[INVOICE] Finding last invoice for tenant:', invoiceTenantId, 'tipo:', data.tipo, 'ptoVta:', ptoVta);
+    const lastInvoice = await InvoiceModel.findOne({ tenantId: invoiceTenantId, tipo: data.tipo, puntoVenta: ptoVta, environment })
       .sort({ numero: -1 });
     const nextNumero = lastInvoice ? lastInvoice.numero + 1 : 1;
     console.log('[INVOICE] Next invoice number:', nextNumero);
     
     console.log('[INVOICE] Creating invoice in database...');
-    const invoiceTenantId = data.clientTenantId || tenantId;
     const invoice = await InvoiceModel.create({
       tenantId: invoiceTenantId,
       userId: req.auth?.sub,
