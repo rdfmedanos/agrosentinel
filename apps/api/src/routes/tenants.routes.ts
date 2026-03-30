@@ -194,10 +194,27 @@ tenantsRouter.post('/:id/reset-password', requireCompanyAdmin, async (req, res) 
     return;
   }
 
-  const user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
+  let user = await UserModel.findOne({ tenantId: tenant.tenantId, role: 'owner' });
+  
   if (!user) {
-    res.status(404).json({ error: 'Usuario del cliente no encontrado' });
-    return;
+    const existingUser = await UserModel.findOne({ tenantId: tenant.tenantId });
+    if (existingUser) {
+      existingUser.role = 'owner';
+      user = existingUser;
+    } else {
+      const newPassword = crypto.randomBytes(6).toString('hex');
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      user = await UserModel.create({
+        name: tenant.contactName || tenant.companyName,
+        email: tenant.email || `${tenant.tenantId}@agrosentinel.local`,
+        role: 'owner',
+        tenantId: tenant.tenantId,
+        passwordHash,
+        mustChangePassword: true
+      });
+      res.json({ email: user.email, newPassword });
+      return;
+    }
   }
 
   const newPassword = crypto.randomBytes(6).toString('hex');
