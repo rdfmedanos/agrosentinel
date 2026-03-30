@@ -30,7 +30,10 @@ const tenantConfigSchema = new Schema(
       certPath: { type: String, default: '' },
       certPassword: { type: String, default: '' },
       environment: { type: String, enum: ['mock', 'homo', 'prod'], default: 'mock' }
-    }
+    },
+    clientUsername: { type: String, default: '' },
+    clientPasswordHash: { type: String, default: '' },
+    clientMustChangePassword: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

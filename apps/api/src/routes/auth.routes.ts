@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireCompanyAdmin, signAuthToken } from '../auth/auth.js';
 import { UserModel } from '../models/User.js';
+import { TenantConfigModel } from '../models/TenantConfig.js';
 import { env } from '../config/env.js';
 
 async function sendPasswordResetEmail(email: string, resetToken: string) {
@@ -72,8 +73,42 @@ export const authRouter = Router();
 
 authRouter.post('/login', async (req, res) => {
   const data = loginSchema.parse(req.body);
-  const user = await UserModel.findOne({ email: data.email.toLowerCase().trim() });
+  const email = data.email.toLowerCase().trim();
+
+  let user = await UserModel.findOne({ email });
+  let isClientLogin = false;
+  let clientTenantId = '';
+
   if (!user) {
+    const tenant = await TenantConfigModel.findOne({ clientUsername: email });
+    if (tenant && tenant.clientPasswordHash) {
+      const passwordMatches = await bcrypt.compare(data.password, tenant.clientPasswordHash);
+      if (!passwordMatches) {
+        res.status(401).json({ error: 'Credenciales invalidas' });
+        return;
+      }
+      isClientLogin = true;
+      clientTenantId = tenant.tenantId;
+      const fakeId = `client-${tenant._id}`;
+      const token = signAuthToken({
+        sub: fakeId,
+        email: tenant.clientUsername,
+        role: 'client',
+        tenantId: clientTenantId
+      });
+      res.json({
+        token,
+        user: {
+          id: fakeId,
+          name: tenant.companyName,
+          email: tenant.clientUsername,
+          role: 'client',
+          tenantId: clientTenantId,
+          mustChangePassword: Boolean(tenant.clientMustChangePassword)
+        }
+      });
+      return;
+    }
     res.status(401).json({ error: 'Credenciales invalidas' });
     return;
   }
