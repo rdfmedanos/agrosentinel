@@ -375,6 +375,7 @@ billingRouter.post('/invoices', requireCompanyAdmin, async (req, res) => {
 
 billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, res) => {
   try {
+    const adminTenantId = resolveTenantFromRequest(req);
     const invoice = await InvoiceModel.findById(req.params.id);
     if (!invoice) {
       res.status(404).json({ error: 'Factura no encontrada' });
@@ -386,7 +387,7 @@ billingRouter.post('/invoices/:id/authorize', requireCompanyAdmin, async (req, r
       return;
     }
     
-    const arcaResult = await authorizeInvoiceWithArca(invoice.tenantId, {
+    const arcaResult = await authorizeInvoiceWithArca(adminTenantId, {
       amountArs: invoice.amountArs,
       period: invoice.period,
       tipo: invoice.tipo as 'A' | 'B' | 'C' | 'M',
