@@ -53,16 +53,6 @@ function MapCenterUpdater(props: { lat: string; lng: string }) {
   return null;
 }
 
-function DevicesMapCenterUpdater(props: { center: [number, number] | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (props.center) {
-      map.setView(props.center, 10);
-    }
-  }, [props.center, map]);
-  return null;
-}
-
 function getStatusColor(status: string) {
   if (status === 'online') return '#28a745';
   if (status === 'warning') return '#ffc107';
@@ -817,14 +807,20 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       setOrders(o);
       setInvoices(i);
 
-      const validDevices = d.filter(dev => dev.location?.lat && dev.location?.lng);
+      const validDevices = d.filter(dev => dev.location && typeof dev.location.lat === 'number' && typeof dev.location.lng === 'number');
       if (validDevices.length > 0) {
-        const lats = validDevices.map(dev => dev.location.lat);
-        const lngs = validDevices.map(dev => dev.location.lng);
-        setMapCenter([
-          (Math.min(...lats) + Math.max(...lats)) / 2,
-          (Math.min(...lngs) + Math.max(...lngs)) / 2
-        ]);
+        const lats = validDevices.map(dev => Number(dev.location.lat));
+        const lngs = validDevices.map(dev => Number(dev.location.lng));
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        if (minLat !== maxLat || minLng !== maxLng) {
+          setMapCenter([
+            (minLat + maxLat) / 2,
+            (minLng + maxLng) / 2
+          ]);
+        }
       }
 
       const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
@@ -2495,7 +2491,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                           <div className="tab-content" style={{ height: '500px' }}>
                             <div className="tab-pane active show h-100">
                               {(() => {
-                                const deviceList = devices.filter(d => d.location.lat && d.location.lng);
+                                const deviceList = devices.filter(d => d.location && typeof d.location.lat === 'number' && typeof d.location.lng === 'number');
                                 if (deviceList.length === 0) {
                                   return (
                                     <div className="d-flex align-items-center justify-content-center h-100 text-muted">
@@ -2503,16 +2499,19 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                     </div>
                                   );
                                 }
-                                const lats = deviceList.map(d => d.location.lat);
-                                const lngs = deviceList.map(d => d.location.lng);
-                                const mapCenter: [number, number] = [
-                                  (Math.min(...lats) + Math.max(...lats)) / 2,
-                                  (Math.min(...lngs) + Math.max(...lngs)) / 2
+                                const lats = deviceList.map(d => Number(d.location.lat));
+                                const lngs = deviceList.map(d => Number(d.location.lng));
+                                const minLat = Math.min(...lats);
+                                const maxLat = Math.max(...lats);
+                                const minLng = Math.min(...lngs);
+                                const maxLng = Math.max(...lngs);
+                                const center: [number, number] = [
+                                  (minLat + maxLat) / 2,
+                                  (minLng + maxLng) / 2
                                 ];
                                 return (
-                              <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
+                              <MapContainer center={center} zoom={10} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                <DevicesMapCenterUpdater center={mapCenter} />
                                 {devices.map(d => {
                                   const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
                                   const hasAlert = deviceAlerts.length > 0;
