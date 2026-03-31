@@ -53,6 +53,16 @@ function MapCenterUpdater(props: { lat: string; lng: string }) {
   return null;
 }
 
+function DevicesMapCenterUpdater(props: { center: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (props.center) {
+      map.setView(props.center, 10);
+    }
+  }, [props.center, map]);
+  return null;
+}
+
 function getStatusColor(status: string) {
   if (status === 'online') return '#28a745';
   if (status === 'warning') return '#ffc107';
@@ -784,6 +794,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [savingArca, setSavingArca] = useState(false);
   const [clientData, setClientData] = useState<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string} | null>(null);
   const [savingClientData, setSavingClientData] = useState(false);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-34.62, -58.43]);
 
   const stats = useMemo(() => {
     const online = devices.filter(d => d.status === 'online').length;
@@ -805,6 +816,16 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       setAlerts(a);
       setOrders(o);
       setInvoices(i);
+
+      const validDevices = d.filter(dev => dev.location?.lat && dev.location?.lng);
+      if (validDevices.length > 0) {
+        const lats = validDevices.map(dev => dev.location.lat);
+        const lngs = validDevices.map(dev => dev.location.lng);
+        setMapCenter([
+          (Math.min(...lats) + Math.max(...lats)) / 2,
+          (Math.min(...lngs) + Math.max(...lngs)) / 2
+        ]);
+      }
 
       const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
       setArcaConfig(arca);
@@ -976,7 +997,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                     <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-map-marked-alt me-2"></i>Mapa de Dispositivos</h3>
                   </div>
                   <div className="card-body p-0">
-                    <MapContainer center={[-34.62, -58.43]} zoom={10} style={{ height: '380px', width: '100%' }}>
+                    <MapContainer center={mapCenter} zoom={10} style={{ height: '380px', width: '100%' }}>
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {devices.map(d => (
                         <CircleMarker
@@ -2484,17 +2505,14 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 }
                                 const lats = deviceList.map(d => d.location.lat);
                                 const lngs = deviceList.map(d => d.location.lng);
-                                const defaultCenter: [number, number] = [
+                                const mapCenter: [number, number] = [
                                   (Math.min(...lats) + Math.max(...lats)) / 2,
                                   (Math.min(...lngs) + Math.max(...lngs)) / 2
                                 ];
-                                const mapCenter = devicesMapCenter || defaultCenter;
-                                if (!devicesMapCenter && lats.length > 0) {
-                                  setDevicesMapCenter(mapCenter);
-                                }
                                 return (
                               <MapContainer center={mapCenter} zoom={10} style={{ height: '100%', width: '100%' }}>
                                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                <DevicesMapCenterUpdater center={mapCenter} />
                                 {devices.map(d => {
                                   const deviceAlerts = alerts.filter(a => a.deviceId === d.deviceId && a.status === 'open');
                                   const hasAlert = deviceAlerts.length > 0;
