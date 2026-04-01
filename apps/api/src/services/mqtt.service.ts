@@ -33,8 +33,10 @@ export async function initMqtt() {
   mqttClient = mqtt.connect(config.url, {
     username: config.username,
     password: config.password,
-    reconnectPeriod: 5000,
-    connectTimeout: 10000
+    reconnectPeriod: 3000,
+    connectTimeout: 30000,
+    keepalive: 60,
+    clean: false
   });
 
   mqttClient.on('connect', () => {

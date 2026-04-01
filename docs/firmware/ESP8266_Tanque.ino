@@ -286,26 +286,26 @@ void reconnectMQTT() {
   }
   
   unsigned long ahora = millis();
-  if (ahora - lastMqttAttempt < 5000) return;
+  if (ahora - lastMqttAttempt < 3000) return;
   lastMqttAttempt = ahora;
   
   Serial.print("Intentando MQTT: ");
   Serial.println(mqtt_server);
   
-  if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
-    digitalWrite(LED_ESTADO, LOW); // LED ON (active low in many ESP8266)
+  if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass, 0, 0, 0, 1)) {
+    digitalWrite(LED_ESTADO, LOW);
     Serial.println("MQTT conectado!");
     mqtt_conectado = true;
     
-    client.subscribe((base_topic + "/config").c_str());
-    client.subscribe((base_topic + "/command").c_str());
+    client.subscribe((base_topic + "/config").c_str(), 1);
+    client.subscribe((base_topic + "/command").c_str(), 1);
 
     StaticJsonDocument<200> doc;
     doc["device_id"] = device_id;
     doc["type"] = "nivel_tanque";
     char buffer[200];
     serializeJson(doc, buffer);
-    client.publish((base_topic + "/register").c_str(), buffer);
+    client.publish((base_topic + "/register").c_str(), buffer, false, 1);
     Serial.println("Registro enviado a " + base_topic + "/register");
   } else {
     Serial.print("MQTT fallo, rc=");
@@ -352,7 +352,8 @@ void setup() {
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
-  client.setKeepAlive(30);
+  client.setKeepAlive(90);
+  client.setSocketTimeout(15);
 }
 
 // ---------------- LOOP ----------------
@@ -360,17 +361,22 @@ void loop() {
   if (!client.connected()) {
     reconnectMQTT();
   }
+  
+  int mqttState = client.state();
+  if (mqttState != 0 && mqttState != -2) {
+    mqtt_conectado = false;
+  }
+  
   client.loop();
 
   int nivel = leerNivelTanque();
   int reserva = leerNivelReserva();
 
-  // Si hay error de hardware, no intentamos controlar la bomba con datos basura
   if (nivel != -1) {
     controlarBomba(nivel, reserva);
   }
 
-  if (millis() - lastSend > 15000 && client.connected()) {
+  if (millis() - lastSend > 15000 && client.connected() && mqtt_conectado) {
     lastSend = millis();
 
     StaticJsonDocument<512> doc;
@@ -385,7 +391,7 @@ void loop() {
 
     char buffer[512];
     serializeJson(doc, buffer);
-    client.publish((base_topic + "/telemetry").c_str(), buffer);
+    client.publish((base_topic + "/telemetry").c_str(), buffer, false, 1);
     
     if (nivel == -1) {
       Serial.println("Estado: ERROR DE SENSOR | Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
@@ -394,7 +400,7 @@ void loop() {
     }
   }
 
-  if (millis() - lastHeartbeat > 30000 && client.connected()) {
+  if (millis() - lastHeartbeat > 30000 && client.connected() && mqtt_conectado) {
     lastHeartbeat = millis();
     client.publish((base_topic + "/heartbeat").c_str(), "1");
   }
