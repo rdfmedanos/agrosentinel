@@ -830,10 +830,18 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
       } else {
         setMapCenter([-34.62, -58.43]);
       }
+    } catch (err) {
+      console.error('Error loading devices/alerts/orders/invoices:', err);
+    }
 
+    try {
       const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
       setArcaConfig(arca);
+    } catch (err) {
+      console.error('Error loading arca config:', err);
+    }
 
+    try {
       const tenant = await getJson<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string}>('/tenants/me', token);
       setClientData(tenant);
     } catch (err) {
