@@ -1173,50 +1173,53 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                     <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-user-circle me-2"></i>Mis Datos</h3>
                   </div>
                   <div className="card-body">
-                    {clientData && (
-                      <div className="row">
-                        <div className="col-md-6">
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Razon Social / Nombre</label>
-                            <input className="form-control" value={clientData.companyName} onChange={e => setClientData(d => d ? { ...d, companyName: e.target.value } : null)} />
+                    {(() => {
+                      const data = clientData || { companyName: props.session.user.name || '', contactName: props.session.user.name || '', email: props.session.user.email || '', phone: '', address: '', taxId: '', ivaCondition: 'Consumidor Final' };
+                      return (
+                        <div className="row">
+                          <div className="col-md-6">
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Razon Social / Nombre</label>
+                              <input className="form-control" value={data.companyName} onChange={e => setClientData(d => d ? { ...d, companyName: e.target.value } : null)} />
+                            </div>
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Nombre de Contacto</label>
+                              <input className="form-control" value={data.contactName} onChange={e => setClientData(d => d ? { ...d, contactName: e.target.value } : null)} />
+                            </div>
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Email</label>
+                              <input className="form-control" type="email" value={data.email} onChange={e => setClientData(d => d ? { ...d, email: e.target.value } : null)} />
+                            </div>
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Telefono</label>
+                              <input className="form-control" value={data.phone} onChange={e => setClientData(d => d ? { ...d, phone: e.target.value } : null)} />
+                            </div>
                           </div>
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Nombre de Contacto</label>
-                            <input className="form-control" value={clientData.contactName} onChange={e => setClientData(d => d ? { ...d, contactName: e.target.value } : null)} />
-                          </div>
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Email</label>
-                            <input className="form-control" type="email" value={clientData.email} onChange={e => setClientData(d => d ? { ...d, email: e.target.value } : null)} />
-                          </div>
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Telefono</label>
-                            <input className="form-control" value={clientData.phone} onChange={e => setClientData(d => d ? { ...d, phone: e.target.value } : null)} />
+                          <div className="col-md-6">
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Direccion</label>
+                              <input className="form-control" value={data.address} onChange={e => setClientData(d => d ? { ...d, address: e.target.value } : null)} />
+                            </div>
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">CUIT / CUIL</label>
+                              <input className="form-control" value={data.taxId} onChange={e => setClientData(d => d ? { ...d, taxId: e.target.value } : null)} />
+                            </div>
+                            <div className="mb-3">
+                              <label className="form-label fw-bold">Condicion ante IVA</label>
+                              <select className="form-control" value={data.ivaCondition} onChange={e => setClientData(d => d ? { ...d, ivaCondition: e.target.value } : null)}>
+                                <option value="Consumidor Final">Consumidor Final</option>
+                                <option value="Responsable Inscripto">Responsable Inscripto</option>
+                                <option value="Monotributista">Monotributista</option>
+                                <option value="Exento">Exento</option>
+                              </select>
+                            </div>
+                            <button className="btn btn-primary mt-3" onClick={() => void saveClientData()} disabled={savingClientData}>
+                              {savingClientData ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
                           </div>
                         </div>
-                        <div className="col-md-6">
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Direccion</label>
-                            <input className="form-control" value={clientData.address} onChange={e => setClientData(d => d ? { ...d, address: e.target.value } : null)} />
-                          </div>
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">CUIT / CUIL</label>
-                            <input className="form-control" value={clientData.taxId} onChange={e => setClientData(d => d ? { ...d, taxId: e.target.value } : null)} />
-                          </div>
-                          <div className="mb-3">
-                            <label className="form-label fw-bold">Condicion ante IVA</label>
-                            <select className="form-control" value={clientData.ivaCondition} onChange={e => setClientData(d => d ? { ...d, ivaCondition: e.target.value } : null)}>
-                              <option value="Consumidor Final">Consumidor Final</option>
-                              <option value="Responsable Inscripto">Responsable Inscripto</option>
-                              <option value="Monotributista">Monotributista</option>
-                              <option value="Exento">Exento</option>
-                            </select>
-                          </div>
-                          <button className="btn btn-primary mt-3" onClick={() => void saveClientData()} disabled={savingClientData}>
-                            {savingClientData ? 'Guardando...' : 'Guardar Cambios'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
