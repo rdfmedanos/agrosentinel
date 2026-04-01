@@ -140,56 +140,80 @@ authRouter.post('/login', async (req, res) => {
 });
 
 authRouter.get('/me', requireAuth, async (req, res) => {
-  const user = await UserModel.findById(req.auth?.sub);
-  if (!user) {
-    res.status(401).json({ error: 'Sesion invalida' });
-    return;
-  }
+  try {
+    const user = await UserModel.findById(req.auth?.sub);
+    if (!user) {
+      res.status(401).json({ error: 'Sesion invalida' });
+      return;
+    }
 
-  res.json({
-    id: String(user._id),
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    tenantId: user.tenantId,
-    mustChangePassword: Boolean(user.mustChangePassword)
-  });
+    res.json({
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      mustChangePassword: Boolean(user.mustChangePassword)
+    });
+  } catch (err: any) {
+    if (err?.name === 'CastError') {
+      res.status(401).json({ error: 'Sesion invalida' });
+      return;
+    }
+    throw err;
+  }
 });
 
 authRouter.post('/change-password', requireAuth, async (req, res) => {
   const data = changePasswordSchema.parse(req.body);
-  const user = await UserModel.findById(req.auth?.sub);
-  if (!user) {
-    res.status(404).json({ error: 'Usuario no encontrado' });
-    return;
+  try {
+    const user = await UserModel.findById(req.auth?.sub);
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    const currentMatches = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    if (!currentMatches) {
+      res.status(401).json({ error: 'Contrasena actual invalida' });
+      return;
+    }
+
+    user.passwordHash = await bcrypt.hash(data.newPassword, 10);
+    user.mustChangePassword = false;
+    await user.save();
+
+    res.json({ status: 'ok' });
+  } catch (err: any) {
+    if (err?.name === 'CastError') {
+      res.status(401).json({ error: 'Sesion invalida' });
+      return;
+    }
+    throw err;
   }
-
-  const currentMatches = await bcrypt.compare(data.currentPassword, user.passwordHash);
-  if (!currentMatches) {
-    res.status(401).json({ error: 'Contrasena actual invalida' });
-    return;
-  }
-
-  user.passwordHash = await bcrypt.hash(data.newPassword, 10);
-  user.mustChangePassword = false;
-  await user.save();
-
-  res.json({ status: 'ok' });
 });
 
 authRouter.post('/change-password-first', requireAuth, async (req, res) => {
   const data = z.object({ newPassword: z.string().min(8) }).parse(req.body);
-  const user = await UserModel.findById(req.auth?.sub);
-  if (!user) {
-    res.status(404).json({ error: 'Usuario no encontrado' });
-    return;
+  try {
+    const user = await UserModel.findById(req.auth?.sub);
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    user.passwordHash = await bcrypt.hash(data.newPassword, 10);
+    user.mustChangePassword = false;
+    await user.save();
+
+    res.json({ status: 'ok' });
+  } catch (err: any) {
+    if (err?.name === 'CastError') {
+      res.status(401).json({ error: 'Sesion invalida' });
+      return;
+    }
+    throw err;
   }
-
-  user.passwordHash = await bcrypt.hash(data.newPassword, 10);
-  user.mustChangePassword = false;
-  await user.save();
-
-  res.json({ status: 'ok' });
 });
 
 authRouter.post('/admin/create-user', requireAuth, requireCompanyAdmin, async (req, res) => {
