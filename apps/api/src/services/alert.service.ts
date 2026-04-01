@@ -108,7 +108,7 @@ export async function evaluateDeviceCriticalLevel(deviceId: string) {
 }
 
 export async function checkOfflineDevices() {
-  const offlineSeconds = Number(getConfig('DEVICE_OFFLINE_SECONDS', '120'));
+  const offlineSeconds = Number(getConfig('DEVICE_OFFLINE_SECONDS', '60'));
   const threshold = new Date(Date.now() - offlineSeconds * 1000);
   
   const offlineDevices = await DeviceModel.find({
