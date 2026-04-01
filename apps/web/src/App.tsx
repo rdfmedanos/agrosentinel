@@ -2348,16 +2348,16 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                     <div className="card">
                       <div className="card-header d-flex justify-content-between align-items-center">
                         <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-microchip me-2"></i>Estado de Dispositivos</h3>
-                        <button className="btn btn-sm btn-light" onClick={() => setSection('dispositivos')}>Ver Todos</button>
+                        <button className="btn btn-sm btn-light" onClick={() => setSection('dispositivos')}>Ver Todos ({allDevices.length})</button>
                       </div>
                       <div className="card-body p-0">
                         <table className="table table-hover m-0">
-                          <thead><tr><th>Nombre</th><th>Device ID</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
+                          <thead><tr><th>Nombre</th><th>Cliente</th><th>Nivel</th><th>Bomba</th><th>Estado</th></tr></thead>
                           <tbody>
-                            {devices.map(d => (
+                            {(allDevices.length > 0 ? allDevices.slice(0, 10) : []).map(d => (
                               <tr key={d._id} style={{ cursor: 'pointer' }} onClick={() => { setSection('dispositivos'); openDeviceModal(d); }}>
-                                <td className="fw-bold">{d.name}</td>
-                                <td className="small text-muted">{d.deviceId}</td>
+                                <td className="fw-bold">{d.name || d.deviceId}</td>
+                                <td className="small text-muted">{(d as any).clientName || '—'}</td>
                                 <td><span className={`badge ${d.levelPct < 20 ? 'text-bg-danger' : d.levelPct < 50 ? 'text-bg-warning' : 'text-bg-success'}`}>{d.levelPct}%</span></td>
                                 <td>
                                   <span className={`badge ${d.pumpOn ? 'text-bg-success' : 'text-bg-danger'}`}>
@@ -2368,6 +2368,9 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                                 <td><span className={`badge ${getStatusBadge(d.status)}`}><i className={`fas fa-circle mr-1`} style={{ fontSize: '0.6em', color: getStatusColor(d.status) }}></i>{d.status}</span></td>
                               </tr>
                             ))}
+                            {allDevices.length === 0 && (
+                              <tr><td colSpan={5} className="text-center text-muted p-3">No hay dispositivos registrados</td></tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
