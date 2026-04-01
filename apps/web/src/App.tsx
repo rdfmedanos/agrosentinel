@@ -784,7 +784,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [savingArca, setSavingArca] = useState(false);
   const [clientData, setClientData] = useState<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string} | null>(null);
   const [savingClientData, setSavingClientData] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-34.62, -58.43]);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
 
   const stats = useMemo(() => {
     const online = devices.filter(d => d.status === 'online').length;
@@ -815,12 +815,16 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
         const maxLat = Math.max(...lats);
         const minLng = Math.min(...lngs);
         const maxLng = Math.max(...lngs);
-        if (minLat !== maxLat || minLng !== maxLng) {
+        if (validDevices.length === 1) {
+          setMapCenter([lats[0], lngs[0]]);
+        } else {
           setMapCenter([
             (minLat + maxLat) / 2,
             (minLng + maxLng) / 2
           ]);
         }
+      } else {
+        setMapCenter([-34.62, -58.43]);
       }
 
       const arca = await getJson<ArcaConfig>(`/billing/arca-config?tenantId=${tenantId}`, token);
@@ -993,9 +997,11 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                     <h3 className="card-title text-white fw-bold mb-0"><i className="fas fa-map-marked-alt me-2"></i>Mapa de Dispositivos</h3>
                   </div>
                   <div className="card-body p-0">
+                    {mapCenter ? (
                     <MapContainer center={mapCenter} zoom={10} style={{ height: '380px', width: '100%' }}>
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      {devices.map(d => (
+                      <MapCenterUpdater lat={mapCenter[0].toString()} lng={mapCenter[1].toString()} />
+                      {devices.filter(d => d.location && typeof d.location.lat === 'number' && typeof d.location.lng === 'number').map(d => (
                         <CircleMarker
                           key={d._id}
                           center={[d.location.lat, d.location.lng]}
@@ -1012,6 +1018,14 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
                         </CircleMarker>
                       ))}
                     </MapContainer>
+                    ) : (
+                      <div className="d-flex align-items-center justify-content-center" style={{ height: '380px', backgroundColor: '#f8f9fa' }}>
+                        <div className="text-center text-muted">
+                          <i className="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                          <p>Cargando mapa...</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
