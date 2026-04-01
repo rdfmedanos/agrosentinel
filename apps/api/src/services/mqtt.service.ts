@@ -24,37 +24,38 @@ async function getMqttConfig() {
 }
 
 export async function initMqtt() {
-  const config = await getMqttConfig();
-  
-  if (mqttClient) {
-    mqttClient.end();
-  }
+  try {
+    const config = await getMqttConfig();
+    
+    if (mqttClient) {
+      mqttClient.end();
+    }
 
-  mqttClient = mqtt.connect(config.url, {
-    username: config.username,
-    password: config.password,
-    reconnectPeriod: 3000,
-    connectTimeout: 30000,
-    keepalive: 60,
-    clean: false
-  });
+    mqttClient = mqtt.connect(config.url, {
+      username: config.username,
+      password: config.password,
+      reconnectPeriod: 3000,
+      connectTimeout: 30000,
+      keepalive: 60,
+      clean: false
+    });
 
-  mqttClient.on('connect', () => {
-    logger.info({ url: config.url }, 'MQTT connected');
-    mqttClient.subscribe('devices/+/#', { qos: 1 });
-  });
+    mqttClient.on('connect', () => {
+      logger.info({ url: config.url }, 'MQTT connected');
+      mqttClient.subscribe('devices/+/#', { qos: 1 });
+    });
 
-  mqttClient.on('reconnect', () => {
-    logger.warn('MQTT reconnecting...');
-  });
+    mqttClient.on('reconnect', () => {
+      logger.warn('MQTT reconnecting...');
+    });
 
-  mqttClient.on('offline', () => {
-    logger.warn('MQTT connection offline');
-  });
+    mqttClient.on('offline', () => {
+      logger.warn('MQTT connection offline');
+    });
 
-  mqttClient.on('error', (err) => {
-    logger.error({ error: err }, 'MQTT connection error');
-  });
+    mqttClient.on('error', (err) => {
+      logger.error({ error: err?.message || String(err) }, 'MQTT connection error');
+    });
 
   mqttClient.on('message', async (topic, payloadBuffer) => {
     try {
@@ -87,6 +88,10 @@ export async function initMqtt() {
       logger.error({ error }, 'MQTT message process error');
     }
   });
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logger.error({ error: errorMsg }, 'Failed to initialize MQTT, will retry...');
+  }
 }
 
 export async function reloadMqtt() {
