@@ -788,7 +788,7 @@ function ClientPanel(props: { session: AuthSession; onLogout: () => void }) {
   const [savingArca, setSavingArca] = useState(false);
   const [clientData, setClientData] = useState<{companyName: string; contactName: string; email: string; phone: string; address: string; taxId: string; ivaCondition: string} | null>(null);
   const [savingClientData, setSavingClientData] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-34.62, -58.43]);
 
   const stats = useMemo(() => {
     const online = devices.filter(d => d.status === 'online').length;
