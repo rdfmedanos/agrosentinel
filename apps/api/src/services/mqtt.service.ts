@@ -31,14 +31,15 @@ export async function initMqtt() {
       mqttClient.end();
     }
 
-    mqttClient = mqtt.connect(config.url, {
-      username: config.username,
-      password: config.password,
-      reconnectPeriod: 3000,
-      connectTimeout: 30000,
-      keepalive: 60,
-      clean: false
-    });
+  mqttClient = mqtt.connect(config.url, {
+    clientId: `agrosentinel-api-${Math.random().toString(36).substring(2, 15)}`,
+    username: config.username,
+    password: config.password,
+    reconnectPeriod: 3000,
+    connectTimeout: 30000,
+    keepalive: 60,
+    clean: true
+  });
 
     mqttClient.on('connect', () => {
       logger.info({ url: config.url }, 'MQTT connected');
