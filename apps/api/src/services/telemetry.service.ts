@@ -35,7 +35,7 @@ export async function upsertHeartbeat(deviceId: string) {
 
   const updated = await DeviceModel.findOneAndUpdate(
     { deviceId },
-    { lastHeartbeatAt: new Date(), status: 'online' },
+    { lastHeartbeatAt: new Date(), lastSeenAt: new Date(), status: 'online' },
     { new: true }
   );
 
@@ -43,7 +43,7 @@ export async function upsertHeartbeat(deviceId: string) {
     if (wasOffline) {
       await resolveAlert(device.tenantId, device.deviceId, 'offline');
     }
-    emitTenant(device.tenantId, 'devices:updated', updated);
+    emitTenant(device.tenantId, 'devices:updated', updated.toObject());
   }
   return updated;
 }
@@ -92,7 +92,7 @@ export async function ingestTelemetry(deviceId: string, payload: unknown) {
       pumpOn,
       status: device.status 
     });
-    emitTenant(device.tenantId, 'devices:updated', device);
+    emitTenant(device.tenantId, 'devices:updated', device.toObject());
     
     if (wasOffline) {
       await resolveAlert(device.tenantId, deviceId, 'offline');

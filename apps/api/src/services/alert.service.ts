@@ -109,16 +109,21 @@ export async function evaluateDeviceCriticalLevel(deviceId: string) {
 
 export async function checkOfflineDevices() {
   const offlineSeconds = Number(getConfig('DEVICE_OFFLINE_SECONDS', '120'));
-  console.log('Checking offline devices, threshold:', offlineSeconds, 'seconds');
   const threshold = new Date(Date.now() - offlineSeconds * 1000);
+  
   const offlineDevices = await DeviceModel.find({
-    $or: [{ lastHeartbeatAt: { $lt: threshold } }, { lastHeartbeatAt: { $exists: false } }, { lastSeenAt: { $lt: threshold } }, { lastSeenAt: { $exists: false } }],
-    status: { $ne: 'offline' }
+    $or: [
+      { lastHeartbeatAt: { $lt: threshold } }, 
+      { lastSeenAt: { $lt: threshold } }
+    ],
+    status: { $ne: 'offline' },
+    pending: false
   });
 
   for (const d of offlineDevices) {
     d.status = 'offline';
     await d.save();
+    logger.info({ deviceId: d.deviceId, lastHeartbeatAt: d.lastHeartbeatAt }, 'Device marked offline');
 
     if (d.tenantId) {
       await openAlert({
@@ -127,7 +132,7 @@ export async function checkOfflineDevices() {
         type: 'offline',
         message: `Dispositivo ${d.name} sin comunicación` 
       });
-      emitTenant(d.tenantId, 'devices:updated', d);
+      emitTenant(d.tenantId, 'devices:updated', d.toObject());
     }
   }
 }
