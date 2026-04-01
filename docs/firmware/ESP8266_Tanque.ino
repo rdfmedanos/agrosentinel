@@ -292,20 +292,20 @@ void reconnectMQTT() {
   Serial.print("Intentando MQTT: ");
   Serial.println(mqtt_server);
   
-  if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass, 0, 0, 0, 1)) {
+  if (client.connect(device_id.c_str(), mqtt_user, mqtt_pass)) {
     digitalWrite(LED_ESTADO, LOW);
     Serial.println("MQTT conectado!");
     mqtt_conectado = true;
     
-    client.subscribe((base_topic + "/config").c_str(), 1);
-    client.subscribe((base_topic + "/command").c_str(), 1);
+    client.subscribe((base_topic + "/config").c_str());
+    client.subscribe((base_topic + "/command").c_str());
 
     StaticJsonDocument<200> doc;
     doc["device_id"] = device_id;
     doc["type"] = "nivel_tanque";
     char buffer[200];
     serializeJson(doc, buffer);
-    client.publish((base_topic + "/register").c_str(), buffer, false, 1);
+    client.publish((base_topic + "/register").c_str(), (uint8_t*)buffer, strlen(buffer));
     Serial.println("Registro enviado a " + base_topic + "/register");
   } else {
     Serial.print("MQTT fallo, rc=");
@@ -391,7 +391,7 @@ void loop() {
 
     char buffer[512];
     serializeJson(doc, buffer);
-    client.publish((base_topic + "/telemetry").c_str(), buffer, false, 1);
+    client.publish((base_topic + "/telemetry").c_str(), (uint8_t*)buffer, strlen(buffer));
     
     if (nivel == -1) {
       Serial.println("Estado: ERROR DE SENSOR | Bomba: " + String(ultimo_estado_bomba ? "ON" : "OFF"));
@@ -402,7 +402,7 @@ void loop() {
 
   if (millis() - lastHeartbeat > 30000 && client.connected() && mqtt_conectado) {
     lastHeartbeat = millis();
-    client.publish((base_topic + "/heartbeat").c_str(), "1");
+    client.publish((base_topic + "/heartbeat").c_str(), (uint8_t*)"1", 1);
   }
 
   if (millis() - bootTime > 86400000) {
