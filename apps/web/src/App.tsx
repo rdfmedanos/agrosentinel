@@ -4687,37 +4687,9 @@ export function App() {
 
   useEffect(() => {
     const current = loadStoredSession();
-    if (!current?.token) return;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    fetch(`${API_URL}/auth/me`, { 
-      headers: authHeaders(current.token),
-      signal: controller.signal 
-    })
-      .then(res => {
-        clearTimeout(timeoutId);
-        if (res.ok) return res.json();
-        if (res.status === 401) {
-          setSession(null);
-          saveSession(null);
-        }
-        return null;
-      })
-      .then(fresh => {
-        if (fresh) {
-          setSession({ token: current.token, user: fresh });
-          saveSession({ token: current.token, user: fresh });
-        }
-      })
-      .catch(() => {
-        clearTimeout(timeoutId);
-      });
-    
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
+    if (current?.token) {
+      setSession(current);
+    }
   }, []);
 
   if (isCompanyPanel || appMode === 'company') {
