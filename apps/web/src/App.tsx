@@ -286,7 +286,11 @@ async function buildApiError(res: Response): Promise<Error> {
 
 async function getJson<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { headers: authHeaders(token) });
-  if (!res.ok) throw await buildApiError(res);
+  if (!res.ok) {
+    const err = await buildApiError(res);
+    (err as Error & { status: number }).status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -4678,9 +4682,11 @@ export function App() {
         setSession({ token: current.token, user: fresh });
         saveSession({ token: current.token, user: fresh });
       }
-    }).catch(() => {
-      setSession(null);
-      saveSession(null);
+    }).catch((err: Error & { status?: number }) => {
+      if (err.status === 401) {
+        setSession(null);
+        saveSession(null);
+      }
     });
   }, []);
 
