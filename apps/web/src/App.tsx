@@ -1616,25 +1616,38 @@ function CompanyAdminPanel(props: { session: AuthSession; onLogout: () => void; 
   const certificateTenantId = props.session.user.tenantId;
   const certificateQuery = `?tenantId=${encodeURIComponent(certificateTenantId)}`;
 
-  useEffect(() => {
-    if (activeSection !== 'facturacion' || (facturacionTab !== 'certificado' && facturacionTab !== 'arca')) return;
-    void runArcaDiagnostics();
-  }, [activeSection, facturacionTab, certificateTenantId]);
+  const runArcaDiagnostics = useCallback(async () => {
+    setTestingArca(true);
+    try {
+      const data = await getJson<ArcaDiagnostics>(`/billing/arca/diagnostics?tenantId=${certificateTenantId}`, props.session.token);
+      setArcaDiagnostics(data);
+    } catch (err) {
+      console.error('Error testing ARCA connection:', err);
+      alert('No se pudo obtener el diagnostico ARCA');
+    } finally {
+      setTestingArca(false);
+    }
+  }, [certificateTenantId, props.session.token]);
 
-  const loadCertStatus = async () => {
+  const loadCertStatus = useCallback(async () => {
     try {
       const status = await getJson<typeof certStatus>(`/billing/certificate/status${certificateQuery}`, props.session.token);
       setCertStatus(status);
     } catch (err) {
       console.error('Error loading cert status:', err);
     }
-  };
+  }, [certificateQuery, props.session.token]);
+
+  useEffect(() => {
+    if (activeSection !== 'facturacion' || (facturacionTab !== 'certificado' && facturacionTab !== 'arca')) return;
+    void runArcaDiagnostics();
+  }, [activeSection, facturacionTab, runArcaDiagnostics]);
 
   useEffect(() => {
     if (activeSection === 'facturacion' && facturacionTab === 'certificado') {
       void loadCertStatus();
     }
-  }, [activeSection, facturacionTab, props.session.token, certificateTenantId]);
+  }, [activeSection, facturacionTab, loadCertStatus]);
 
   const createInvoice = async (autoAuthorize = true) => {
     setCreatingInvoice(true);
@@ -1877,19 +1890,6 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
       await loadCompanyData(certificateTenantId);
     } finally {
       setSavingArca(false);
-    }
-  };
-
-  const runArcaDiagnostics = async () => {
-    setTestingArca(true);
-    try {
-      const data = await getJson<ArcaDiagnostics>(`/billing/arca/diagnostics?tenantId=${certificateTenantId}`, props.session.token);
-      setArcaDiagnostics(data);
-    } catch (err) {
-      console.error('Error testing ARCA connection:', err);
-      alert('No se pudo obtener el diagnostico ARCA');
-    } finally {
-      setTestingArca(false);
     }
   };
 
@@ -2797,7 +2797,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="card mb-3 border-info">
                                 <div className="card-header d-flex justify-content-between align-items-center">
                                   <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
-                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !certificateTenantId}>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !props.session.user.tenantId}>
                                     {testingArca ? 'Probando...' : 'Probar conexion'}
                                   </button>
                                 </div>
@@ -2949,7 +2949,7 @@ setOperacionOpen(['clientes', 'dispositivos', 'notificaciones', 'pending-devices
                               <div className="card mb-3 border-info">
                                 <div className="card-header d-flex justify-content-between align-items-center">
                                   <h4 className="card-title small fw-bold mb-0"><i className="fas fa-stethoscope mr-1"></i>Diagnostico de conexion ARCA</h4>
-                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !certificateTenantId}>
+                                  <button className="btn btn-info btn-sm" onClick={() => void runArcaDiagnostics()} disabled={testingArca || !props.session.user.tenantId}>
                                     {testingArca ? 'Probando...' : 'Probar conexion'}
                                   </button>
                                 </div>
