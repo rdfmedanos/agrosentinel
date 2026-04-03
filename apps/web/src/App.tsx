@@ -284,13 +284,21 @@ async function buildApiError(res: Response): Promise<Error> {
   return new Error(`API ${res.status}${suffix}`);
 }
 
+let globalLogoutCallback: (() => void) | null = null;
+export function setGlobalLogoutCallback(cb: () => void) { globalLogoutCallback = cb; }
+
+async function handleApiError(res: Response): Promise<Error> {
+  const err = await buildApiError(res);
+  (err as Error & { status: number }).status = res.status;
+  if (res.status === 401 && globalLogoutCallback) {
+    globalLogoutCallback();
+  }
+  throw err;
+}
+
 async function getJson<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { headers: authHeaders(token) });
-  if (!res.ok) {
-    const err = await buildApiError(res);
-    (err as Error & { status: number }).status = res.status;
-    throw err;
-  }
+  if (!res.ok) await handleApiError(res);
   return res.json();
 }
 
@@ -300,7 +308,7 @@ async function putJson<T>(path: string, body: unknown, token?: string): Promise<
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw await buildApiError(res);
+  if (!res.ok) await handleApiError(res);
   return res.json();
 }
 
@@ -310,7 +318,7 @@ async function postJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw await buildApiError(res);
+  if (!res.ok) await handleApiError(res);
   return res;
 }
 
@@ -320,7 +328,7 @@ async function patchJson(path: string, body: unknown, token?: string) {
     headers: authHeaders(token, true),
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw await buildApiError(res);
+  if (!res.ok) await handleApiError(res);
   return res;
 }
 
@@ -329,7 +337,7 @@ async function deleteJson(path: string, token?: string) {
     method: 'DELETE',
     headers: authHeaders(token)
   });
-  if (!res.ok) throw await buildApiError(res);
+  if (!res.ok) await handleApiError(res);
   return res;
 }
 
@@ -4693,6 +4701,7 @@ export function App() {
     if (current?.token) {
       setSession(current);
     }
+    setGlobalLogoutCallback(logout);
   }, []);
 
   if (isCompanyPanel || appMode === 'company') {
